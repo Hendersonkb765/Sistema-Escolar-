@@ -1,25 +1,9 @@
 <div class="space-y-4">
     <x-cartao>
         <x-slot:acoes>
-            @can('update', $grade)
-                <x-botao variante="secundario" href="{{ route('grades.editar', $grade) }}" wire:navigate>Editar</x-botao>
-            @endcan
-
-            @can('publicar', $grade)
-                @if ($confirmandoPublicacao)
-                    <x-botao wire:click="publicar">Confirmar publicação</x-botao>
-                    <x-botao variante="discreto" wire:click="$set('confirmandoPublicacao', false)">Cancelar</x-botao>
-                @else
-                    <x-botao wire:click="$set('confirmandoPublicacao', true)">Publicar versão</x-botao>
-                @endif
-            @endcan
-
-            @can('novaVersao', $grade)
-                <x-botao variante="secundario" wire:click="criarNovaVersao"
-                         wire:confirm="Isto cria a próxima versão em rascunho, copiando as disciplinas. A versão atual e as turmas que a usam não são alteradas.">
-                    Criar nova versão
-                </x-botao>
-            @endcan
+            <x-botao variante="secundario" href="{{ route('cursos.show', $grade->curso) }}" wire:navigate>
+                Abrir curso
+            </x-botao>
         </x-slot:acoes>
 
         <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -52,31 +36,25 @@
             </p>
         @endif
 
-        @if ($grade->emUso())
-            <x-alerta tipo="atencao" class="mt-4" titulo="Versão congelada em {{ $grade->turmas->count() }} turma(s)">
-                Esta versão não pode mais ser editada. Para mudar a grade, crie uma nova versão —
-                as turmas listadas continuam exatamente como estão.
-            </x-alerta>
-        @endif
-
-        @if ($confirmandoPublicacao)
-            <x-alerta tipo="info" class="mt-4" titulo="Publicar a versão {{ $grade->versao }}?">
-                A versão vigente atual passa a "arquivada" e esta entra em vigência para
-                <strong>novas</strong> turmas. Turmas já abertas mantêm a versão que congelaram.
-            </x-alerta>
-        @endif
+        <x-alerta tipo="info" class="mt-4" titulo="Esta página é um registro, não um formulário">
+            A grade é a foto do curso no momento em que foi publicada. Para mudar o que as
+            próximas turmas vão cursar, edite as disciplinas no curso e publique uma nova versão.
+            @if ($grade->emUso())
+                <strong>{{ $grade->turmas->count() }} turma(s)</strong> congelaram esta versão e
+                continuam exatamente como estão.
+            @endif
+        </x-alerta>
     </x-cartao>
 
-    <x-cartao titulo="Disciplinas por ano" :descricao="$grade->disciplinas->count().' disciplina(s)'">
-        @if ($porAno->isEmpty())
-            <x-vazio titulo="Grade sem disciplinas"
-                     descricao="Uma grade vazia não pode entrar em vigência."/>
+    <x-cartao titulo="Disciplinas por período" :descricao="$porPeriodo->flatten()->count().' disciplina(s)'">
+        @if ($porPeriodo->isEmpty())
+            <x-vazio titulo="Grade sem disciplinas"/>
         @else
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                @foreach ($porAno as $ano => $itens)
+                @foreach ($porPeriodo as $periodo => $itens)
                     <div class="rounded-lg border border-slate-200 dark:border-slate-800">
                         <div class="border-b border-slate-200 px-3 py-2 dark:border-slate-800">
-                            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $ano }}º ano</h3>
+                            <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">{{ $periodo }}º período</h3>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
                                 {{ $itens->count() }} disciplina(s) · {{ $itens->sum('carga_horaria') }}h
                             </p>
@@ -97,14 +75,14 @@
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <x-cartao titulo="Turmas nesta versão">
-            @forelse ($grade->turmas->sortBy('identificacao') as $turma)
+            @forelse ($grade->turmas->sortBy('nome') as $turma)
                 <div class="flex items-center justify-between border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
                     <a href="{{ route('turmas.show', $turma) }}" wire:navigate
                        class="text-sm font-medium text-marca-600 hover:underline dark:text-marca-400">
-                        {{ $turma->identificacao }}
+                        {{ $turma->nome }}
                     </a>
                     <span class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ $turma->ano_curso }}º ano · {{ $turma->periodo_letivo }}
+                        {{ $turma->periodo }}º período · {{ $turma->periodo_letivo }}
                     </span>
                 </div>
             @empty

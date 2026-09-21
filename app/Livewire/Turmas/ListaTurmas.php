@@ -23,8 +23,8 @@ class ListaTurmas extends Component
     #[Url(as: 'situacao', except: '')]
     public string $filtroStatus = '';
 
-    #[Url(as: 'ano', except: '')]
-    public string $filtroAno = '';
+    #[Url(as: 'periodo', except: '')]
+    public string $filtroPeriodo = '';
 
     public function mount(): void
     {
@@ -33,12 +33,12 @@ class ListaTurmas extends Component
 
     protected function colunasOrdenaveis(): array
     {
-        return ['identificacao', 'ano_curso', 'periodo_letivo', 'status'];
+        return ['nome', 'periodo', 'periodo_letivo', 'status'];
     }
 
     protected function colunaPadrao(): string
     {
-        return 'identificacao';
+        return 'nome';
     }
 
     public function updatedFiltroCurso(): void
@@ -51,7 +51,7 @@ class ListaTurmas extends Component
         $this->resetPage();
     }
 
-    public function updatedFiltroAno(): void
+    public function updatedFiltroPeriodo(): void
     {
         $this->resetPage();
     }
@@ -67,12 +67,12 @@ class ListaTurmas extends Component
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
-                    ->where('identificacao', 'like', $termo)
+                    ->where('nome', 'like', $termo)
                     ->orWhere('periodo_letivo', 'like', $termo));
             })
             ->when($this->filtroCurso !== '', fn (Builder $q) => $q->where('curso_id', $this->filtroCurso))
             ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
-            ->when($this->filtroAno !== '', fn (Builder $q) => $q->where('ano_curso', $this->filtroAno));
+            ->when($this->filtroPeriodo !== '', fn (Builder $q) => $q->where('periodo', $this->filtroPeriodo));
 
         return view('turmas.lista', [
             'turmas' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
@@ -80,7 +80,7 @@ class ListaTurmas extends Component
             'situacoes' => StatusTurma::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Turmas',
-            'subtitulo' => 'Cada turma congela a versão de grade com que começou',
+            'subtitulo' => 'Cada turma cursa um período e congela a grade com que começou',
         ]);
     }
 }

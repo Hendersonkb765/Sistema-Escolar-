@@ -2,15 +2,14 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
 use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
-use App\Enums\StatusGrade;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
-use App\Models\GradeCurricular;
 use App\Models\Turma;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -30,91 +29,47 @@ class DemonstracaoSeeder extends Seeder
             return;
         }
 
-        $tecnologia = Eixo::query()->firstOrCreate(
-            ['codigo' => 'TEC'],
-            ['nome' => 'Tecnologia da Informação']
-        );
+        $tecnologia = Eixo::query()->firstOrCreate(['codigo' => 'TEC'], ['nome' => 'Tecnologia da Informação']);
+        $gestao = Eixo::query()->firstOrCreate(['codigo' => 'ADM'], ['nome' => 'Gestão e Negócios']);
 
-        $administracao = Eixo::query()->firstOrCreate(
-            ['codigo' => 'ADM'],
-            ['nome' => 'Gestão e Negócios']
-        );
+        $admin = $this->usuario('admin@paeet.local', 'Coordenação PAEET', PerfilUsuario::PaeetAdmin);
+        $admin->eixos()->syncWithoutDetaching([$tecnologia->id, $gestao->id]);
 
-        $admin = User::query()->firstOrCreate(
-            ['email' => 'admin@paeet.local'],
-            [
-                'nome' => 'Coordenação PAEET',
-                'password' => Hash::make('senha-forte-123'),
-                'perfil' => PerfilUsuario::PaeetAdmin,
-                'ativo' => true,
-            ]
-        );
-        $admin->eixos()->syncWithoutDetaching([$tecnologia->id, $administracao->id]);
-
-        $paeetTecnologia = User::query()->firstOrCreate(
-            ['email' => 'paeet.tec@paeet.local'],
-            [
-                'nome' => 'Paula Enes (PAEET Tecnologia)',
-                'password' => Hash::make('senha-forte-123'),
-                'perfil' => PerfilUsuario::Paeet,
-                'ativo' => true,
-                'criado_por' => $admin->id,
-            ]
-        );
+        $paeetTecnologia = $this->usuario('paeet.tec@paeet.local', 'Paula Enes (PAEET Tecnologia)', PerfilUsuario::Paeet, $admin);
         $paeetTecnologia->eixos()->syncWithoutDetaching([$tecnologia->id]);
 
-        $paeetAdministracao = User::query()->firstOrCreate(
-            ['email' => 'paeet.adm@paeet.local'],
-            [
-                'nome' => 'Adriano Mota (PAEET Gestão)',
-                'password' => Hash::make('senha-forte-123'),
-                'perfil' => PerfilUsuario::Paeet,
-                'ativo' => true,
-                'criado_por' => $admin->id,
-            ]
-        );
-        $paeetAdministracao->eixos()->syncWithoutDetaching([$administracao->id]);
+        $paeetGestao = $this->usuario('paeet.adm@paeet.local', 'Adriano Mota (PAEET Gestão)', PerfilUsuario::Paeet, $admin);
+        $paeetGestao->eixos()->syncWithoutDetaching([$gestao->id]);
 
+        // Curso de 2 anos: o exemplo do enunciado — Lógica e Redes no 1º
+        // período, Back-end e Front-end no 2º.
         $curso = Curso::query()->firstOrCreate(
             ['eixo_id' => $tecnologia->id, 'codigo' => 'DS'],
-            ['nome' => 'Desenvolvimento de Sistemas', 'duracao_anos' => 3]
+            ['nome' => 'Desenvolvimento de Sistemas', 'duracao_anos' => 2]
         );
 
         $disciplinas = collect([
-            'Lógica de Programação' => 'LOG',
-            'Processos de Desenvolvimento' => 'PDS',
-            'Banco de Dados' => 'BDD',
-        ])->map(fn (string $codigo, string $nome) => Disciplina::query()->firstOrCreate(
-            ['eixo_id' => $tecnologia->id, 'codigo' => $codigo],
-            ['nome' => $nome]
+            ['Lógica de Programação', 'LOG', 1, 80],
+            ['Redes de Computadores', 'RED', 1, 60],
+            ['Back-end', 'BKD', 2, 80],
+            ['Front-end', 'FRT', 2, 80],
+        ])->map(fn (array $dados) => Disciplina::query()->firstOrCreate(
+            ['curso_id' => $curso->id, 'codigo' => $dados[1]],
+            ['nome' => $dados[0], 'periodo' => $dados[2], 'carga_horaria' => $dados[3]]
         ));
 
-        $grade = GradeCurricular::query()->firstOrCreate(
-            ['curso_id' => $curso->id, 'versao' => 1],
-            [
-                'ano_vigencia' => (int) now()->format('Y'),
-                'status' => StatusGrade::Vigente,
-                'criado_por' => $admin->id,
-            ]
-        );
+        $grade = app(PublicarVersaoDeGradeAction::class)->garantirVigente($curso, $admin);
 
-        foreach ($disciplinas->values() as $indice => $disciplina) {
-            $grade->disciplinas()->firstOrCreate(
-                ['disciplina_id' => $disciplina->id, 'ano_curso' => $indice + 1],
-                ['carga_horaria' => 80]
-            );
-        }
-
-        foreach ([1 => '1DS', 2 => '2DS', 3 => '3DS'] as $ano => $identificacao) {
+        foreach ([1 => '1 A', 2 => '2 A'] as $periodo => $nome) {
             $turma = Turma::query()->firstOrCreate(
                 [
                     'curso_id' => $curso->id,
-                    'identificacao' => $identificacao,
+                    'nome' => $nome,
                     'periodo_letivo' => (string) now()->format('Y'),
                 ],
                 [
                     'grade_curricular_id' => $grade->id,
-                    'ano_curso' => $ano,
+                    'periodo' => $periodo,
                 ]
             );
 
@@ -123,7 +78,7 @@ class DemonstracaoSeeder extends Seeder
                     Aluno::query()->create([
                         'turma_id' => $turma->id,
                         'nome' => fake('pt_BR')->name(),
-                        'matricula' => now()->format('Y').$ano.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
+                        'matricula' => now()->format('Y').$periodo.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
                     ]);
                 }
             }
@@ -137,16 +92,7 @@ class DemonstracaoSeeder extends Seeder
             }
         }
 
-        $professor = User::query()->firstOrCreate(
-            ['email' => 'professor@paeet.local'],
-            [
-                'nome' => 'Prof. Renato Lima',
-                'password' => Hash::make('senha-forte-123'),
-                'perfil' => PerfilUsuario::Professor,
-                'ativo' => true,
-                'criado_por' => $paeetTecnologia->id,
-            ]
-        );
+        $professor = $this->usuario('professor@paeet.local', 'Prof. Renato Lima', PerfilUsuario::Professor, $paeetTecnologia);
         $professor->eixos()->syncWithoutDetaching([$tecnologia->id]);
         $professor->vinculosDocentes()->firstOrCreate(
             ['disciplina_id' => $disciplinas->first()->id, 'turma_id' => null],
@@ -160,5 +106,19 @@ class DemonstracaoSeeder extends Seeder
         );
 
         $this->command?->info('Demonstração pronta. Senha de todos: senha-forte-123');
+    }
+
+    protected function usuario(string $email, string $nome, PerfilUsuario $perfil, ?User $autor = null): User
+    {
+        return User::query()->firstOrCreate(
+            ['email' => $email],
+            [
+                'nome' => $nome,
+                'password' => Hash::make('senha-forte-123'),
+                'perfil' => $perfil,
+                'ativo' => true,
+                'criado_por' => $autor?->id,
+            ]
+        );
     }
 }

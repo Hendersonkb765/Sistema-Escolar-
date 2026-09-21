@@ -2,7 +2,7 @@
 
 /*
  * Critério de aceite 4:
- * o avanço 2DS → 3DS atualiza as disciplinas e grava histórico.
+ * o avanço 2 A → 3 A atualiza as disciplinas e grava histórico.
  */
 
 use App\Actions\Academico\AvancarTurmaAction;
@@ -34,24 +34,24 @@ beforeEach(function () {
     $this->disciplinas = $montagem['disciplinas'];
 
     $this->turma = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 2,
-        'identificacao' => '2DS',
+        'periodo' => 2,
+        'nome' => '2 A',
         'periodo_letivo' => '2026',
     ]);
 
     $this->action = app(AvancarTurmaAction::class);
 });
 
-it('avança 2DS para 3DS e troca as disciplinas do ano', function () {
-    expect($this->turma->disciplinasDoAno()->pluck('disciplina_id')->all())
+it('avança 2 A para 3 A e troca as disciplinas do ano', function () {
+    expect($this->turma->disciplinasDoPeriodo()->pluck('disciplina_id')->all())
         ->toBe([$this->disciplinas['Processos de Desenvolvimento']->id]);
 
     $resultado = $this->action->executar($this->turma, $this->paeet);
 
     $turma = $resultado['turma'];
 
-    expect($turma->ano_curso)->toBe(3)
-        ->and($turma->identificacao)->toBe('3DS')
+    expect($turma->periodo)->toBe(3)
+        ->and($turma->nome)->toBe('3 A')
         ->and($resultado['disciplinas']->pluck('disciplina_id')->all())
         ->toBe([$this->disciplinas['Banco de Dados']->id]);
 });
@@ -64,12 +64,12 @@ it('grava o estado anterior no histórico antes de mudar', function () {
     expect($historico)->not->toBeNull()
         ->and($historico->evento)->toBe(EventoHistorico::TurmaAvancoAno)
         // O histórico guarda o que existia ANTES: 2º ano, 2DS.
-        ->and($historico->ano_curso)->toBe(2)
-        ->and($historico->identificacao)->toBe('2DS')
+        ->and($historico->periodo)->toBe(2)
+        ->and($historico->nome)->toBe('2 A')
         ->and($historico->grade_curricular_id)->toBe($this->grade->id)
         ->and($historico->observacoes)->toBe('Virada de 2026')
         ->and($historico->registrado_por)->toBe($this->paeet->id)
-        ->and($historico->metadados['ano_destino'])->toBe(3);
+        ->and($historico->metadados['periodo_destino'])->toBe(3);
 });
 
 it('mantém a grade congelada da turma ao avançar', function () {
@@ -84,19 +84,19 @@ it('registra o avanço na auditoria', function () {
     $registro = Activity::query()->where('log_name', 'turma')->latest('id')->first();
 
     expect($registro)->not->toBeNull()
-        ->and($registro->description)->toBe('Turma avançada do 2º para o 3º ano')
+        ->and($registro->description)->toBe('Turma avançada do 2º para o 3º período')
         ->and($registro->causer_id)->toBe($this->paeet->id)
-        ->and($registro->getProperty('ano_anterior'))->toBe(2)
-        ->and($registro->getProperty('ano_novo'))->toBe(3);
+        ->and($registro->getProperty('periodo_anterior'))->toBe(2)
+        ->and($registro->getProperty('periodo_novo'))->toBe(3);
 });
 
 it('não avança além do último ano do curso', function () {
-    $this->turma->update(['ano_curso' => 3, 'identificacao' => '3DS']);
+    $this->turma->update(['periodo' => 3, 'nome' => '3 A']);
 
     expect(fn () => $this->action->executar($this->turma->refresh(), $this->paeet))
         ->toThrow(RegraDeNegocioException::class, 'último do curso');
 
-    expect($this->turma->refresh()->ano_curso)->toBe(3);
+    expect($this->turma->refresh()->periodo)->toBe(3);
 });
 
 it('não avança turma que não está ativa', function () {
@@ -106,7 +106,7 @@ it('não avança turma que não está ativa', function () {
     expect(fn () => $this->action->executar($this->turma->refresh(), $this->paeet))
         ->toThrow(RegraDeNegocioException::class, 'Apenas turmas ativas');
 
-    expect($this->turma->refresh()->ano_curso)->toBe(2);
+    expect($this->turma->refresh()->periodo)->toBe(2);
 });
 
 it('nega o avanço a um PAEET de outro eixo', function () {
@@ -115,7 +115,7 @@ it('nega o avanço a um PAEET de outro eixo', function () {
     expect(fn () => $this->action->executar($this->turma, paeet($outroEixo)))
         ->toThrow(AuthorizationException::class);
 
-    expect($this->turma->refresh()->ano_curso)->toBe(2);
+    expect($this->turma->refresh()->periodo)->toBe(2);
 });
 
 it('nega o avanço ao professor', function () {
@@ -125,8 +125,8 @@ it('nega o avanço ao professor', function () {
 
 it('move os alunos e grava histórico quando há turma de destino', function () {
     $destino = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 3,
-        'identificacao' => '3DS',
+        'periodo' => 3,
+        'nome' => '3 A',
         'periodo_letivo' => '2027',
     ]);
 
@@ -156,14 +156,14 @@ it('recusa turma de destino de outro curso ou de ano errado', function () {
     $outroCurso = cursoComGrade($this->eixo, [3 => ['Redes']])['curso'];
     $destinoErrado = Turma::factory()
         ->doCurso($outroCurso)
-        ->create(['ano_curso' => 3, 'identificacao' => '3RD']);
+        ->create(['periodo' => 3, 'nome' => '3 R']);
 
     expect(fn () => $this->action->executar($this->turma, $this->paeet, turmaDestino: $destinoErrado))
         ->toThrow(RegraDeNegocioException::class, 'outro curso');
 
     $mesmoAno = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 2,
-        'identificacao' => '2DS-B',
+        'periodo' => 2,
+        'nome' => '2 B',
     ]);
 
     expect(fn () => $this->action->executar($this->turma, $this->paeet, turmaDestino: $mesmoAno))
@@ -171,7 +171,7 @@ it('recusa turma de destino de outro curso ou de ano errado', function () {
 });
 
 it('deixa o avanço em nada quando a regra é violada', function () {
-    $this->turma->update(['ano_curso' => 3]);
+    $this->turma->update(['periodo' => 3]);
 
     $historicosAntes = TurmaHistorico::query()->count();
 
@@ -182,38 +182,38 @@ it('deixa o avanço em nada quando a regra é violada', function () {
     }
 
     expect(TurmaHistorico::query()->count())->toBe($historicosAntes)
-        ->and($this->turma->refresh()->ano_curso)->toBe(3);
+        ->and($this->turma->refresh()->periodo)->toBe(3);
 });
 
 it('mantém a identificação quando ela não começa por número', function () {
-    $this->turma->update(['identificacao' => 'Turma Noturna']);
+    $this->turma->update(['nome' => 'Turma Noturna']);
 
     $resultado = $this->action->executar($this->turma->refresh(), $this->paeet);
 
-    expect($resultado['turma']->identificacao)->toBe('Turma Noturna')
-        ->and($resultado['turma']->ano_curso)->toBe(3);
+    expect($resultado['turma']->nome)->toBe('Turma Noturna')
+        ->and($resultado['turma']->periodo)->toBe(3);
 });
 
 it('explica a colisão quando a turma do ano seguinte já existe no período', function () {
     // Cenário real: 1DS, 2DS e 3DS convivem no mesmo ano letivo.
     Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 3,
-        'identificacao' => '3DS',
+        'periodo' => 3,
+        'nome' => '3 A',
         'periodo_letivo' => '2026',
     ]);
 
     expect(fn () => $this->action->executar($this->turma, $this->paeet))
-        ->toThrow(RegraDeNegocioException::class, 'Já existe a turma 3DS em 2026');
+        ->toThrow(RegraDeNegocioException::class, 'Já existe a turma 3 A em 2026');
 
     // Nada foi alterado nem registrado.
-    expect($this->turma->refresh()->ano_curso)->toBe(2)
+    expect($this->turma->refresh()->periodo)->toBe(2)
         ->and(TurmaHistorico::query()->where('turma_id', $this->turma->id)->count())->toBe(0);
 });
 
 it('aceita a promoção quando o período letivo avança junto', function () {
     Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 3,
-        'identificacao' => '3DS',
+        'periodo' => 3,
+        'nome' => '3 A',
         'periodo_letivo' => '2026',
     ]);
 
@@ -223,7 +223,7 @@ it('aceita a promoção quando o período letivo avança junto', function () {
         novoPeriodoLetivo: '2027',
     );
 
-    expect($resultado['turma']->identificacao)->toBe('3DS')
+    expect($resultado['turma']->nome)->toBe('3 A')
         ->and($resultado['turma']->periodo_letivo)->toBe('2027')
-        ->and($resultado['turma']->ano_curso)->toBe(3);
+        ->and($resultado['turma']->periodo)->toBe(3);
 });

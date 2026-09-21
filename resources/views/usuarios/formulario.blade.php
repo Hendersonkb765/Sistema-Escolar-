@@ -90,7 +90,10 @@
                         <label class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
                             <input type="checkbox" value="{{ $disciplina->id }}" wire:model="disciplinasSelecionadas"
                                    class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
-                            <span class="text-slate-700 dark:text-slate-200">{{ $disciplina->nome }}</span>
+                            <span class="min-w-0 truncate text-slate-700 dark:text-slate-200">{{ $disciplina->nome }}</span>
+                            <span class="ml-auto shrink-0 text-xs text-slate-400">
+                                {{ $disciplina->curso->nome }} · {{ $disciplina->periodo }}º
+                            </span>
                         </label>
                     @endforeach
                 </div>

@@ -3,24 +3,33 @@
 namespace App\Livewire\Disciplinas;
 
 use App\Enums\StatusRegistro;
+use App\Models\Curso;
 use App\Models\Disciplina;
-use App\Models\Eixo;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
+/**
+ * A disciplina pertence a um curso e é cursada em um período dele.
+ * Mudar o período aqui não altera turmas já abertas: elas seguem na foto
+ * da grade que congelaram até que uma nova versão seja publicada.
+ */
 class FormularioDisciplina extends Component
 {
     use AuthorizesRequests;
 
     public ?Disciplina $disciplina = null;
 
-    public ?int $eixo_id = null;
+    public ?int $curso_id = null;
 
     public string $nome = '';
 
     public string $codigo = '';
+
+    public int $periodo = 1;
+
+    public int $carga_horaria = 80;
 
     public string $status = 'ativo';
 
@@ -30,9 +39,11 @@ class FormularioDisciplina extends Component
             $this->authorize('update', $disciplina);
 
             $this->disciplina = $disciplina;
-            $this->eixo_id = $disciplina->eixo_id;
+            $this->curso_id = $disciplina->curso_id;
             $this->nome = $disciplina->nome;
             $this->codigo = $disciplina->codigo;
+            $this->periodo = $disciplina->periodo;
+            $this->carga_horaria = $disciplina->carga_horaria;
             $this->status = $disciplina->status->value;
 
             return;
@@ -40,28 +51,32 @@ class FormularioDisciplina extends Component
 
         $this->authorize('create', Disciplina::class);
 
-        $this->eixo_id = auth()->user()->eixoIds()[0] ?? null;
+        $this->curso_id = (int) request()->query('curso') ?: null;
+        $this->periodo = max(1, (int) request()->query('periodo'));
     }
 
     /** @return array<string, mixed> */
     protected function rules(): array
     {
-        $eixosDoUsuario = auth()->user()->eixoIds();
+        $usuario = auth()->user();
 
         return [
-            'eixo_id' => [
+            'curso_id' => [
                 'required',
-                Rule::exists('eixos', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn('id', $eixosDoUsuario)
+                Rule::exists('cursos', 'id')->where(
+                    fn ($consulta) => $consulta->whereIn('eixo_id', $usuario->eixoIds())
                 ),
             ],
             'nome' => ['required', 'string', 'max:255'],
             'codigo' => [
                 'required', 'string', 'max:30',
                 Rule::unique('disciplinas', 'codigo')
-                    ->where(fn ($consulta) => $consulta->where('eixo_id', $this->eixo_id))
+                    ->where(fn ($consulta) => $consulta->where('curso_id', $this->curso_id))
                     ->ignore($this->disciplina?->getKey()),
             ],
+            // Não existe 3º período em um curso de dois anos.
+            'periodo' => ['required', 'integer', 'min:1', 'max:'.$this->duracaoDoCurso()],
+            'carga_horaria' => ['required', 'integer', 'min:1', 'max:2000'],
             'status' => ['required', Rule::in(StatusRegistro::valores())],
         ];
     }
@@ -69,13 +84,23 @@ class FormularioDisciplina extends Component
     /** @return array<string, string> */
     protected function validationAttributes(): array
     {
-        return ['eixo_id' => 'eixo', 'nome' => 'nome', 'codigo' => 'código', 'status' => 'status'];
+        return [
+            'curso_id' => 'curso',
+            'nome' => 'nome',
+            'codigo' => 'código',
+            'periodo' => 'período',
+            'carga_horaria' => 'carga horária',
+            'status' => 'status',
+        ];
     }
 
     /** @return array<string, string> */
     protected function messages(): array
     {
-        return ['codigo.unique' => 'Já existe uma disciplina com este código neste eixo.'];
+        return [
+            'codigo.unique' => 'Já existe uma disciplina com este código neste curso.',
+            'periodo.max' => 'O curso selecionado não tem esse período.',
+        ];
     }
 
     public function salvar(): void
@@ -86,20 +111,31 @@ class FormularioDisciplina extends Component
 
         $dados = $this->validate();
 
+        $mudouPeriodo = $this->disciplina !== null
+            && (int) $this->disciplina->periodo !== (int) $dados['periodo'];
+
         $this->disciplina === null
             ? Disciplina::create($dados)
             : $this->disciplina->update($dados);
 
-        session()->flash('sucesso', 'Disciplina salva com sucesso.');
+        session()->flash('sucesso', $mudouPeriodo
+            ? 'Disciplina salva. As turmas já abertas seguem na grade que congelaram — publique uma nova versão para que a mudança valha nas próximas.'
+            : 'Disciplina salva com sucesso.');
 
         $this->redirectRoute('disciplinas.index', navigate: true);
+    }
+
+    protected function duracaoDoCurso(): int
+    {
+        return (int) (Curso::query()->find($this->curso_id)?->duracao_anos ?? 3);
     }
 
     public function render(): View
     {
         return view('disciplinas.formulario', [
-            'eixosDisponiveis' => Eixo::query()->visivelPara(auth()->user())->orderBy('nome')->get(),
+            'cursosDisponiveis' => Curso::query()->visivelPara(auth()->user())->orderBy('nome')->get(),
             'situacoes' => StatusRegistro::opcoes(),
+            'duracao' => $this->duracaoDoCurso(),
         ])->layout('components.layouts.app', [
             'titulo' => $this->disciplina === null ? 'Nova disciplina' : 'Editar disciplina',
             'subtitulo' => $this->disciplina?->nome,

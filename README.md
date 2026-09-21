@@ -109,28 +109,50 @@ constraints. Os módulos ainda sem tela respondem por
 um professor recebe 403 em `/solicitacoes/criar`, `/provas/criar` e
 `/importacoes/criar` desde hoje, não quando a tela ficar pronta.
 
-## Grade versionada e avanço de ano
+## Estrutura acadêmica
 
-Uma grade só é editável enquanto é rascunho e nenhuma turma a congelou.
-Depois disso, mudar a grade significa **criar a próxima versão**
-(`CriarNovaVersaoDeGradeAction`), ajustá-la e publicá-la
-(`PublicarGradeAction`). Publicar arquiva a versão anterior sem apagá-la: as
-turmas continuam ligadas à versão com que começaram, e é por isso que mover
-Banco de Dados do 2º para o 3º ano não reescreve o percurso de quem já está
-no meio do curso.
+```
+Eixo → Curso → Disciplina (com período)
+              → Turma (de um período) → Aluno
+```
+
+A **disciplina pertence a um curso** e carrega o período em que é cursada.
+Um curso de dois anos tem, por exemplo, Lógica e Redes no 1º período e
+Back-end e Front-end no 2º. A **turma cursa um período** e tem nome livre —
+"2 A", "3B", "Noturno A".
+
+Isso é o cadastro: o estado atual, editável a qualquer momento.
+
+## Grade versionada: a foto do curso
+
+A grade **não é um formulário**, é o registro de como o curso estava num
+momento. `PublicarVersaoDeGradeAction` tira uma foto das disciplinas ativas
+do curso e a congela como nova versão vigente, arquivando a anterior sem
+apagá-la. Cada turma aponta para a foto com que começou.
+
+É isso que permite mover Back-end do 2º para o 1º período sem reescrever o
+percurso de quem já cursou: a turma antiga segue na v1, a nova nasce na v2.
+`CompararGradeComCursoAction` alimenta o aviso de "mudanças ainda não
+publicadas" na tela do curso.
+
+A primeira turma de um curso publica a v1 automaticamente, para não travar o
+fluxo numa etapa extra.
+
+## Avanço de ano
 
 `AvancarTurmaAction` roda em transação e grava o estado anterior em
 `turma_historicos` **antes** de qualquer escrita. Tem duas modalidades:
 
-- **promoção** — a própria turma avança: 2DS passa a 3DS, os alunos seguem
-  juntos e as disciplinas do novo ano saem da grade congelada;
-- **remanejamento** — os alunos vão para uma turma já aberta do ano seguinte,
-  cada movimentação com registro em `aluno_historicos`, e a turma de origem
-  passa a "Concluída".
+- **promoção** — a própria turma avança: "2 A" passa a "3 A", os alunos
+  seguem juntos e as disciplinas do novo período saem da foto congelada;
+- **remanejamento** — os alunos vão para uma turma já aberta do período
+  seguinte, cada movimentação com registro em `aluno_historicos`, e a turma
+  de origem passa a "Concluída".
 
-Quando a escola mantém 1DS, 2DS e 3DS no mesmo período letivo, promover 2DS
-esbarraria na turma 3DS existente. Nesse caso a action recusa com a razão e
-as saídas possíveis, em vez de estourar a unicidade no banco.
+Quando a escola mantém "1 A", "2 A" e "3 A" no mesmo período letivo,
+promover "2 A" esbarraria na turma "3 A" existente. Nesse caso a action
+recusa com a razão e as saídas possíveis, em vez de estourar a unicidade no
+banco.
 
 ### Autorização x regra de negócio
 

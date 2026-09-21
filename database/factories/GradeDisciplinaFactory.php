@@ -19,13 +19,13 @@ class GradeDisciplinaFactory extends Factory
         return [
             'grade_curricular_id' => GradeCurricular::factory(),
             'disciplina_id' => Disciplina::factory(),
-            'ano_curso' => 1,
+            'periodo' => 1,
             'carga_horaria' => fake()->randomElement([40, 60, 80]),
         ];
     }
 
-    public function noAno(int $ano): static
+    public function noPeriodo(int $periodo): static
     {
-        return $this->state(fn () => ['ano_curso' => $ano]);
+        return $this->state(fn () => ['periodo' => $periodo]);
     }
 }

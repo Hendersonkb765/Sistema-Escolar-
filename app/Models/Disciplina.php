@@ -14,6 +14,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * Disciplina de um curso, cursada em um período determinado.
+ *
+ * O período vive aqui, no cadastro — é o estado atual e editável. As
+ * grades curriculares são fotos desse estado, tiradas ao publicar uma
+ * versão, e é nelas que as turmas se apoiam para não terem o percurso
+ * reescrito quando o cadastro muda.
+ */
 class Disciplina extends Model
 {
     use AplicaEscopoDeEixo;
@@ -23,19 +31,23 @@ class Disciplina extends Model
 
     protected $table = 'disciplinas';
 
-    protected $fillable = ['eixo_id', 'nome', 'codigo', 'status'];
+    protected $fillable = ['curso_id', 'nome', 'codigo', 'periodo', 'carga_horaria', 'status'];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
-    protected $attributes = ['status' => 'ativo'];
+    protected $attributes = ['status' => 'ativo', 'carga_horaria' => 80];
 
     protected function casts(): array
     {
-        return ['status' => StatusRegistro::class];
+        return [
+            'status' => StatusRegistro::class,
+            'periodo' => 'integer',
+            'carga_horaria' => 'integer',
+        ];
     }
 
     public static function caminhoDoEixo(): string
     {
-        return 'eixo';
+        return 'curso.eixo';
     }
 
     public function getActivitylogOptions(): LogOptions
@@ -49,10 +61,10 @@ class Disciplina extends Model
         return $query->whereIn('disciplinas.id', $usuario->disciplinaIds());
     }
 
-    /** @return BelongsTo<Eixo, $this> */
-    public function eixo(): BelongsTo
+    /** @return BelongsTo<Curso, $this> */
+    public function curso(): BelongsTo
     {
-        return $this->belongsTo(Eixo::class);
+        return $this->belongsTo(Curso::class);
     }
 
     /** @return HasMany<GradeDisciplina, $this> */
@@ -67,5 +79,17 @@ class Disciplina extends Model
         return $this->belongsToMany(User::class, 'professor_disciplina', 'disciplina_id', 'usuario_id')
             ->withPivot(['turma_id', 'ativo'])
             ->withTimestamps();
+    }
+
+    /** @return Builder<Disciplina> */
+    public function scopeAtivas(Builder $query): Builder
+    {
+        return $query->where('status', StatusRegistro::Ativo);
+    }
+
+    /** @return Builder<Disciplina> */
+    public function scopeDoPeriodo(Builder $query, int $periodo): Builder
+    {
+        return $query->where('periodo', $periodo);
     }
 }

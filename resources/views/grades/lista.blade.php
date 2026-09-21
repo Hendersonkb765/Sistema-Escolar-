@@ -25,16 +25,16 @@
                 </x-campo>
             </div>
 
-            @can('create', App\Models\GradeCurricular::class)
-                <x-botao href="{{ route('grades.criar') }}" wire:navigate class="shrink-0">Nova grade</x-botao>
-            @endcan
+            <x-botao variante="secundario" href="{{ route('cursos.index') }}" wire:navigate class="shrink-0">
+                Publicar pelo curso
+            </x-botao>
         </div>
     </x-cartao>
 
-    <x-cartao descricao="Uma versão usada por turmas nunca é editada: para mudar, cria-se a próxima versão.">
+    <x-cartao descricao="Cada versão é uma foto das disciplinas do curso. Para publicar uma nova, abra o curso.">
         @if ($grades->isEmpty())
-            <x-vazio titulo="Nenhuma grade encontrada"
-                     descricao="Cadastre a primeira versão da grade de um curso."/>
+            <x-vazio titulo="Nenhuma grade publicada"
+                     descricao="Abra um curso, cadastre as disciplinas de cada período e publique a grade."/>
         @else
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">

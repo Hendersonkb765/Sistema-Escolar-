@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -71,6 +72,35 @@ class Curso extends Model
     public function turmas(): HasMany
     {
         return $this->hasMany(Turma::class);
+    }
+
+    /** @return HasMany<Disciplina, $this> */
+    public function disciplinas(): HasMany
+    {
+        return $this->hasMany(Disciplina::class);
+    }
+
+    /**
+     * Disciplinas agrupadas pelo período do curso — a visão que o
+     * coordenador tem ao montar a grade.
+     *
+     * @return Collection<int, Collection<int, Disciplina>>
+     */
+    public function disciplinasPorPeriodo(): Collection
+    {
+        return $this->disciplinas()
+            ->ativas()
+            ->orderBy('periodo')
+            ->orderBy('nome')
+            ->get()
+            ->groupBy('periodo')
+            ->sortKeys();
+    }
+
+    /** @return array<int, int> períodos previstos, de 1 até a duração */
+    public function periodos(): array
+    {
+        return range(1, (int) $this->duracao_anos);
     }
 
     /** Grade vigente mais recente do curso. */

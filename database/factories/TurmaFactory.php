@@ -25,8 +25,8 @@ class TurmaFactory extends Factory
                 ->orderByDesc('versao')
                 ->value('id')
                 ?? GradeCurricular::factory()->create(['curso_id' => $atributos['curso_id']])->getKey(),
-            'ano_curso' => 1,
-            'identificacao' => '1DS',
+            'periodo' => 1,
+            'nome' => '1 A',
             'periodo_letivo' => (string) now()->format('Y'),
             'status' => StatusTurma::Ativa,
         ];
@@ -45,11 +45,11 @@ class TurmaFactory extends Factory
         ]);
     }
 
-    public function noAno(int $ano, ?string $identificacao = null): static
+    public function noPeriodo(int $periodo, ?string $nome = null): static
     {
         return $this->state(fn (array $atributos) => [
-            'ano_curso' => $ano,
-            'identificacao' => $identificacao ?? $ano.substr((string) ($atributos['identificacao'] ?? '1DS'), 1),
+            'periodo' => $periodo,
+            'nome' => $nome ?? $periodo.substr((string) ($atributos['nome'] ?? '1 A'), 1),
         ]);
     }
 }

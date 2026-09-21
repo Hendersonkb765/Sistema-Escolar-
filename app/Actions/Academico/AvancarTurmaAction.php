@@ -42,28 +42,28 @@ class AvancarTurmaAction
         Turma $turma,
         User $autor,
         ?Turma $turmaDestino = null,
-        ?string $novaIdentificacao = null,
+        ?string $novoNome = null,
         ?string $novoPeriodoLetivo = null,
         ?string $observacoes = null,
     ): array {
         Gate::forUser($autor)->authorize('avancarAno', $turma);
 
-        $anoAnterior = $turma->ano_curso;
-        $novoAno = $anoAnterior + 1;
+        $periodoAnterior = $turma->periodo;
+        $novoPeriodo = $periodoAnterior + 1;
 
         $this->validar($turma, $turmaDestino);
 
         if ($turmaDestino === null) {
-            $this->recusarColisaoDeIdentificacao(
+            $this->recusarColisaoDeNome(
                 turma: $turma,
-                identificacao: $novaIdentificacao ?: $turma->identificacaoParaAno($novoAno),
+                nome: $novoNome ?: $turma->nomeParaPeriodo($novoPeriodo),
                 periodoLetivo: $novoPeriodoLetivo ?: $turma->periodo_letivo,
             );
         }
 
         return DB::transaction(function () use (
-            $turma, $autor, $turmaDestino, $novaIdentificacao,
-            $novoPeriodoLetivo, $observacoes, $anoAnterior, $novoAno
+            $turma, $autor, $turmaDestino, $novoNome,
+            $novoPeriodoLetivo, $observacoes, $periodoAnterior, $novoPeriodo
         ) {
             // 1. Estado anterior preservado antes de qualquer escrita.
             $this->historico->executar(
@@ -72,7 +72,7 @@ class AvancarTurmaAction
                 autor: $autor,
                 observacoes: $observacoes,
                 metadados: [
-                    'ano_destino' => $novoAno,
+                    'periodo_destino' => $novoPeriodo,
                     'turma_destino_id' => $turmaDestino?->getKey(),
                 ],
             );
@@ -90,28 +90,28 @@ class AvancarTurmaAction
             } else {
                 // 2b. Promoção: a própria turma avança de ano.
                 $turma->update([
-                    'ano_curso' => $novoAno,
-                    'identificacao' => $novaIdentificacao ?: $turma->identificacaoParaAno($novoAno),
+                    'periodo' => $novoPeriodo,
+                    'nome' => $novoNome ?: $turma->nomeParaPeriodo($novoPeriodo),
                     'periodo_letivo' => $novoPeriodoLetivo ?: $turma->periodo_letivo,
                 ]);
 
                 $turmaAtualizada = $turma->refresh();
             }
 
-            // 3. Disciplinas do novo ano, lidas da grade congelada da turma.
-            $disciplinas = $turmaAtualizada->disciplinasDoAno();
+            // 3. Disciplinas do novo período, lidas da foto congelada na turma.
+            $disciplinas = $turmaAtualizada->disciplinasDoPeriodo();
 
             activity('turma')
                 ->performedOn($turmaAtualizada)
                 ->causedBy($autor)
                 ->withProperties([
-                    'ano_anterior' => $anoAnterior,
-                    'ano_novo' => $turmaAtualizada->ano_curso,
+                    'periodo_anterior' => $periodoAnterior,
+                    'periodo_novo' => $turmaAtualizada->periodo,
                     'turma_destino_id' => $turmaDestino?->getKey(),
                     'alunos_movidos' => $alunosMovidos,
-                    'disciplinas_do_ano' => $disciplinas->pluck('disciplina_id')->all(),
+                    'disciplinas_do_periodo' => $disciplinas->pluck('disciplina_id')->all(),
                 ])
-                ->log("Turma avançada do {$anoAnterior}º para o {$turmaAtualizada->ano_curso}º ano");
+                ->log("Turma avançada do {$periodoAnterior}º para o {$turmaAtualizada->periodo}º período");
 
             return [
                 'turma' => $turmaAtualizada,
@@ -125,9 +125,9 @@ class AvancarTurmaAction
     {
         if (! $turma->podeAvancar()) {
             throw RegraDeNegocioException::porque(
-                $turma->ano_curso >= $turma->anoFinal()
-                    ? "A turma já está no {$turma->anoFinal()}º ano, último do curso."
-                    : 'Apenas turmas ativas podem avançar de ano.'
+                $turma->periodo >= $turma->periodoFinal()
+                    ? "A turma já está no {$turma->periodoFinal()}º período, último do curso."
+                    : 'Apenas turmas ativas podem avançar de período.'
             );
         }
 
@@ -143,9 +143,11 @@ class AvancarTurmaAction
             throw RegraDeNegocioException::porque('A turma de destino pertence a outro curso.');
         }
 
-        if ((int) $turmaDestino->ano_curso !== $turma->ano_curso + 1) {
+        if ((int) $turmaDestino->periodo !== $turma->periodo + 1) {
+            $esperado = $turma->periodo + 1;
+
             throw RegraDeNegocioException::porque(
-                "A turma de destino precisa estar no {$turma->ano_curso}º+1 ano do curso."
+                "A turma de destino precisa estar no {$esperado}º período do curso."
             );
         }
     }
@@ -156,26 +158,26 @@ class AvancarTurmaAction
      * escola com 1DS, 2DS e 3DS rodando juntas. Em vez de estourar a
      * unicidade no banco, explicamos as duas saídas reais.
      */
-    protected function recusarColisaoDeIdentificacao(
+    protected function recusarColisaoDeNome(
         Turma $turma,
-        string $identificacao,
+        string $nome,
         string $periodoLetivo,
     ): void {
         $conflitante = Turma::query()
             ->where('curso_id', $turma->curso_id)
-            ->where('identificacao', $identificacao)
+            ->where('nome', $nome)
             ->where('periodo_letivo', $periodoLetivo)
             ->whereKeyNot($turma->getKey())
-            ->first();
+            ->exists();
 
-        if ($conflitante === null) {
+        if (! $conflitante) {
             return;
         }
 
         throw RegraDeNegocioException::porque(
-            "Já existe a turma {$identificacao} em {$periodoLetivo}. "
+            "Já existe a turma {$nome} em {$periodoLetivo}. "
             .'Mova os alunos para ela, avance para um novo período letivo '
-            .'ou use outra identificação.'
+            .'ou use outro nome.'
         );
     }
 

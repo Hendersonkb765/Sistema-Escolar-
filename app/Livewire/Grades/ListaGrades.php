@@ -71,7 +71,7 @@ class ListaGrades extends Component
             'situacoes' => StatusGrade::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Grades curriculares',
-            'subtitulo' => 'Versionadas por curso — alterar uma grade em uso gera uma nova versão',
+            'subtitulo' => 'Fotos do curso: publicadas a partir das disciplinas cadastradas',
         ]);
     }
 }

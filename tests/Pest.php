@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Enums\PerfilUsuario;
 use App\Models\Curso;
 use App\Models\Disciplina;
@@ -81,40 +82,37 @@ function professor(Eixo ...$eixos): User
 }
 
 /**
- * Monta um curso com grade vigente e disciplinas posicionadas por ano.
+ * Monta um curso com disciplinas por período e publica a primeira versão
+ * da grade a partir delas.
  *
- * @param  array<int, array<int, string>>  $porAno  ano => [nomes das disciplinas]
+ * @param  array<int, array<int, string>>  $porPeriodo  período => [nomes das disciplinas]
  * @return array{curso: Curso, grade: GradeCurricular, disciplinas: Collection<string, Disciplina>}
  */
-function cursoComGrade(Eixo $eixo, array $porAno, int $duracaoAnos = 3, int $versao = 1): array
+function cursoComGrade(Eixo $eixo, array $porPeriodo, ?int $duracaoAnos = null, ?User $autor = null): array
 {
     $curso = Curso::factory()->noEixo($eixo)->create([
-        'duracao_anos' => $duracaoAnos,
+        'duracao_anos' => $duracaoAnos ?? max(2, max(array_keys($porPeriodo))),
     ]);
-
-    $grade = GradeCurricular::factory()->doCurso($curso)->versao($versao)->create();
 
     $disciplinas = collect();
 
-    foreach ($porAno as $ano => $nomes) {
+    foreach ($porPeriodo as $periodo => $nomes) {
         foreach ($nomes as $nome) {
-            $disciplina = $disciplinas->get($nome) ?? Disciplina::factory()
-                ->noEixo($eixo)
-                ->create(['nome' => $nome]);
-
-            $disciplinas->put($nome, $disciplina);
-
-            $grade->disciplinas()->create([
-                'disciplina_id' => $disciplina->getKey(),
-                'ano_curso' => $ano,
-                'carga_horaria' => 80,
-            ]);
+            $disciplinas->put($nome, Disciplina::factory()
+                ->doCurso($curso)
+                ->noPeriodo($periodo)
+                ->create(['nome' => $nome]));
         }
     }
 
+    $autor ??= paeetAdmin($eixo);
+
+    $grade = app(PublicarVersaoDeGradeAction::class)
+        ->executar($curso, $autor);
+
     return [
         'curso' => $curso,
-        'grade' => $grade->refresh(),
+        'grade' => $grade,
         'disciplinas' => $disciplinas,
     ];
 }

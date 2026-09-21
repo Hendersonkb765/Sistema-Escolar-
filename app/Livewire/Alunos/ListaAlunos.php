@@ -55,7 +55,7 @@ class ListaAlunos extends Component
         $consulta = Aluno::query()
             ->visivelPara($usuario)
             // `eixo_id` é o que a Policy lê para decidir o escopo de cada linha.
-            ->with('turma:id,identificacao,curso_id,ano_curso', 'turma.curso:id,nome,eixo_id')
+            ->with('turma:id,nome,curso_id,periodo', 'turma.curso:id,nome,eixo_id')
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
@@ -67,7 +67,7 @@ class ListaAlunos extends Component
 
         return view('alunos.lista', [
             'alunos' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
-            'turmas' => Turma::query()->visivelPara($usuario)->orderBy('identificacao')->get(),
+            'turmas' => Turma::query()->visivelPara($usuario)->orderBy('nome')->get(),
             'situacoes' => StatusAluno::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Alunos',

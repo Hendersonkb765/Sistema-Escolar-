@@ -8,7 +8,7 @@
                         <option value="">Selecione…</option>
                         @foreach ($turmasDisponiveis as $turma)
                             <option value="{{ $turma->id }}">
-                                {{ $turma->identificacao }} · {{ $turma->curso->nome }} · {{ $turma->periodo_letivo }}
+                                {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo_letivo }}
                             </option>
                         @endforeach
                     </x-select>
@@ -62,9 +62,9 @@
                         <div class="min-w-0 flex-1">
                             <p class="text-sm text-slate-700 dark:text-slate-200">
                                 @if ($registro->turmaAnterior && $registro->turmaNova)
-                                    {{ $registro->turmaAnterior->identificacao }} → {{ $registro->turmaNova->identificacao }}
+                                    {{ $registro->turmaAnterior->nome }} → {{ $registro->turmaNova->nome }}
                                 @elseif ($registro->turmaNova)
-                                    Turma {{ $registro->turmaNova->identificacao }}
+                                    Turma {{ $registro->turmaNova->nome }}
                                 @endif
                                 @if ($registro->status_anterior !== $registro->status_novo)
                                     · status {{ $registro->status_anterior ?? '—' }} → {{ $registro->status_novo }}

@@ -57,7 +57,7 @@ it('renderiza as telas com parâmetro de rota', function () {
 });
 
 it('renderiza as telas do milestone 2', function () {
-    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica'], 2 => ['Banco de Dados']]);
+    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica'], 2 => ['Banco de Dados']], autor: $this->admin);
     $turma = Turma::factory()->doCurso($montagem['curso'], $montagem['grade'])->create();
     $aluno = Aluno::factory()->naTurma($turma)->create();
     $disciplina = $montagem['disciplinas']->first();
@@ -69,7 +69,6 @@ it('renderiza as telas do milestone 2', function () {
     $como('cursos.criar');
     $como('disciplinas.criar');
     $como('disciplinas.editar', $disciplina);
-    $como('grades.criar');
     $como('grades.show', $montagem['grade']);
     $como('turmas.criar');
     $como('turmas.show', $turma);

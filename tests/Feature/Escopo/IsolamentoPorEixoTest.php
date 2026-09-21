@@ -73,13 +73,13 @@ it('filtra pelo escopo toda consulta que usa visivelPara', function () {
     $gradeAdministracao = GradeCurricular::factory()->doCurso($this->cursoAdministracao)->create();
 
     $turmaTecnologia = Turma::factory()->doCurso($this->cursoTecnologia, $gradeTecnologia)->create();
-    $turmaAdministracao = Turma::factory()->doCurso($this->cursoAdministracao, $gradeAdministracao)->create(['identificacao' => '1LG']);
+    $turmaAdministracao = Turma::factory()->doCurso($this->cursoAdministracao, $gradeAdministracao)->create(['nome' => '1 L']);
 
     $alunoTecnologia = Aluno::factory()->naTurma($turmaTecnologia)->create();
     $alunoAdministracao = Aluno::factory()->naTurma($turmaAdministracao)->create();
 
-    $disciplinaTecnologia = Disciplina::factory()->noEixo($this->tecnologia)->create();
-    $disciplinaAdministracao = Disciplina::factory()->noEixo($this->administracao)->create();
+    $disciplinaTecnologia = Disciplina::factory()->doCurso($this->cursoTecnologia)->create();
+    $disciplinaAdministracao = Disciplina::factory()->doCurso($this->cursoAdministracao)->create();
 
     expect($consulta(Curso::class)->all())->toBe([$this->cursoTecnologia->id])
         ->and($consulta(GradeCurricular::class)->all())->toBe([$gradeTecnologia->id])
@@ -97,9 +97,9 @@ it('filtra pelo escopo toda consulta que usa visivelPara', function () {
 
 it('nega a policy para cada tipo de recurso de outro eixo', function () {
     $gradeAdministracao = GradeCurricular::factory()->doCurso($this->cursoAdministracao)->create();
-    $turmaAdministracao = Turma::factory()->doCurso($this->cursoAdministracao, $gradeAdministracao)->create(['identificacao' => '1LG']);
+    $turmaAdministracao = Turma::factory()->doCurso($this->cursoAdministracao, $gradeAdministracao)->create(['nome' => '1 L']);
     $alunoAdministracao = Aluno::factory()->naTurma($turmaAdministracao)->create();
-    $disciplinaAdministracao = Disciplina::factory()->noEixo($this->administracao)->create();
+    $disciplinaAdministracao = Disciplina::factory()->doCurso($this->cursoAdministracao)->create();
 
     $usuario = $this->paeetTecnologia;
 

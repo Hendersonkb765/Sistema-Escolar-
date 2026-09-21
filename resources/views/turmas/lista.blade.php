@@ -15,12 +15,12 @@
                     </x-select>
                 </x-campo>
 
-                <x-campo rotulo="Ano" para="filtro-ano">
-                    <x-select id="filtro-ano" wire:model.live="filtroAno">
+                <x-campo rotulo="Período" para="filtro-periodo">
+                    <x-select id="filtro-periodo" wire:model.live="filtroPeriodo">
                         <option value="">Todos</option>
-                        <option value="1">1º ano</option>
-                        <option value="2">2º ano</option>
-                        <option value="3">3º ano</option>
+                        <option value="1">1º período</option>
+                        <option value="2">2º período</option>
+                        <option value="3">3º período</option>
                     </x-select>
                 </x-campo>
 
@@ -50,11 +50,11 @@
                     <thead>
                         <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="px-4 py-2 sm:px-6">
-                                <button type="button" wire:click="ordenar('identificacao')" class="font-semibold">Turma {{ $this->setaDaColuna('identificacao') }}</button>
+                                <button type="button" wire:click="ordenar('nome')" class="font-semibold">Turma {{ $this->setaDaColuna('nome') }}</button>
                             </th>
                             <th class="hidden px-4 py-2 sm:table-cell">Curso</th>
                             <th class="px-4 py-2">
-                                <button type="button" wire:click="ordenar('ano_curso')" class="font-semibold">Ano {{ $this->setaDaColuna('ano_curso') }}</button>
+                                <button type="button" wire:click="ordenar('periodo')" class="font-semibold">Ano {{ $this->setaDaColuna('periodo') }}</button>
                             </th>
                             <th class="hidden px-4 py-2 md:table-cell">Grade</th>
                             <th class="hidden px-4 py-2 md:table-cell">Período</th>
@@ -66,9 +66,9 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @foreach ($turmas as $turma)
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                <td class="px-4 py-3 font-medium text-slate-900 sm:px-6 dark:text-slate-100">{{ $turma->identificacao }}</td>
+                                <td class="px-4 py-3 font-medium text-slate-900 sm:px-6 dark:text-slate-100">{{ $turma->nome }}</td>
                                 <td class="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">{{ $turma->curso->nome }}</td>
-                                <td class="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $turma->ano_curso }}º</td>
+                                <td class="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $turma->periodo }}º</td>
                                 <td class="hidden px-4 py-3 md:table-cell">
                                     <x-badge cor="cinza">v{{ $turma->grade->versao }}</x-badge>
                                 </td>

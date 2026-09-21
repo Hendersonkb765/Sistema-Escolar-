@@ -16,8 +16,8 @@
  */
 
 use App\Actions\Academico\AvancarTurmaAction;
-use App\Actions\Academico\CriarNovaVersaoDeGradeAction;
 use App\Actions\Academico\MoverAlunoDeTurmaAction;
+use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
 use App\Enums\EventoHistorico;
 use App\Enums\StatusAluno;
@@ -42,23 +42,23 @@ beforeEach(function () {
         1 => ['Lógica de Programação', 'Redes de Computadores'],
         2 => ['Processos de Desenvolvimento', 'Programação Web'],
         3 => ['Banco de Dados', 'Gestão de Projetos'],
-    ]);
+    ], autor: $this->admin);
 
     $this->curso = $montagem['curso'];
     $this->grade = $montagem['grade'];
 
     // Segundo curso: as listagens precisam de mais de uma linha.
-    $this->segundoCurso = cursoComGrade($this->outroEixo, [1 => ['Contabilidade']])['curso'];
+    $this->segundoCurso = cursoComGrade($this->outroEixo, [1 => ['Contabilidade']], autor: $this->admin)['curso'];
 
     $this->turma = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 2,
-        'identificacao' => '2DS',
+        'periodo' => 2,
+        'nome' => '2 A',
         'periodo_letivo' => '2026',
     ]);
 
     $this->outraTurma = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 1,
-        'identificacao' => '1DS',
+        'periodo' => 1,
+        'nome' => '1 A',
         'periodo_letivo' => '2026',
     ]);
 
@@ -87,9 +87,9 @@ beforeEach(function () {
 
     $this->turma->refresh();
 
-    // Duas versões de grade, para o bloco "outras versões".
-    $this->v2 = app(CriarNovaVersaoDeGradeAction::class)->executar($this->grade, $this->admin);
-    $this->v3 = app(CriarNovaVersaoDeGradeAction::class)->executar($this->v2, $this->admin);
+    // Duas versões extras de grade, para o bloco "outras versões".
+    $this->v2 = app(PublicarVersaoDeGradeAction::class)->executar($this->curso, $this->admin);
+    $this->v3 = app(PublicarVersaoDeGradeAction::class)->executar($this->curso, $this->admin);
 });
 
 it('abre o detalhe da turma com histórico, alunos e disciplinas', function () {
@@ -100,7 +100,7 @@ it('abre o detalhe da turma com histórico, alunos e disciplinas', function () {
     $this->actingAs($this->admin)
         ->get(route('turmas.show', $this->turma))
         ->assertOk()
-        ->assertSee('3DS')
+        ->assertSee('3 A')
         ->assertSee('Marina Alves')
         ->assertSee('Caio Prado')
         ->assertSee('Banco de Dados')
@@ -114,10 +114,10 @@ it('abre o detalhe do aluno com várias movimentações no histórico', function
     $aluno = Aluno::query()->where('matricula', '1001')->first();
 
     $destinoA = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 3, 'identificacao' => '3DS-B', 'periodo_letivo' => '2026',
+        'periodo' => 3, 'nome' => '3 B', 'periodo_letivo' => '2026',
     ]);
     $destinoB = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 3, 'identificacao' => '3DS-C', 'periodo_letivo' => '2026',
+        'periodo' => 3, 'nome' => '3 C', 'periodo_letivo' => '2026',
     ]);
 
     $mover = app(MoverAlunoDeTurmaAction::class);
@@ -131,8 +131,8 @@ it('abre o detalhe do aluno com várias movimentações no histórico', function
         ->assertOk()
         ->assertSee('Primeira troca')
         ->assertSee('Segunda troca')
-        ->assertSee('3DS-B')
-        ->assertSee('3DS-C');
+        ->assertSee('3 B')
+        ->assertSee('3 C');
 });
 
 it('abre o detalhe da grade com disciplinas, turmas e outras versões', function () {
@@ -143,8 +143,8 @@ it('abre o detalhe da grade com disciplinas, turmas e outras versões', function
         ->assertOk()
         ->assertSee('Lógica de Programação')
         ->assertSee('Banco de Dados')
-        ->assertSee('3DS')
-        ->assertSee('1DS')
+        ->assertSee('3 A')
+        ->assertSee('1 A')
         ->assertSee('v'.$this->v2->versao, escape: false)
         ->assertSee('v'.$this->v3->versao, escape: false);
 });
@@ -157,8 +157,8 @@ it('abre o detalhe do curso com várias grades e turmas', function () {
         ->get(route('cursos.show', $this->curso))
         ->assertOk()
         ->assertSee($this->curso->nome)
-        ->assertSee('3DS')
-        ->assertSee('1DS');
+        ->assertSee('3 A')
+        ->assertSee('1 A');
 });
 
 it('abre cada listagem com mais de um registro', function (string $rota, string $model) {
@@ -203,7 +203,6 @@ it('abre os formulários de edição com dados carregados', function () {
 
     $como('cursos.editar', $this->curso);
     $como('disciplinas.editar', $disciplina);
-    $como('grades.editar', $this->v3);
     $como('turmas.editar', $this->turma);
     $como('alunos.editar', $aluno);
     $como('eixos.editar', $this->eixo);
@@ -215,7 +214,6 @@ it('abre os formulários de criação com listas de opções povoadas', function
 })->with([
     'cursos.criar',
     'disciplinas.criar',
-    'grades.criar',
     'turmas.criar',
     'alunos.criar',
     'eixos.criar',
@@ -234,22 +232,22 @@ it('abre o painel do professor com mais de um vínculo docente', function () {
     $this->actingAs($professor)->get(route('painel'))->assertOk();
 });
 
-it('abre o painel de avanço de ano com turmas de destino', function () {
+it('abre o painel de avanço de período com turmas de destino', function () {
     $turma = Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 1, 'identificacao' => '1DS-B', 'periodo_letivo' => '2027',
+        'periodo' => 1, 'nome' => '1 B', 'periodo_letivo' => '2027',
     ]);
 
     Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 2, 'identificacao' => '2DS-A', 'periodo_letivo' => '2027',
+        'periodo' => 2, 'nome' => '2 A', 'periodo_letivo' => '2027',
     ]);
     Turma::factory()->doCurso($this->curso, $this->grade)->create([
-        'ano_curso' => 2, 'identificacao' => '2DS-B', 'periodo_letivo' => '2027',
+        'periodo' => 2, 'nome' => '2 B', 'periodo_letivo' => '2027',
     ]);
 
     Livewire\Livewire::actingAs($this->admin)
         ->test(DetalheTurma::class, ['turma' => $turma])
         ->call('abrirPainelAvanco')
         ->assertOk()
-        ->assertSee('2DS-A')
-        ->assertSee('2DS-B');
+        ->assertSee('2 A')
+        ->assertSee('2 B');
 });

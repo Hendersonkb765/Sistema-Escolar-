@@ -12,15 +12,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('curso_id')->constrained('cursos')->restrictOnDelete();
             $table->foreignId('grade_curricular_id')->constrained('grades_curriculares')->restrictOnDelete();
-            $table->unsignedTinyInteger('ano_curso');
-            $table->string('identificacao', 30);
+            // Período do curso que a turma está cursando.
+            $table->unsignedTinyInteger('periodo');
+            // Nome livre, como a escola chama: "2 A", "3B", "Noturno A".
+            $table->string('nome', 50);
             $table->string('periodo_letivo', 20);
             $table->string('status', 20)->default('ativa')->index();
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['curso_id', 'identificacao', 'periodo_letivo'], 'turmas_curso_ident_periodo_unique');
-            $table->index(['curso_id', 'ano_curso']);
+            $table->unique(['curso_id', 'nome', 'periodo_letivo'], 'turmas_curso_nome_periodo_unique');
+            $table->index(['curso_id', 'periodo']);
         });
     }
 

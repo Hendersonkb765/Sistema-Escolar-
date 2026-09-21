@@ -10,7 +10,7 @@
                     <x-select id="filtro-turma" wire:model.live="filtroTurma">
                         <option value="">Todas</option>
                         @foreach ($turmas as $turma)
-                            <option value="{{ $turma->id }}">{{ $turma->identificacao }} · {{ $turma->periodo_letivo }}</option>
+                            <option value="{{ $turma->id }}">{{ $turma->nome }} · {{ $turma->periodo_letivo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -59,7 +59,7 @@
                                 <td class="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $aluno->matricula }}</td>
                                 <td class="hidden px-4 py-3 sm:table-cell">
                                     <a href="{{ route('turmas.show', $aluno->turma) }}" wire:navigate
-                                       class="text-marca-600 hover:underline dark:text-marca-400">{{ $aluno->turma->identificacao }}</a>
+                                       class="text-marca-600 hover:underline dark:text-marca-400">{{ $aluno->turma->nome }}</a>
                                 </td>
                                 <td class="hidden px-4 py-3 text-slate-600 md:table-cell dark:text-slate-300">{{ $aluno->turma->curso->nome }}</td>
                                 <td class="px-4 py-3">

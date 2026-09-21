@@ -23,7 +23,7 @@ class DetalheTurma extends Component
     /** Vazio = a própria turma avança de ano; preenchido = remanejamento. */
     public string $turmaDestinoId = '';
 
-    public string $novaIdentificacao = '';
+    public string $novoNome = '';
 
     public string $novoPeriodoLetivo = '';
 
@@ -41,7 +41,7 @@ class DetalheTurma extends Component
         $this->authorize('avancarAno', $this->turma);
 
         $this->painelAvancoAberto = true;
-        $this->novaIdentificacao = $this->turma->identificacaoParaAno($this->turma->ano_curso + 1);
+        $this->novoNome = $this->turma->nomeParaPeriodo($this->turma->periodo + 1);
         $this->novoPeriodoLetivo = $this->turma->periodo_letivo;
     }
 
@@ -70,7 +70,7 @@ class DetalheTurma extends Component
                 turma: $this->turma,
                 autor: auth()->user(),
                 turmaDestino: $destino,
-                novaIdentificacao: $this->novaIdentificacao ?: null,
+                novoNome: $this->novoNome ?: null,
                 novoPeriodoLetivo: $this->novoPeriodoLetivo ?: null,
                 observacoes: $this->observacoesAvanco ?: null,
             );
@@ -86,8 +86,8 @@ class DetalheTurma extends Component
         $quantidade = $resultado['disciplinas']->count();
 
         $mensagem = $destino === null
-            ? "Turma avançada para o {$turma->ano_curso}º ano ({$turma->identificacao}). {$quantidade} disciplina(s) neste ano."
-            : "{$resultado['alunos_movidos']} aluno(s) movido(s) para {$turma->identificacao}. Turma de origem concluída.";
+            ? "Turma avançada para o {$turma->periodo}º período ({$turma->nome}). {$quantidade} disciplina(s) neste período."
+            : "{$resultado['alunos_movidos']} aluno(s) movido(s) para {$turma->nome}. Turma de origem concluída.";
 
         session()->flash('sucesso', $mensagem);
 
@@ -109,9 +109,9 @@ class DetalheTurma extends Component
         return Turma::query()
             ->visivelPara(auth()->user())
             ->where('curso_id', $this->turma->curso_id)
-            ->where('ano_curso', $this->turma->ano_curso + 1)
+            ->where('periodo', $this->turma->periodo + 1)
             ->whereKeyNot($this->turma->getKey())
-            ->orderBy('identificacao')
+            ->orderBy('nome')
             ->get();
     }
 
@@ -120,7 +120,7 @@ class DetalheTurma extends Component
         $this->turma->load(['curso.eixo', 'grade']);
 
         return view('turmas.detalhe', [
-            'disciplinasDoAno' => $this->turma->disciplinasDoAno(),
+            'disciplinasDoPeriodo' => $this->turma->disciplinasDoPeriodo(),
             'alunos' => $this->turma->alunos()->orderBy('nome')->get(),
             // `grade` entra aqui porque o histórico mostra a versão que
             // estava congelada à época do registro.
@@ -131,8 +131,8 @@ class DetalheTurma extends Component
             'destinos' => $this->turmasDestinoPossiveis(),
             'gradeDesatualizada' => $this->gradeDesatualizada(),
         ])->layout('components.layouts.app', [
-            'titulo' => $this->turma->identificacao,
-            'subtitulo' => $this->turma->curso->nome.' · '.$this->turma->ano_curso.'º ano · '.$this->turma->periodo_letivo,
+            'titulo' => $this->turma->nome,
+            'subtitulo' => $this->turma->curso->nome.' · '.$this->turma->periodo.'º período · '.$this->turma->periodo_letivo,
         ]);
     }
 

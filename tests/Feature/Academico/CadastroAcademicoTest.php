@@ -8,9 +8,9 @@
 use App\Enums\EventoHistorico;
 use App\Enums\StatusGrade;
 use App\Livewire\Alunos\FormularioAluno;
+use App\Livewire\Cursos\DetalheCurso;
 use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Disciplinas\FormularioDisciplina;
-use App\Livewire\Grades\FormularioGrade;
 use App\Livewire\Turmas\FormularioTurma;
 use App\Models\Aluno;
 use App\Models\Curso;
@@ -86,9 +86,9 @@ it('recusa cadastrar curso em eixo fora do escopo', function () {
     expect(Curso::query()->where('codigo', 'INT')->exists())->toBeFalse();
 });
 
-it('impede encurtar um curso abaixo do ano de suas turmas', function () {
+it('impede encurtar um curso abaixo do período de suas turmas', function () {
     $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 3]);
-    Turma::factory()->doCurso($curso)->create(['ano_curso' => 3, 'identificacao' => '3DS']);
+    Turma::factory()->doCurso($curso)->create(['periodo' => 3, 'nome' => '3 A']);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioCurso::class, ['curso' => $curso])
@@ -99,104 +99,149 @@ it('impede encurtar um curso abaixo do ano de suas turmas', function () {
     expect($curso->refresh()->duracao_anos)->toBe(3);
 });
 
-it('cadastra uma disciplina sem amarrá-la a um ano', function () {
+it('cadastra uma disciplina no curso e no período', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 2]);
+
     Livewire::actingAs($this->paeet)
         ->test(FormularioDisciplina::class)
-        ->set('eixo_id', $this->eixo->id)
+        ->set('curso_id', $curso->id)
         ->set('nome', 'Lógica de Programação')
         ->set('codigo', 'LOG')
+        ->set('periodo', 1)
+        ->set('carga_horaria', 80)
         ->call('salvar')
         ->assertHasNoErrors();
 
     $disciplina = Disciplina::query()->where('codigo', 'LOG')->first();
 
     expect($disciplina)->not->toBeNull()
-        // O ano é definido na grade, não na disciplina.
-        ->and($disciplina->getAttributes())->not->toHaveKey('ano_curso');
+        ->and($disciplina->curso_id)->toBe($curso->id)
+        ->and($disciplina->periodo)->toBe(1)
+        ->and($disciplina->carga_horaria)->toBe(80);
 });
 
-it('cadastra uma grade em rascunho com disciplinas por ano', function () {
-    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 3]);
-    $logica = Disciplina::factory()->noEixo($this->eixo)->create(['nome' => 'Lógica']);
-    $banco = Disciplina::factory()->noEixo($this->eixo)->create(['nome' => 'Banco de Dados']);
+it('recusa disciplina em período além da duração do curso', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 2]);
 
     Livewire::actingAs($this->paeet)
-        ->test(FormularioGrade::class)
+        ->test(FormularioDisciplina::class)
         ->set('curso_id', $curso->id)
-        ->set('ano_vigencia', 2026)
-        ->set('itens', [
-            ['disciplina_id' => $logica->id, 'ano_curso' => 1, 'carga_horaria' => 80],
-            ['disciplina_id' => $banco->id, 'ano_curso' => 2, 'carga_horaria' => 60],
-        ])
+        ->set('nome', 'Fora do curso')
+        ->set('codigo', 'FOR')
+        ->set('periodo', 3)
         ->call('salvar')
+        ->assertHasErrors('periodo');
+
+    expect(Disciplina::query()->where('codigo', 'FOR')->exists())->toBeFalse();
+});
+
+it('recusa disciplina em curso fora do escopo', function () {
+    $cursoAlheio = Curso::factory()->noEixo(Eixo::factory()->create(['codigo' => 'ADM']))->create();
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioDisciplina::class)
+        ->set('curso_id', $cursoAlheio->id)
+        ->set('nome', 'Intrusa')
+        ->set('codigo', 'INT')
+        ->set('periodo', 1)
+        ->call('salvar')
+        ->assertHasErrors('curso_id');
+
+    expect(Disciplina::query()->where('codigo', 'INT')->exists())->toBeFalse();
+});
+
+it('aceita o mesmo código de disciplina em cursos diferentes', function () {
+    $a = Curso::factory()->noEixo($this->eixo)->create();
+    $b = Curso::factory()->noEixo($this->eixo)->create();
+
+    Disciplina::factory()->doCurso($a)->create(['codigo' => 'LOG']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioDisciplina::class)
+        ->set('curso_id', $b->id)
+        ->set('nome', 'Lógica de Programação')
+        ->set('codigo', 'LOG')
+        ->set('periodo', 1)
+        ->call('salvar')
+        ->assertHasNoErrors();
+
+    expect(Disciplina::query()->where('codigo', 'LOG')->count())->toBe(2);
+});
+
+it('recusa código de disciplina repetido no mesmo curso', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create();
+    Disciplina::factory()->doCurso($curso)->create(['codigo' => 'LOG']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioDisciplina::class)
+        ->set('curso_id', $curso->id)
+        ->set('nome', 'Outra Lógica')
+        ->set('codigo', 'LOG')
+        ->set('periodo', 1)
+        ->call('salvar')
+        ->assertHasErrors('codigo');
+});
+
+it('publica a grade a partir das disciplinas do curso', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 2]);
+    Disciplina::factory()->doCurso($curso)->noPeriodo(1)->create(['nome' => 'Lógica']);
+    Disciplina::factory()->doCurso($curso)->noPeriodo(2)->create(['nome' => 'Back-end']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(DetalheCurso::class, ['curso' => $curso])
+        ->call('publicarGrade')
         ->assertHasNoErrors();
 
     $grade = GradeCurricular::query()->where('curso_id', $curso->id)->first();
 
-    expect($grade->status)->toBe(StatusGrade::Rascunho)
+    expect($grade)->not->toBeNull()
+        ->and($grade->status)->toBe(StatusGrade::Vigente)
         ->and($grade->versao)->toBe(1)
         ->and($grade->disciplinas()->count())->toBe(2)
-        ->and($grade->disciplinas()->where('disciplina_id', $banco->id)->value('ano_curso'))->toBe(2);
+        ->and($grade->disciplinas()->where('periodo', 2)->count())->toBe(1);
 });
 
-it('recusa disciplina em ano que o curso não tem', function () {
-    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 2]);
-    $disciplina = Disciplina::factory()->noEixo($this->eixo)->create();
+it('avisa quando o cadastro divergiu da grade publicada', function () {
+    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica'], 2 => ['Back-end']], autor: $this->paeet);
+
+    $montagem['disciplinas']['Back-end']->update(['periodo' => 1]);
 
     Livewire::actingAs($this->paeet)
-        ->test(FormularioGrade::class)
-        ->set('curso_id', $curso->id)
-        ->set('itens', [
-            ['disciplina_id' => $disciplina->id, 'ano_curso' => 3, 'carga_horaria' => 80],
-        ])
-        ->call('salvar')
-        ->assertHasErrors('itens.0.ano_curso');
-});
-
-it('recusa a mesma disciplina duas vezes no mesmo ano', function () {
-    $curso = Curso::factory()->noEixo($this->eixo)->create();
-    $disciplina = Disciplina::factory()->noEixo($this->eixo)->create();
-
-    Livewire::actingAs($this->paeet)
-        ->test(FormularioGrade::class)
-        ->set('curso_id', $curso->id)
-        ->set('itens', [
-            ['disciplina_id' => $disciplina->id, 'ano_curso' => 1, 'carga_horaria' => 80],
-            ['disciplina_id' => $disciplina->id, 'ano_curso' => 1, 'carga_horaria' => 40],
-        ])
-        ->call('salvar')
-        ->assertHasErrors('itens.1.disciplina_id');
+        ->test(DetalheCurso::class, ['curso' => $montagem['curso']])
+        ->assertSee('Há mudanças ainda não publicadas')
+        ->assertSee('2º → 1º período');
 });
 
 it('cadastra uma turma congelando a versão da grade', function () {
-    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica']]);
+    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica']], autor: $this->paeet);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioTurma::class)
         ->set('curso_id', $montagem['curso']->id)
         ->set('grade_curricular_id', $montagem['grade']->id)
-        ->set('ano_curso', 1)
-        ->set('identificacao', '1DS')
+        ->set('periodo', 1)
+        ->set('nome', '1 A')
         ->set('periodo_letivo', '2026')
         ->call('salvar')
         ->assertHasNoErrors();
 
-    $turma = Turma::query()->where('identificacao', '1DS')->first();
+    $turma = Turma::query()->where('nome', '1 A')->first();
 
-    expect($turma->grade_curricular_id)->toBe($montagem['grade']->id)
+    expect($turma->periodo)->toBe(1)
+        ->and($turma->grade_curricular_id)->toBe($montagem['grade']->id)
         // Criar a turma já abre o histórico dela.
         ->and(TurmaHistorico::query()->where('turma_id', $turma->id)->count())->toBe(1);
 });
 
 it('recusa turma com grade de outro curso', function () {
-    $a = cursoComGrade($this->eixo, [1 => ['Lógica']]);
-    $b = cursoComGrade($this->eixo, [1 => ['Redes']]);
+    $a = cursoComGrade($this->eixo, [1 => ['Lógica']], autor: $this->paeet);
+    $b = cursoComGrade($this->eixo, [1 => ['Redes']], autor: $this->paeet);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioTurma::class)
         ->set('curso_id', $a['curso']->id)
         ->set('grade_curricular_id', $b['grade']->id)
-        ->set('identificacao', '1XX')
+        ->set('nome', '1 X')
         ->call('salvar')
         ->assertHasErrors('grade_curricular_id');
 });
@@ -204,7 +249,7 @@ it('recusa turma com grade de outro curso', function () {
 it('matricula um aluno e abre o histórico dele', function () {
     $turma = Turma::factory()
         ->doCurso(Curso::factory()->noEixo($this->eixo)->create())
-        ->create(['identificacao' => '1DS']);
+        ->create(['nome' => '1 A']);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioAluno::class)
@@ -239,8 +284,8 @@ it('recusa matrícula repetida na mesma turma', function () {
 
 it('grava histórico ao trocar o aluno de turma pelo formulário', function () {
     $curso = Curso::factory()->noEixo($this->eixo)->create();
-    $origem = Turma::factory()->doCurso($curso)->create(['identificacao' => '1DS-A']);
-    $destino = Turma::factory()->doCurso($curso)->create(['identificacao' => '1DS-B']);
+    $origem = Turma::factory()->doCurso($curso)->create(['nome' => '1 A']);
+    $destino = Turma::factory()->doCurso($curso)->create(['nome' => '1 B']);
 
     $aluno = Aluno::factory()->naTurma($origem)->create(['matricula' => '999']);
 
@@ -278,12 +323,65 @@ it('não oferece o botão de novo curso a quem não pode criar', function () {
         ->assertForbidden();
 });
 
-it('leva do curso recém-criado à grade e à turma', function () {
+it('leva do curso recém-criado à disciplina e à turma', function () {
     $curso = Curso::factory()->noEixo($this->eixo)->create();
 
     $this->actingAs($this->paeet)
         ->get(route('cursos.show', $curso))
         ->assertOk()
-        ->assertSee('Nova grade')
-        ->assertSee('Nova turma');
+        ->assertSee('Nova disciplina')
+        ->assertSee('Nova turma')
+        // Curso sem disciplina ainda não tem grade publicada.
+        ->assertSee('Nenhuma grade publicada ainda');
+});
+
+it('aceita nomes de turma em formato livre', function (string $nome) {
+    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica']], autor: $this->paeet);
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioTurma::class)
+        ->set('curso_id', $montagem['curso']->id)
+        ->set('grade_curricular_id', $montagem['grade']->id)
+        ->set('periodo', 1)
+        ->set('nome', $nome)
+        ->set('periodo_letivo', '2026')
+        ->call('salvar')
+        ->assertHasNoErrors();
+
+    expect(Turma::query()->where('nome', $nome)->exists())->toBeTrue();
+})->with(['2 A', '3B', 'Noturno A', '1 A - Manhã']);
+
+it('publica a v1 sozinha ao abrir a primeira turma de um curso', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create(['duracao_anos' => 2]);
+    Disciplina::factory()->doCurso($curso)->noPeriodo(1)->create(['nome' => 'Lógica']);
+
+    expect($curso->grades()->count())->toBe(0);
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioTurma::class)
+        ->set('curso_id', $curso->id)
+        ->set('periodo', 1)
+        ->set('nome', '1 A')
+        ->set('periodo_letivo', '2026')
+        ->call('salvar')
+        ->assertHasNoErrors();
+
+    expect($curso->grades()->count())->toBe(1)
+        ->and(Turma::query()->where('nome', '1 A')->value('grade_curricular_id'))
+        ->toBe($curso->grades()->value('id'));
+});
+
+it('recusa abrir turma em curso sem nenhuma disciplina', function () {
+    $curso = Curso::factory()->noEixo($this->eixo)->create();
+
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioTurma::class)
+        ->set('curso_id', $curso->id)
+        ->set('periodo', 1)
+        ->set('nome', '1 A')
+        ->set('periodo_letivo', '2026')
+        ->call('salvar')
+        ->assertHasErrors('grade_curricular_id');
+
+    expect(Turma::query()->where('nome', '1 A')->exists())->toBeFalse();
 });

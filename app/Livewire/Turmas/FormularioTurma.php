@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Turmas;
 
+use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
 use App\Enums\EventoHistorico;
 use App\Enums\StatusGrade;
 use App\Enums\StatusTurma;
+use App\Exceptions\RegraDeNegocioException;
 use App\Models\Curso;
 use App\Models\GradeCurricular;
 use App\Models\Turma;
@@ -25,9 +27,9 @@ class FormularioTurma extends Component
 
     public ?int $grade_curricular_id = null;
 
-    public int $ano_curso = 1;
+    public int $periodo = 1;
 
-    public string $identificacao = '';
+    public string $nome = '';
 
     public string $periodo_letivo = '';
 
@@ -43,8 +45,8 @@ class FormularioTurma extends Component
             $this->turma = $turma;
             $this->curso_id = $turma->curso_id;
             $this->grade_curricular_id = $turma->grade_curricular_id;
-            $this->ano_curso = $turma->ano_curso;
-            $this->identificacao = $turma->identificacao;
+            $this->periodo = $turma->periodo;
+            $this->nome = $turma->nome;
             $this->periodo_letivo = $turma->periodo_letivo;
             $this->status = $turma->status->value;
 
@@ -98,10 +100,10 @@ class FormularioTurma extends Component
                     fn ($consulta) => $consulta->where('curso_id', $this->curso_id)
                 ),
             ],
-            'ano_curso' => ['required', 'integer', 'min:1', 'max:'.$duracao],
-            'identificacao' => [
-                'required', 'string', 'max:30',
-                Rule::unique('turmas', 'identificacao')
+            'periodo' => ['required', 'integer', 'min:1', 'max:'.$duracao],
+            'nome' => [
+                'required', 'string', 'max:50',
+                Rule::unique('turmas', 'nome')
                     ->where(fn ($consulta) => $consulta
                         ->where('curso_id', $this->curso_id)
                         ->where('periodo_letivo', $this->periodo_letivo))
@@ -118,8 +120,8 @@ class FormularioTurma extends Component
         return [
             'curso_id' => 'curso',
             'grade_curricular_id' => 'grade curricular',
-            'ano_curso' => 'ano do curso',
-            'identificacao' => 'identificação',
+            'periodo' => 'período',
+            'nome' => 'nome da turma',
             'periodo_letivo' => 'período letivo',
         ];
     }
@@ -128,17 +130,33 @@ class FormularioTurma extends Component
     protected function messages(): array
     {
         return [
-            'identificacao.unique' => 'Já existe uma turma com esta identificação neste curso e período.',
+            'nome.unique' => 'Já existe uma turma com este nome neste curso e período letivo.',
             'grade_curricular_id.exists' => 'Selecione uma grade curricular do curso escolhido.',
-            'ano_curso.max' => 'O curso selecionado não chega a esse ano.',
+            'periodo.max' => 'O curso selecionado não chega a esse período.',
         ];
     }
 
-    public function salvar(RegistrarHistoricoDeTurma $historico): void
-    {
+    public function salvar(
+        RegistrarHistoricoDeTurma $historico,
+        PublicarVersaoDeGradeAction $publicar,
+    ): void {
         $this->turma !== null
             ? $this->authorize('update', $this->turma)
             : $this->authorize('create', Turma::class);
+
+        // Curso sem grade publicada: a primeira turma publica a v1 com as
+        // disciplinas cadastradas hoje, para não travar o fluxo numa etapa
+        // extra. A partir daí a turma fica congelada nessa foto.
+        if ($this->grade_curricular_id === null && $this->curso_id !== null) {
+            try {
+                $curso = Curso::query()->findOrFail($this->curso_id);
+                $this->grade_curricular_id = $publicar->garantirVigente($curso, auth()->user())->getKey();
+            } catch (RegraDeNegocioException $excecao) {
+                $this->addError('grade_curricular_id', $excecao->getMessage());
+
+                return;
+            }
+        }
 
         $dados = $this->validate();
 
@@ -186,7 +204,7 @@ class FormularioTurma extends Component
             'situacoes' => StatusTurma::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => $this->turma === null ? 'Nova turma' : 'Editar turma',
-            'subtitulo' => $this->turma?->identificacao,
+            'subtitulo' => $this->turma?->nome,
         ]);
     }
 }

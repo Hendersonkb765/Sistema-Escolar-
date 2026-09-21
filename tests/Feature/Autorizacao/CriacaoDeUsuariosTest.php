@@ -8,6 +8,7 @@
 
 use App\Enums\PerfilUsuario;
 use App\Livewire\Usuarios\FormularioUsuario;
+use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\User;
@@ -117,7 +118,9 @@ it('cria a conta com senha provisória quando nenhuma é informada', function ()
 
 it('registra o mesmo usuário como docente sem criar uma segunda conta', function () {
     $admin = paeetAdmin($this->eixo);
-    $disciplina = Disciplina::factory()->noEixo($this->eixo)->create();
+    $disciplina = Disciplina::factory()
+        ->doCurso(Curso::factory()->noEixo($this->eixo)->create())
+        ->create();
 
     $paeetQueLeciona = paeet($this->eixo);
 

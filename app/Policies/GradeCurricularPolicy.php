@@ -7,41 +7,23 @@ use App\Models\GradeCurricular;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Uma grade é uma foto do curso, não um documento editável. Só se cria
+ * (publicando uma versão) e se consulta.
+ */
 class GradeCurricularPolicy extends PolicyBase
 {
-    /**
-     * Uma grade só é editável enquanto está em rascunho e nenhuma turma a
-     * congelou. Depois disso, a mudança passa obrigatoriamente por uma
-     * nova versão.
-     */
     public function update(User $usuario, Model $registro): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $registro)
-            && $registro->editavel();
+        return false;
     }
 
     public function delete(User $usuario, Model $registro): bool
     {
-        return $this->update($usuario, $registro);
+        return false;
     }
 
-    /** Clonar a grade em uma nova versão de rascunho. */
-    public function novaVersao(User $usuario, GradeCurricular $grade): bool
-    {
-        return $usuario->ehGestao() && $this->noEscopo($usuario, $grade);
-    }
-
-    /** Publicar um rascunho, arquivando a versão vigente anterior. */
-    public function publicar(User $usuario, GradeCurricular $grade): bool
-    {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $grade)
-            && $grade->status === StatusGrade::Rascunho
-            && $grade->disciplinas()->exists();
-    }
-
-    /** Arquivar retira a grade de uso sem apagar nada. */
+    /** Arquivar retira a versão de circulação sem apagar nada. */
     public function arquivar(User $usuario, GradeCurricular $grade): bool
     {
         return $usuario->ehGestao()

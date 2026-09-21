@@ -26,8 +26,8 @@ class TurmaHistorico extends Model
         'evento',
         'curso_id',
         'grade_curricular_id',
-        'ano_curso',
-        'identificacao',
+        'periodo',
+        'nome',
         'periodo_letivo',
         'status',
         'metadados',
@@ -40,7 +40,7 @@ class TurmaHistorico extends Model
         return [
             'evento' => EventoHistorico::class,
             'metadados' => 'array',
-            'ano_curso' => 'integer',
+            'periodo' => 'integer',
             'created_at' => 'datetime',
         ];
     }

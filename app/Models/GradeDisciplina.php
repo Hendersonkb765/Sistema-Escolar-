@@ -20,14 +20,14 @@ class GradeDisciplina extends Model
     protected $fillable = [
         'grade_curricular_id',
         'disciplina_id',
-        'ano_curso',
+        'periodo',
         'carga_horaria',
     ];
 
     protected function casts(): array
     {
         return [
-            'ano_curso' => 'integer',
+            'periodo' => 'integer',
             'carga_horaria' => 'integer',
         ];
     }

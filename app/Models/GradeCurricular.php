@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -77,14 +78,33 @@ class GradeCurricular extends Model
         return $this->hasMany(Turma::class);
     }
 
-    /** Uma grade já congelada em alguma turma nunca pode ser editada. */
+    /** Uma grade já congelada em alguma turma nunca pode ser alterada. */
     public function emUso(): bool
     {
         return $this->turmas()->exists();
     }
 
+    /**
+     * Grades são fotos: não se editam, publicam-se novas. O método fica
+     * para quem perguntar, respondendo sempre que não.
+     */
     public function editavel(): bool
     {
-        return $this->status->editavel() && ! $this->emUso();
+        return false;
+    }
+
+    /**
+     * Disciplinas da foto agrupadas por período.
+     *
+     * @return Collection<int, Collection<int, GradeDisciplina>>
+     */
+    public function porPeriodo(): Collection
+    {
+        return $this->disciplinas()
+            ->with('disciplina')
+            ->orderBy('periodo')
+            ->get()
+            ->groupBy('periodo')
+            ->sortKeys();
     }
 }

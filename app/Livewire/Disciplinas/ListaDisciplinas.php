@@ -3,8 +3,8 @@
 namespace App\Livewire\Disciplinas;
 
 use App\Livewire\Concerns\ComTabela;
+use App\Models\Curso;
 use App\Models\Disciplina;
-use App\Models\Eixo;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,8 +16,11 @@ class ListaDisciplinas extends Component
     use AuthorizesRequests;
     use ComTabela;
 
-    #[Url(as: 'eixo', except: '')]
-    public string $filtroEixo = '';
+    #[Url(as: 'curso', except: '')]
+    public string $filtroCurso = '';
+
+    #[Url(as: 'periodo', except: '')]
+    public string $filtroPeriodo = '';
 
     public function mount(): void
     {
@@ -26,15 +29,20 @@ class ListaDisciplinas extends Component
 
     protected function colunasOrdenaveis(): array
     {
-        return ['nome', 'codigo', 'status'];
+        return ['nome', 'codigo', 'periodo', 'carga_horaria', 'status'];
     }
 
     protected function colunaPadrao(): string
     {
-        return 'nome';
+        return 'periodo';
     }
 
-    public function updatedFiltroEixo(): void
+    public function updatedFiltroCurso(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFiltroPeriodo(): void
     {
         $this->resetPage();
     }
@@ -45,7 +53,7 @@ class ListaDisciplinas extends Component
 
         $consulta = Disciplina::query()
             ->visivelPara($usuario)
-            ->with('eixo:id,nome')
+            ->with('curso:id,nome,codigo,eixo_id')
             ->withCount('gradeDisciplinas')
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
@@ -53,14 +61,15 @@ class ListaDisciplinas extends Component
                     ->where('nome', 'like', $termo)
                     ->orWhere('codigo', 'like', $termo));
             })
-            ->when($this->filtroEixo !== '', fn (Builder $q) => $q->where('eixo_id', $this->filtroEixo));
+            ->when($this->filtroCurso !== '', fn (Builder $q) => $q->where('curso_id', $this->filtroCurso))
+            ->when($this->filtroPeriodo !== '', fn (Builder $q) => $q->where('periodo', $this->filtroPeriodo));
 
         return view('disciplinas.lista', [
             'disciplinas' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
-            'eixos' => Eixo::query()->visivelPara($usuario)->orderBy('nome')->pluck('nome', 'id'),
+            'cursos' => Curso::query()->visivelPara($usuario)->orderBy('nome')->pluck('nome', 'id'),
         ])->layout('components.layouts.app', [
             'titulo' => 'Disciplinas',
-            'subtitulo' => 'Independentes de ano — a mesma disciplina serve a vários cursos e anos',
+            'subtitulo' => 'Cada disciplina pertence a um curso e a um período dele',
         ]);
     }
 }

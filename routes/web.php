@@ -12,7 +12,6 @@ use App\Livewire\Disciplinas\ListaDisciplinas;
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
-use App\Livewire\Grades\FormularioGrade;
 use App\Livewire\Grades\ListaGrades;
 use App\Livewire\Painel;
 use App\Livewire\Turmas\DetalheTurma;
@@ -51,10 +50,10 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/disciplinas/criar', FormularioDisciplina::class)->name('disciplinas.criar');
     Route::get('/disciplinas/{disciplina}/editar', FormularioDisciplina::class)->name('disciplinas.editar');
 
+    // A grade é publicada a partir do curso (foto das disciplinas), então
+    // aqui só se consulta.
     Route::get('/grades', ListaGrades::class)->name('grades.index');
-    Route::get('/grades/criar', FormularioGrade::class)->name('grades.criar');
     Route::get('/grades/{grade}', DetalheGrade::class)->name('grades.show');
-    Route::get('/grades/{grade}/editar', FormularioGrade::class)->name('grades.editar');
 
     Route::get('/turmas', ListaTurmas::class)->name('turmas.index');
     Route::get('/turmas/criar', FormularioTurma::class)->name('turmas.criar');

@@ -22,9 +22,9 @@
                 <dd class="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">{{ $turma->curso->nome }}</dd>
             </div>
             <div>
-                <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Ano</dt>
+                <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Período</dt>
                 <dd class="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {{ $turma->ano_curso }}º de {{ $turma->anoFinal() }}
+                    {{ $turma->periodo }}º de {{ $turma->periodoFinal() }}
                 </dd>
             </div>
             <div>
@@ -55,23 +55,23 @@
     </x-cartao>
 
     @if ($painelAvancoAberto)
-        <x-cartao titulo="Avançar para o {{ $turma->ano_curso + 1 }}º ano"
+        <x-cartao titulo="Avançar para o {{ $turma->periodo + 1 }}º período"
                   descricao="O estado atual da turma é gravado no histórico antes de qualquer mudança. Nada é apagado.">
             <div class="space-y-4">
                 <x-campo rotulo="Como avançar" para="turma-destino">
                     <x-select id="turma-destino" wire:model.live="turmaDestinoId">
-                        <option value="">Promover esta turma ({{ $turma->identificacao }} passa ao {{ $turma->ano_curso + 1 }}º ano)</option>
+                        <option value="">Promover esta turma ({{ $turma->nome }} passa ao {{ $turma->periodo + 1 }}º período)</option>
                         @foreach ($destinos as $destino)
-                            <option value="{{ $destino->id }}">Mover alunos para {{ $destino->identificacao }} ({{ $destino->periodo_letivo }})</option>
+                            <option value="{{ $destino->id }}">Mover alunos para {{ $destino->nome }} ({{ $destino->periodo_letivo }})</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 @if ($turmaDestinoId === '')
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <x-campo rotulo="Nova identificação" para="nova-identificacao"
+                        <x-campo rotulo="Novo nome da turma" para="novo-nome"
                                  ajuda="Sugerida a partir da atual.">
-                            <x-input id="nova-identificacao" wire:model="novaIdentificacao"/>
+                            <x-input id="novo-nome" wire:model="novoNome"/>
                         </x-campo>
 
                         <x-campo rotulo="Período letivo" para="novo-periodo">
@@ -99,16 +99,16 @@
     @endif
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <x-cartao titulo="Disciplinas do {{ $turma->ano_curso }}º ano"
-                  :descricao="'Pela grade v'.$turma->grade->versao.' · '.$disciplinasDoAno->sum('carga_horaria').'h'">
-            @forelse ($disciplinasDoAno->sortBy('disciplina.nome') as $item)
+        <x-cartao titulo="Disciplinas do {{ $turma->periodo }}º período"
+                  :descricao="'Pela grade v'.$turma->grade->versao.' · '.$disciplinasDoPeriodo->sum('carga_horaria').'h'">
+            @forelse ($disciplinasDoPeriodo->sortBy('disciplina.nome') as $item)
                 <div class="flex items-center justify-between border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
                     <span class="text-sm text-slate-700 dark:text-slate-200">{{ $item->disciplina->nome }}</span>
                     <span class="text-xs tabular-nums text-slate-400">{{ $item->carga_horaria }}h</span>
                 </div>
             @empty
                 <x-vazio titulo="Nenhuma disciplina neste ano"
-                         descricao="A grade congelada não define disciplinas para o {{ $turma->ano_curso }}º ano."/>
+                         descricao="A grade congelada não define disciplinas para o {{ $turma->periodo }}º período."/>
             @endforelse
         </x-cartao>
 
@@ -143,8 +143,8 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="text-sm text-slate-700 dark:text-slate-200">
-                                Estado anterior: {{ $registro->identificacao }} ·
-                                {{ $registro->ano_curso }}º ano ·
+                                Estado anterior: {{ $registro->nome }} ·
+                                {{ $registro->periodo }}º período ·
                                 grade v{{ $registro->grade?->versao ?? '—' }} ·
                                 {{ $registro->periodo_letivo }}
                             </p>

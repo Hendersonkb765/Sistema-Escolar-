@@ -3,6 +3,7 @@
 namespace App\Livewire\Usuarios;
 
 use App\Enums\PerfilUsuario;
+use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\User;
@@ -108,9 +109,14 @@ class FormularioUsuario extends Component
                 ),
             ],
             'disciplinasSelecionadas' => ['array'],
+            // A disciplina pertence a um curso, e o curso a um eixo:
+            // só vale vincular o que está no escopo de quem edita.
             'disciplinasSelecionadas.*' => [
                 Rule::exists('disciplinas', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn('eixo_id', $autor->eixoIds())
+                    fn ($consulta) => $consulta->whereIn(
+                        'curso_id',
+                        Curso::query()->whereIn('eixo_id', $autor->eixoIds())->select('id')
+                    )
                 ),
             ],
         ];
@@ -264,7 +270,13 @@ class FormularioUsuario extends Component
 
         return view('usuarios.formulario', [
             'eixosDisponiveis' => Eixo::query()->visivelPara($autor)->orderBy('nome')->get(),
-            'disciplinasDisponiveis' => Disciplina::query()->visivelPara($autor)->orderBy('nome')->get(),
+            'disciplinasDisponiveis' => Disciplina::query()
+                ->visivelPara($autor)
+                ->with('curso:id,nome,eixo_id')
+                ->orderBy('curso_id')
+                ->orderBy('periodo')
+                ->orderBy('nome')
+                ->get(),
             'perfisDisponiveis' => collect($this->perfisPermitidos($autor))
                 ->mapWithKeys(fn (string $valor) => [$valor => PerfilUsuario::from($valor)->rotulo()])
                 ->all(),

@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\StatusRegistro;
+use App\Models\Curso;
 use App\Models\Disciplina;
-use App\Models\Eixo;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -19,23 +19,30 @@ class DisciplinaFactory extends Factory
     {
         $nome = fake()->randomElement([
             'Lógica de Programação',
-            'Processos de Desenvolvimento',
-            'Banco de Dados',
             'Redes de Computadores',
-            'Gestão de Projetos',
+            'Back-end',
+            'Front-end',
+            'Banco de Dados',
         ]);
 
         return [
-            'eixo_id' => Eixo::factory(),
+            'curso_id' => Curso::factory(),
             'nome' => $nome,
             'codigo' => Str::upper(Str::substr(Str::slug($nome), 0, 3)).fake()->unique()->numberBetween(100, 999),
+            'periodo' => 1,
+            'carga_horaria' => fake()->randomElement([40, 60, 80]),
             'status' => StatusRegistro::Ativo,
         ];
     }
 
-    public function noEixo(Eixo $eixo): static
+    public function doCurso(Curso $curso): static
     {
-        return $this->state(fn () => ['eixo_id' => $eixo->getKey()]);
+        return $this->state(fn () => ['curso_id' => $curso->getKey()]);
+    }
+
+    public function noPeriodo(int $periodo): static
+    {
+        return $this->state(fn () => ['periodo' => $periodo]);
     }
 
     public function chamada(string $nome): static

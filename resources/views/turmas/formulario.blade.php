@@ -15,8 +15,9 @@
                          :erro="$errors->first('grade_curricular_id')"
                          ajuda="Esta versão fica congelada na turma: publicar uma grade nova depois não muda esta turma.">
                     @if ($gradesDisponiveis->isEmpty())
-                        <x-alerta tipo="atencao">
-                            O curso selecionado ainda não tem grade curricular. Cadastre e publique uma antes de abrir a turma.
+                        <x-alerta tipo="info">
+                            Este curso ainda não tem grade publicada. Ao salvar, o sistema publica a
+                            <strong>v1</strong> com as disciplinas cadastradas hoje e congela a turma nela.
                         </x-alerta>
                     @else
                         <x-select id="grade_curricular_id" wire:model="grade_curricular_id" required>
@@ -31,17 +32,18 @@
                 </x-campo>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <x-campo rotulo="Ano do curso" para="ano_curso" obrigatorio :erro="$errors->first('ano_curso')">
-                        <x-select id="ano_curso" wire:model="ano_curso" required>
-                            <option value="1">1º ano</option>
-                            <option value="2">2º ano</option>
-                            <option value="3">3º ano</option>
+                    <x-campo rotulo="Período" para="periodo" obrigatorio :erro="$errors->first('periodo')"
+                             ajuda="Ano do curso que a turma cursa.">
+                        <x-select id="periodo" wire:model="periodo" required>
+                            <option value="1">1º período</option>
+                            <option value="2">2º período</option>
+                            <option value="3">3º período</option>
                         </x-select>
                     </x-campo>
 
-                    <x-campo rotulo="Identificação" para="identificacao" obrigatorio
-                             :erro="$errors->first('identificacao')" ajuda="Ex.: 1DS">
-                        <x-input id="identificacao" wire:model="identificacao" required/>
+                    <x-campo rotulo="Nome da turma" para="nome" obrigatorio
+                             :erro="$errors->first('nome')" ajuda="Ex.: 2 A, 3B, Noturno A">
+                        <x-input id="nome" wire:model="nome" required placeholder="2 A"/>
                     </x-campo>
 
                     <x-campo rotulo="Período letivo" para="periodo_letivo" obrigatorio :erro="$errors->first('periodo_letivo')">

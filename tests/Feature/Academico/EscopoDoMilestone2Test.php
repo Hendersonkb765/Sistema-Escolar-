@@ -25,7 +25,7 @@ beforeEach(function () {
     $this->gradeAlheia = $alheio['grade'];
     $this->turmaAlheia = Turma::factory()->doCurso($this->cursoAlheio, $this->gradeAlheia)->create();
     $this->alunoAlheio = Aluno::factory()->naTurma($this->turmaAlheia)->create();
-    $this->disciplinaAlheia = Disciplina::factory()->noEixo($this->administracao)->create();
+    $this->disciplinaAlheia = Disciplina::factory()->doCurso($this->cursoAlheio)->create();
 });
 
 it('responde 403 ao professor em toda rota de escrita do milestone 2', function (string $rota) {
@@ -33,7 +33,6 @@ it('responde 403 ao professor em toda rota de escrita do milestone 2', function 
 })->with([
     'cursos.criar',
     'disciplinas.criar',
-    'grades.criar',
     'turmas.criar',
     'alunos.criar',
 ]);
@@ -59,7 +58,6 @@ it('responde 403 em recurso de outro eixo acessado por id', function (string $ro
     ['cursos.show', 'cursoAlheio'],
     ['disciplinas.editar', 'disciplinaAlheia'],
     ['grades.show', 'gradeAlheia'],
-    ['grades.editar', 'gradeAlheia'],
     ['turmas.show', 'turmaAlheia'],
     ['turmas.editar', 'turmaAlheia'],
     ['alunos.editar', 'alunoAlheio'],
@@ -68,11 +66,11 @@ it('responde 403 em recurso de outro eixo acessado por id', function (string $ro
 it('não vaza registros de outro eixo nas listagens novas', function () {
     $proprio = cursoComGrade($this->tecnologia, [1 => ['Lógica de Programação']]);
     $turmaPropria = Turma::factory()->doCurso($proprio['curso'], $proprio['grade'])->create([
-        'identificacao' => '1DS',
+        'nome' => '1 A',
     ]);
     Aluno::factory()->naTurma($turmaPropria)->create(['nome' => 'Aluna Visível']);
     $this->alunoAlheio->update(['nome' => 'Aluno Oculto']);
-    $this->turmaAlheia->update(['identificacao' => '1CT']);
+    $this->turmaAlheia->update(['nome' => '1 C']);
     $this->disciplinaAlheia->update(['nome' => 'Contabilidade Geral']);
 
     $como = fn (string $rota) => $this->actingAs($this->paeetTecnologia)->get(route($rota));
@@ -81,7 +79,7 @@ it('não vaza registros de outro eixo nas listagens novas', function () {
         ->assertSee('Lógica de Programação')->assertDontSee('Contabilidade Geral');
 
     $como('turmas.index')->assertOk()
-        ->assertSee('1DS')->assertDontSee('1CT');
+        ->assertSee('1 A')->assertDontSee('1 C');
 
     $como('alunos.index')->assertOk()
         ->assertSee('Aluna Visível')->assertDontSee('Aluno Oculto');

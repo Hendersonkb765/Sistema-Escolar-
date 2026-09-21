@@ -115,15 +115,19 @@ class FormularioCurso extends Component
     }
 
     /**
-     * Encurtar o curso deixaria turmas em um ano que deixou de existir.
+     * Encurtar o curso deixaria turmas e disciplinas em um período que
+     * passou a não existir.
      */
     protected function impedirReducaoDeDuracaoComTurmas(int $novaDuracao): void
     {
-        $anoMaisAvancado = (int) $this->curso->turmas()->max('ano_curso');
+        $periodoMaisAvancado = max(
+            (int) $this->curso->turmas()->max('periodo'),
+            (int) $this->curso->disciplinas()->max('periodo'),
+        );
 
-        if ($anoMaisAvancado > $novaDuracao) {
+        if ($periodoMaisAvancado > $novaDuracao) {
             throw ValidationException::withMessages([
-                'duracao_anos' => "Há turmas no {$anoMaisAvancado}º ano; a duração não pode ser menor que isso.",
+                'duracao_anos' => "Há turmas ou disciplinas no {$periodoMaisAvancado}º período; a duração não pode ser menor que isso.",
             ]);
         }
     }

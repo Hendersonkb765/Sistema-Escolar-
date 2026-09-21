@@ -182,7 +182,7 @@ class FormularioAluno extends Component
             'turmasDisponiveis' => Turma::query()
                 ->visivelPara(auth()->user())
                 ->with('curso:id,nome,eixo_id')
-                ->orderBy('identificacao')
+                ->orderBy('nome')
                 ->get(),
             'situacoes' => StatusAluno::opcoes(),
             'trocandoDeTurma' => $this->aluno !== null && (int) $this->turma_id !== (int) $this->turmaOriginal,

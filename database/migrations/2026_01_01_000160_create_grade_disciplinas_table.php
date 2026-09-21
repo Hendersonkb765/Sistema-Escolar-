@@ -12,12 +12,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('grade_curricular_id')->constrained('grades_curriculares')->cascadeOnDelete();
             $table->foreignId('disciplina_id')->constrained('disciplinas')->restrictOnDelete();
-            $table->unsignedTinyInteger('ano_curso');
+            // Período congelado no momento da foto.
+            $table->unsignedTinyInteger('periodo');
             $table->unsignedSmallInteger('carga_horaria')->default(0);
             $table->timestamps();
 
-            $table->unique(['grade_curricular_id', 'disciplina_id', 'ano_curso'], 'grade_disc_ano_unique');
-            $table->index(['grade_curricular_id', 'ano_curso']);
+            $table->unique(['grade_curricular_id', 'disciplina_id'], 'grade_disc_unique');
+            $table->index(['grade_curricular_id', 'periodo']);
         });
     }
 

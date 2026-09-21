@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('evento', 30)->index();
             $table->foreignId('curso_id')->constrained('cursos')->restrictOnDelete();
             $table->foreignId('grade_curricular_id')->constrained('grades_curriculares')->restrictOnDelete();
-            $table->unsignedTinyInteger('ano_curso');
-            $table->string('identificacao', 30);
+            $table->unsignedTinyInteger('periodo');
+            $table->string('nome', 50);
             $table->string('periodo_letivo', 20);
             $table->string('status', 20);
             $table->json('metadados')->nullable();

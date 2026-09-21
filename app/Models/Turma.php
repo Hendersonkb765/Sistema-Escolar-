@@ -26,8 +26,8 @@ class Turma extends Model
     protected $fillable = [
         'curso_id',
         'grade_curricular_id',
-        'ano_curso',
-        'identificacao',
+        'periodo',
+        'nome',
         'periodo_letivo',
         'status',
     ];
@@ -39,7 +39,7 @@ class Turma extends Model
     {
         return [
             'status' => StatusTurma::class,
-            'ano_curso' => 'integer',
+            'periodo' => 'integer',
         ];
     }
 
@@ -99,22 +99,23 @@ class Turma extends Model
     }
 
     /**
-     * Disciplinas do ano corrente da turma, segundo a grade congelada.
+     * Disciplinas do período corrente da turma, segundo a foto de grade
+     * congelada nela.
      *
      * @return Collection<int, GradeDisciplina>
      */
-    public function disciplinasDoAno(?int $ano = null): Collection
+    public function disciplinasDoPeriodo(?int $periodo = null): Collection
     {
         return $this->grade
             ->disciplinas()
             ->with('disciplina')
-            ->where('ano_curso', $ano ?? $this->ano_curso)
+            ->where('periodo', $periodo ?? $this->periodo)
             ->orderBy('id')
             ->get();
     }
 
-    /** Último ano previsto pelo curso. */
-    public function anoFinal(): int
+    /** Último período previsto pelo curso. */
+    public function periodoFinal(): int
     {
         return (int) $this->curso->duracao_anos;
     }
@@ -122,18 +123,18 @@ class Turma extends Model
     public function podeAvancar(): bool
     {
         return $this->status === StatusTurma::Ativa
-            && $this->ano_curso < $this->anoFinal();
+            && $this->periodo < $this->periodoFinal();
     }
 
     /**
-     * Sugere a identificação do próximo ano trocando o prefixo numérico:
-     * 2DS vira 3DS. Quando a identificação não começa por dígito, o valor
-     * atual é mantido e cabe ao usuário ajustar.
+     * Sugere o nome do próximo período trocando o prefixo numérico:
+     * "2 A" vira "3 A". O nome é livre, então quando não começa por
+     * dígito o valor atual é mantido e cabe ao usuário ajustar.
      */
-    public function identificacaoParaAno(int $ano): string
+    public function nomeParaPeriodo(int $periodo): string
     {
-        return preg_match('/^\\d+/', $this->identificacao) === 1
-            ? preg_replace('/^\\d+/', (string) $ano, $this->identificacao)
-            : $this->identificacao;
+        return preg_match('/^\\d+/', $this->nome) === 1
+            ? preg_replace('/^\\d+/', (string) $periodo, $this->nome)
+            : $this->nome;
     }
 }
