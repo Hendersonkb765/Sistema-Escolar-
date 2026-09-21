@@ -20,9 +20,11 @@ class TurmaFactory extends Factory
         return [
             'curso_id' => Curso::factory(),
             // A grade nasce do mesmo curso: a turma congela uma versão dele.
-            'grade_curricular_id' => fn (array $atributos) => GradeCurricular::factory()
-                ->create(['curso_id' => $atributos['curso_id']])
-                ->getKey(),
+            'grade_curricular_id' => fn (array $atributos) => GradeCurricular::query()
+                ->where('curso_id', $atributos['curso_id'])
+                ->orderByDesc('versao')
+                ->value('id')
+                ?? GradeCurricular::factory()->create(['curso_id' => $atributos['curso_id']])->getKey(),
             'ano_curso' => 1,
             'identificacao' => '1DS',
             'periodo_letivo' => (string) now()->format('Y'),
@@ -33,7 +35,9 @@ class TurmaFactory extends Factory
     /** Amarra turma e grade ao mesmo curso — o caso real. */
     public function doCurso(Curso $curso, ?GradeCurricular $grade = null): static
     {
-        $grade ??= GradeCurricular::factory()->doCurso($curso)->create();
+        // Reaproveita a grade que o curso já tem; só cria uma quando não há.
+        $grade ??= $curso->grades()->orderByDesc('versao')->first()
+            ?? GradeCurricular::factory()->doCurso($curso)->create();
 
         return $this->state(fn () => [
             'curso_id' => $curso->getKey(),

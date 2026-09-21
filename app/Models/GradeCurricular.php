@@ -31,6 +31,9 @@ class GradeCurricular extends Model
         'origem_grade_id',
     ];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'rascunho'];
+
     protected function casts(): array
     {
         return [

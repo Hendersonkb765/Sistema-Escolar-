@@ -1,13 +1,26 @@
 <div class="space-y-4">
     <x-cartao>
-        <x-campo rotulo="Buscar" para="busca" class="sm:max-w-sm">
-            <x-input id="busca" wire:model.live.debounce.400ms="busca" placeholder="Nome ou código"/>
-        </x-campo>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <x-campo rotulo="Buscar" para="busca" class="flex-1 sm:max-w-sm">
+                <x-input id="busca" wire:model.live.debounce.400ms="busca" placeholder="Nome ou código"/>
+            </x-campo>
+
+            @can('create', App\Models\Curso::class)
+                <x-botao href="{{ route('cursos.criar') }}" wire:navigate class="shrink-0">Novo curso</x-botao>
+            @endcan
+        </div>
     </x-cartao>
 
-    <x-cartao descricao="O cadastro completo de cursos, grades e turmas chega no milestone 2.">
+    <x-cartao>
         @if ($cursos->isEmpty())
-            <x-vazio titulo="Nenhum curso no seu escopo"/>
+            <x-vazio titulo="Nenhum curso no seu escopo"
+                     descricao="Cadastre o primeiro curso deste eixo.">
+                <x-slot:acoes>
+                    @can('create', App\Models\Curso::class)
+                        <x-botao href="{{ route('cursos.criar') }}" wire:navigate>Novo curso</x-botao>
+                    @endcan
+                </x-slot:acoes>
+            </x-vazio>
         @else
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -36,7 +49,12 @@
                                     <x-badge :cor="$curso->status->cor()" :rotulo="$curso->status->rotulo()"/>
                                 </td>
                                 <td class="px-4 py-3 text-right sm:px-6">
-                                    <x-botao variante="discreto" href="{{ route('cursos.show', $curso) }}" wire:navigate>Ver</x-botao>
+                                    <div class="flex items-center justify-end gap-1">
+                                        <x-botao variante="discreto" href="{{ route('cursos.show', $curso) }}" wire:navigate>Ver</x-botao>
+                                        @can('update', $curso)
+                                            <x-botao variante="discreto" href="{{ route('cursos.editar', $curso) }}" wire:navigate>Editar</x-botao>
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

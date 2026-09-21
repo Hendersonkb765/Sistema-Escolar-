@@ -2,16 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Aluno;
-use App\Models\Disciplina;
-use App\Models\GradeCurricular;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
 use App\Models\ResultadoAluno;
 use App\Models\SolicitacaoProva;
-use App\Models\Turma;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -29,34 +25,6 @@ class ModuloEmConstrucaoController extends Controller
      * @var array<string, array{model: class-string, habilidade: string, titulo: string, descricao: string, etapa: string}>
      */
     protected array $modulos = [
-        'disciplinas.index' => [
-            'model' => Disciplina::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Disciplinas',
-            'descricao' => 'Cadastro de disciplinas independentes de ano, reaproveitáveis entre cursos.',
-            'etapa' => 'Milestone 2',
-        ],
-        'grades.index' => [
-            'model' => GradeCurricular::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Grades curriculares',
-            'descricao' => 'Grades versionadas por curso: alterar a grade cria uma nova versão e preserva as anteriores.',
-            'etapa' => 'Milestone 2',
-        ],
-        'turmas.index' => [
-            'model' => Turma::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Turmas',
-            'descricao' => 'Turmas com a versão da grade congelada, avanço de ano e histórico completo.',
-            'etapa' => 'Milestone 2',
-        ],
-        'alunos.index' => [
-            'model' => Aluno::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Alunos',
-            'descricao' => 'Matrículas por turma, com histórico de movimentações.',
-            'etapa' => 'Milestone 2',
-        ],
         'solicitacoes.index' => [
             'model' => SolicitacaoProva::class,
             'habilidade' => 'viewAny',

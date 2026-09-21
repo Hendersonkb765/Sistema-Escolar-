@@ -95,7 +95,7 @@ em `professor_disciplina` e independe do perfil.
 | # | Milestone | Situação |
 |---|---|---|
 | 1 | Setup, auth sem registro público, perfis, escopo, policies, testes | ✅ concluído |
-| 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | schema pronto, UI pendente |
+| 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | ✅ concluído |
 | 3 | Solicitações de questões, área do professor, prazos | schema pronto, UI pendente |
 | 4 | Análise, feedbacks, reenvio e versionamento | schema pronto, UI pendente |
 | 5 | Montagem da prova, modelo e PDF | schema pronto, UI pendente |
@@ -108,3 +108,34 @@ constraints. Os módulos ainda sem tela respondem por
 `ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
 um professor recebe 403 em `/solicitacoes/criar`, `/provas/criar` e
 `/importacoes/criar` desde hoje, não quando a tela ficar pronta.
+
+## Grade versionada e avanço de ano
+
+Uma grade só é editável enquanto é rascunho e nenhuma turma a congelou.
+Depois disso, mudar a grade significa **criar a próxima versão**
+(`CriarNovaVersaoDeGradeAction`), ajustá-la e publicá-la
+(`PublicarGradeAction`). Publicar arquiva a versão anterior sem apagá-la: as
+turmas continuam ligadas à versão com que começaram, e é por isso que mover
+Banco de Dados do 2º para o 3º ano não reescreve o percurso de quem já está
+no meio do curso.
+
+`AvancarTurmaAction` roda em transação e grava o estado anterior em
+`turma_historicos` **antes** de qualquer escrita. Tem duas modalidades:
+
+- **promoção** — a própria turma avança: 2DS passa a 3DS, os alunos seguem
+  juntos e as disciplinas do novo ano saem da grade congelada;
+- **remanejamento** — os alunos vão para uma turma já aberta do ano seguinte,
+  cada movimentação com registro em `aluno_historicos`, e a turma de origem
+  passa a "Concluída".
+
+Quando a escola mantém 1DS, 2DS e 3DS no mesmo período letivo, promover 2DS
+esbarraria na turma 3DS existente. Nesse caso a action recusa com a razão e
+as saídas possíveis, em vez de estourar a unicidade no banco.
+
+### Autorização x regra de negócio
+
+As Policies respondem apenas "este recurso é seu?" (403). "Dá para fazer
+isto agora?" — turma no último ano, grade sem disciplinas, identificação em
+conflito — é decidido nas actions, que lançam `RegraDeNegocioException` com
+uma mensagem explicativa. Misturar as duas coisas transformaria um "ainda
+não dá" em um 403 mudo.

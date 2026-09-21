@@ -7,8 +7,10 @@
 
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Usuarios\ListaUsuarios;
+use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Eixo;
+use App\Models\Turma;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -49,8 +51,31 @@ it('renderiza cada tela do PAEET Admin', function (string $rota) {
 
 it('renderiza as telas com parâmetro de rota', function () {
     $this->actingAs($this->admin)->get(route('cursos.show', $this->curso))->assertOk();
+    $this->actingAs($this->admin)->get(route('cursos.editar', $this->curso))->assertOk();
     $this->actingAs($this->admin)->get(route('eixos.editar', $this->eixo))->assertOk();
     $this->actingAs($this->admin)->get(route('usuarios.editar', $this->admin))->assertOk();
+});
+
+it('renderiza as telas do milestone 2', function () {
+    $montagem = cursoComGrade($this->eixo, [1 => ['Lógica'], 2 => ['Banco de Dados']]);
+    $turma = Turma::factory()->doCurso($montagem['curso'], $montagem['grade'])->create();
+    $aluno = Aluno::factory()->naTurma($turma)->create();
+    $disciplina = $montagem['disciplinas']->first();
+
+    $como = fn (string $rota, $parametro = null) => $this->actingAs($this->admin)
+        ->get($parametro === null ? route($rota) : route($rota, $parametro))
+        ->assertOk();
+
+    $como('cursos.criar');
+    $como('disciplinas.criar');
+    $como('disciplinas.editar', $disciplina);
+    $como('grades.criar');
+    $como('grades.show', $montagem['grade']);
+    $como('turmas.criar');
+    $como('turmas.show', $turma);
+    $como('turmas.editar', $turma);
+    $como('alunos.criar');
+    $como('alunos.editar', $aluno);
 });
 
 it('filtra a listagem de usuários por busca, perfil e situação', function () {

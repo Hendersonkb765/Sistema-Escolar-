@@ -2,8 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Academico\RegistrarHistoricoDeTurma;
+use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
 use App\Enums\StatusGrade;
+use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
@@ -103,7 +106,7 @@ class DemonstracaoSeeder extends Seeder
         }
 
         foreach ([1 => '1DS', 2 => '2DS', 3 => '3DS'] as $ano => $identificacao) {
-            Turma::query()->firstOrCreate(
+            $turma = Turma::query()->firstOrCreate(
                 [
                     'curso_id' => $curso->id,
                     'identificacao' => $identificacao,
@@ -114,6 +117,24 @@ class DemonstracaoSeeder extends Seeder
                     'ano_curso' => $ano,
                 ]
             );
+
+            if ($turma->alunos()->doesntExist()) {
+                foreach (range(1, 6) as $indice) {
+                    Aluno::query()->create([
+                        'turma_id' => $turma->id,
+                        'nome' => fake('pt_BR')->name(),
+                        'matricula' => now()->format('Y').$ano.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
+                    ]);
+                }
+            }
+
+            if ($turma->historicos()->doesntExist()) {
+                app(RegistrarHistoricoDeTurma::class)->executar(
+                    turma: $turma,
+                    evento: EventoHistorico::TurmaCriada,
+                    autor: $admin,
+                );
+            }
         }
 
         $professor = User::query()->firstOrCreate(

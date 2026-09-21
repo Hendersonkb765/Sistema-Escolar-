@@ -2,11 +2,22 @@
 
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\ModuloEmConstrucaoController;
+use App\Livewire\Alunos\FormularioAluno;
+use App\Livewire\Alunos\ListaAlunos;
 use App\Livewire\Cursos\DetalheCurso;
+use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
+use App\Livewire\Disciplinas\FormularioDisciplina;
+use App\Livewire\Disciplinas\ListaDisciplinas;
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
+use App\Livewire\Grades\DetalheGrade;
+use App\Livewire\Grades\FormularioGrade;
+use App\Livewire\Grades\ListaGrades;
 use App\Livewire\Painel;
+use App\Livewire\Turmas\DetalheTurma;
+use App\Livewire\Turmas\FormularioTurma;
+use App\Livewire\Turmas\ListaTurmas;
 use App\Livewire\Usuarios\FormularioUsuario;
 use App\Livewire\Usuarios\ListaUsuarios;
 use Illuminate\Support\Facades\Route;
@@ -32,14 +43,29 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/eixos/{eixo}/editar', FormularioEixo::class)->name('eixos.editar');
 
     Route::get('/cursos', ListaCursos::class)->name('cursos.index');
+    Route::get('/cursos/criar', FormularioCurso::class)->name('cursos.criar');
     Route::get('/cursos/{curso}', DetalheCurso::class)->name('cursos.show');
+    Route::get('/cursos/{curso}/editar', FormularioCurso::class)->name('cursos.editar');
 
-    Route::get('/disciplinas', ModuloEmConstrucaoController::class)->name('disciplinas.index');
-    Route::get('/grades', ModuloEmConstrucaoController::class)->name('grades.index');
-    Route::get('/turmas', ModuloEmConstrucaoController::class)->name('turmas.index');
-    Route::get('/alunos', ModuloEmConstrucaoController::class)->name('alunos.index');
+    Route::get('/disciplinas', ListaDisciplinas::class)->name('disciplinas.index');
+    Route::get('/disciplinas/criar', FormularioDisciplina::class)->name('disciplinas.criar');
+    Route::get('/disciplinas/{disciplina}/editar', FormularioDisciplina::class)->name('disciplinas.editar');
 
-    // --- Avaliações ------------------------------------------------------
+    Route::get('/grades', ListaGrades::class)->name('grades.index');
+    Route::get('/grades/criar', FormularioGrade::class)->name('grades.criar');
+    Route::get('/grades/{grade}', DetalheGrade::class)->name('grades.show');
+    Route::get('/grades/{grade}/editar', FormularioGrade::class)->name('grades.editar');
+
+    Route::get('/turmas', ListaTurmas::class)->name('turmas.index');
+    Route::get('/turmas/criar', FormularioTurma::class)->name('turmas.criar');
+    Route::get('/turmas/{turma}', DetalheTurma::class)->name('turmas.show');
+    Route::get('/turmas/{turma}/editar', FormularioTurma::class)->name('turmas.editar');
+
+    Route::get('/alunos', ListaAlunos::class)->name('alunos.index');
+    Route::get('/alunos/criar', FormularioAluno::class)->name('alunos.criar');
+    Route::get('/alunos/{aluno}/editar', FormularioAluno::class)->name('alunos.editar');
+
+    // --- Avaliações (milestones 3 a 7) -----------------------------------
     Route::get('/solicitacoes', ModuloEmConstrucaoController::class)->name('solicitacoes.index');
     Route::get('/solicitacoes/criar', ModuloEmConstrucaoController::class)->name('solicitacoes.criar');
 

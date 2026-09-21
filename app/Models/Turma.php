@@ -32,6 +32,9 @@ class Turma extends Model
         'status',
     ];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'ativa'];
+
     protected function casts(): array
     {
         return [
@@ -100,12 +103,37 @@ class Turma extends Model
      *
      * @return Collection<int, GradeDisciplina>
      */
-    public function disciplinasDoAno(): Collection
+    public function disciplinasDoAno(?int $ano = null): Collection
     {
         return $this->grade
             ->disciplinas()
             ->with('disciplina')
-            ->where('ano_curso', $this->ano_curso)
+            ->where('ano_curso', $ano ?? $this->ano_curso)
+            ->orderBy('id')
             ->get();
+    }
+
+    /** Último ano previsto pelo curso. */
+    public function anoFinal(): int
+    {
+        return (int) $this->curso->duracao_anos;
+    }
+
+    public function podeAvancar(): bool
+    {
+        return $this->status === StatusTurma::Ativa
+            && $this->ano_curso < $this->anoFinal();
+    }
+
+    /**
+     * Sugere a identificação do próximo ano trocando o prefixo numérico:
+     * 2DS vira 3DS. Quando a identificação não começa por dígito, o valor
+     * atual é mantido e cabe ao usuário ajustar.
+     */
+    public function identificacaoParaAno(int $ano): string
+    {
+        return preg_match('/^\\d+/', $this->identificacao) === 1
+            ? preg_replace('/^\\d+/', (string) $ano, $this->identificacao)
+            : $this->identificacao;
     }
 }

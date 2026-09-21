@@ -23,6 +23,9 @@ class Eixo extends Model
 
     protected $fillable = ['nome', 'codigo', 'status'];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'ativo'];
+
     protected function casts(): array
     {
         return ['status' => StatusRegistro::class];

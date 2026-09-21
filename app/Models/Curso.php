@@ -25,6 +25,9 @@ class Curso extends Model
 
     protected $fillable = ['eixo_id', 'nome', 'codigo', 'duracao_anos', 'status'];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'ativo'];
+
     protected function casts(): array
     {
         return [

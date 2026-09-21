@@ -24,6 +24,9 @@ class Aluno extends Model
 
     protected $fillable = ['turma_id', 'nome', 'matricula', 'status'];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'ativo'];
+
     protected function casts(): array
     {
         return ['status' => StatusAluno::class];
