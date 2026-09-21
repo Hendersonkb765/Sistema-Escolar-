@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\StatusGrade;
+use App\Models\Concerns\AplicaEscopoDeEixo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
+
+class GradeCurricular extends Model
+{
+    use AplicaEscopoDeEixo;
+    use HasFactory;
+    use LogsActivity;
+    use SoftDeletes;
+
+    protected $table = 'grades_curriculares';
+
+    protected $fillable = [
+        'curso_id',
+        'versao',
+        'ano_vigencia',
+        'status',
+        'observacoes',
+        'criado_por',
+        'origem_grade_id',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'status' => StatusGrade::class,
+            'versao' => 'integer',
+            'ano_vigencia' => 'integer',
+        ];
+    }
+
+    public static function caminhoDoEixo(): string
+    {
+        return 'curso.eixo';
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()->logFillable()->logOnlyDirty()->useLogName('grade');
+    }
+
+    /** @return BelongsTo<Curso, $this> */
+    public function curso(): BelongsTo
+    {
+        return $this->belongsTo(Curso::class);
+    }
+
+    /** @return BelongsTo<GradeCurricular, $this> */
+    public function origem(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'origem_grade_id');
+    }
+
+    /** @return HasMany<GradeDisciplina, $this> */
+    public function disciplinas(): HasMany
+    {
+        return $this->hasMany(GradeDisciplina::class);
+    }
+
+    /** @return HasMany<Turma, $this> */
+    public function turmas(): HasMany
+    {
+        return $this->hasMany(Turma::class);
+    }
+
+    /** Uma grade já congelada em alguma turma nunca pode ser editada. */
+    public function emUso(): bool
+    {
+        return $this->turmas()->exists();
+    }
+
+    public function editavel(): bool
+    {
+        return $this->status->editavel() && ! $this->emUso();
+    }
+}

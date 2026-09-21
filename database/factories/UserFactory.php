@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\PerfilUsuario;
+use App\Models\Eixo;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -12,34 +14,57 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
-    protected static ?string $password;
+    protected $model = User::class;
 
-    /**
-     * Define the model's default state.
-     *
-     * @return array<string, mixed>
-     */
+    protected static ?string $senhaPadrao = null;
+
     public function definition(): array
     {
         return [
-            'name' => fake()->name(),
+            'nome' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
+            'password' => static::$senhaPadrao ??= Hash::make('senha-de-teste'),
+            'perfil' => PerfilUsuario::Professor,
+            'ativo' => true,
+            'telefone' => null,
             'remember_token' => Str::random(10),
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
+    public function paeetAdmin(): static
+    {
+        return $this->state(fn () => ['perfil' => PerfilUsuario::PaeetAdmin]);
+    }
+
+    public function paeet(): static
+    {
+        return $this->state(fn () => ['perfil' => PerfilUsuario::Paeet]);
+    }
+
+    public function professor(): static
+    {
+        return $this->state(fn () => ['perfil' => PerfilUsuario::Professor]);
+    }
+
+    public function inativo(): static
+    {
+        return $this->state(fn () => ['ativo' => false]);
+    }
+
+    /** Vincula o usuário aos Eixos indicados após a criação. */
+    public function noEixo(Eixo|int ...$eixos): static
+    {
+        return $this->afterCreating(function (User $usuario) use ($eixos) {
+            $usuario->eixos()->syncWithoutDetaching(
+                collect($eixos)->map(fn ($eixo) => $eixo instanceof Eixo ? $eixo->getKey() : $eixo)->all()
+            );
+            $usuario->esquecerEscopo();
+        });
+    }
+
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn () => ['email_verified_at' => null]);
     }
 }

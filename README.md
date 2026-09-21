@@ -1,58 +1,110 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# PAEET Avaliações
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Plataforma de gestão acadêmica e do ciclo completo de avaliações: estrutura
+acadêmica hierárquica, solicitação de questões aos professores, análise e
+aprovação, montagem automática de provas, geração em PDF, importação de
+resultados via planilha e cálculo de notas por disciplina com pesos.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Camada | Escolha |
+|---|---|
+| Runtime | PHP 8.4 · Laravel 12 |
+| Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
+| Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
+| Auth | Laravel Fortify **sem registro público** |
+| PDF | `barryvdh/laravel-dompdf` |
+| Planilhas | `maatwebsite/excel` |
+| Auditoria | `spatie/laravel-activitylog` v5 |
+| Testes | Pest 3 |
+| Filas | driver `database` |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Regra de ouro
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**Não existe cadastro público.** Não há rota, tela, link ou controller de
+registro; `Features::registration()` está desligada e a action
+`CreateNewUser` foi removida. Uma conta só nasce em `/usuarios/criar`, criada
+por um PAEET Admin ou por um PAEET, e só entra se existir e estiver com
+`ativo = true`.
 
-## Learning Laravel
+O `ativo` é verificado em três camadas independentes:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+1. `Fortify::authenticateUsing()` — barra o login;
+2. `GarantirUsuarioAtivo` — middleware `web`, derruba a sessão em curso;
+3. `Gate::before()` — nega qualquer autorização, inclusive fora do HTTP.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Como rodar
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+npm install
+cp .env.example .env && php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed          # DemonstracaoSeeder: recusa rodar em produção
+npm run build                       # ou: npm run dev
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Contas de demonstração (senha `senha-forte-123`):
 
-## Contributing
+| E-mail | Perfil | Escopo |
+|---|---|---|
+| `admin@paeet.local` | PAEET Admin | Tecnologia + Gestão |
+| `paeet.tec@paeet.local` | PAEET (também leciona) | Tecnologia |
+| `paeet.adm@paeet.local` | PAEET | Gestão |
+| `professor@paeet.local` | Professor | Tecnologia |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Em produção não há seeder de acesso. A primeira conta nasce pelo terminal:
 
-## Code of Conduct
+```bash
+php artisan usuario:criar-admin
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Escopo por Eixo
 
-## Security Vulnerabilities
+O isolamento multi-tenant é lógico e se apoia no pivot `eixo_usuario`. Cada
+model declara em `caminhoDoEixo()` o caminho relacional até o Eixo, e o trait
+`AplicaEscopoDeEixo` usa isso para dois fins:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- `Model::query()->visivelPara($usuario)` — filtra listagens, selects e
+  validações de formulário;
+- `$model->dentroDoEscopoDe($usuario)` — decisão individual das Policies.
 
-## License
+**Não há Global Scope, de propósito.** Um global scope faria o Route Model
+Binding devolver 404 para um recurso de outro Eixo, enquanto o critério de
+aceite exige 403. O binding resolve sem filtro e a Policy responde 403.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Professores não são escopados por Eixo, e sim pelo próprio trabalho: veem as
+solicitações endereçadas a eles, as próprias questões e os resultados das
+disciplinas que lecionam (`professor_disciplina`).
+
+## Vínculo docente
+
+Um PAEET que também dá aula **não recebe uma segunda conta**. O vínculo vive
+em `professor_disciplina` e independe do perfil.
+
+## Testes
+
+```bash
+./vendor/bin/pest
+./vendor/bin/pint            # estilo de código
+```
+
+## Estado dos milestones
+
+| # | Milestone | Situação |
+|---|---|---|
+| 1 | Setup, auth sem registro público, perfis, escopo, policies, testes | ✅ concluído |
+| 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | schema pronto, UI pendente |
+| 3 | Solicitações de questões, área do professor, prazos | schema pronto, UI pendente |
+| 4 | Análise, feedbacks, reenvio e versionamento | schema pronto, UI pendente |
+| 5 | Montagem da prova, modelo e PDF | schema pronto, UI pendente |
+| 6 | Importação XLS em dois passos | schema pronto, UI pendente |
+| 7 | Cálculo de notas por disciplina | schema pronto, UI pendente |
+| 8 | Dashboards, auditoria e refino de UI | parcial |
+
+Todas as 24 tabelas de domínio já existem com chaves estrangeiras, índices e
+constraints. Os módulos ainda sem tela respondem por
+`ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
+um professor recebe 403 em `/solicitacoes/criar`, `/provas/criar` e
+`/importacoes/criar` desde hoje, não quando a tela ficar pronta.
