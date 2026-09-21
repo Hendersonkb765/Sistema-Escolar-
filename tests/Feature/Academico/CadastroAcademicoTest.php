@@ -135,8 +135,8 @@ it('cadastra uma grade em rascunho com disciplinas por ano', function () {
 
     expect($grade->status)->toBe(StatusGrade::Rascunho)
         ->and($grade->versao)->toBe(1)
-        ->and($grade->disciplinas)->toHaveCount(2)
-        ->and($grade->disciplinas->firstWhere('disciplina_id', $banco->id)->ano_curso)->toBe(2);
+        ->and($grade->disciplinas()->count())->toBe(2)
+        ->and($grade->disciplinas()->where('disciplina_id', $banco->id)->value('ano_curso'))->toBe(2);
 });
 
 it('recusa disciplina em ano que o curso não tem', function () {

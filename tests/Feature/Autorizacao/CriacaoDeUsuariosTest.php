@@ -35,7 +35,7 @@ it('deixa o PAEET Admin criar um PAEET', function () {
     expect($criado)->not->toBeNull()
         ->and($criado->perfil)->toBe(PerfilUsuario::Paeet)
         ->and($criado->criado_por)->toBe($admin->id)
-        ->and($criado->eixos->pluck('id')->all())->toBe([$this->eixo->id]);
+        ->and($criado->eixos()->pluck('eixos.id')->all())->toBe([$this->eixo->id]);
 });
 
 it('impede um PAEET de criar outro PAEET', function () {

@@ -6,13 +6,45 @@ use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\GradeCurricular;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(fn () => proibirLazyLoading())
     ->in('Feature');
+
+/*
+|--------------------------------------------------------------------------
+| Proteção contra lazy loading
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Proíbe lazy loading em TODO model hidratado, inclusive nos que vêm
+ * sozinhos numa consulta.
+ *
+ * O `Model::preventLazyLoading()` do framework só marca a instância
+ * quando a consulta devolve mais de um registro (Builder::hydrate), o que
+ * faz um teste com uma linha só passar enquanto a tela de quem tem duas
+ * quebra. Marcando no evento `retrieved`, qualquer relação esquecida no
+ * eager load aparece já no primeiro registro.
+ */
+function proibirLazyLoading(): void
+{
+    Model::preventLazyLoading();
+
+    Event::listen('eloquent.retrieved: *', function (string $evento, array $models) {
+        foreach ($models as $model) {
+            if ($model instanceof Model) {
+                $model->preventsLazyLoading = true;
+            }
+        }
+    });
+}
 
 /*
 |--------------------------------------------------------------------------

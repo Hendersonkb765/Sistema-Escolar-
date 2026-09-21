@@ -22,7 +22,7 @@ class DetalheCurso extends Component
     {
         $this->authorize('view', $curso);
 
-        $this->curso = $curso->load('eixo', 'grades', 'turmas');
+        $this->curso = $curso->load('eixo', 'grades', 'turmas.curso.eixo');
     }
 
     public function render(): View

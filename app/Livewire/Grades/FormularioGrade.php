@@ -49,7 +49,7 @@ class FormularioGrade extends Component
             $this->curso_id = $grade->curso_id;
             $this->ano_vigencia = $grade->ano_vigencia;
             $this->observacoes = (string) $grade->observacoes;
-            $this->itens = $grade->disciplinas
+            $this->itens = $grade->disciplinas()->get()
                 ->map(fn ($item) => [
                     'disciplina_id' => $item->disciplina_id,
                     'ano_curso' => $item->ano_curso,

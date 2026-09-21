@@ -122,7 +122,12 @@ class DetalheTurma extends Component
         return view('turmas.detalhe', [
             'disciplinasDoAno' => $this->turma->disciplinasDoAno(),
             'alunos' => $this->turma->alunos()->orderBy('nome')->get(),
-            'historicos' => $this->turma->historicos()->with('registradoPor')->latest('created_at')->get(),
+            // `grade` entra aqui porque o histórico mostra a versão que
+            // estava congelada à época do registro.
+            'historicos' => $this->turma->historicos()
+                ->with(['registradoPor', 'grade'])
+                ->latest('created_at')
+                ->get(),
             'destinos' => $this->turmasDestinoPossiveis(),
             'gradeDesatualizada' => $this->gradeDesatualizada(),
         ])->layout('components.layouts.app', [

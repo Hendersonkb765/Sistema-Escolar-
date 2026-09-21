@@ -54,6 +54,7 @@ class ListaAlunos extends Component
 
         $consulta = Aluno::query()
             ->visivelPara($usuario)
+            // `eixo_id` é o que a Policy lê para decidir o escopo de cada linha.
             ->with('turma:id,identificacao,curso_id,ano_curso', 'turma.curso:id,nome,eixo_id')
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';

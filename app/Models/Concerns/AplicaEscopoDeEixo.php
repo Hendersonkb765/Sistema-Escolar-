@@ -4,6 +4,7 @@ namespace App\Models\Concerns;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Escopo lógico multi-tenant por Eixo.
@@ -86,6 +87,12 @@ trait AplicaEscopoDeEixo
     /**
      * Id do Eixo a que este registro pertence, resolvido pelo caminho
      * declarado. Usado pelas Policies para decidir entre permitir e 403.
+     *
+     * O último trecho do caminho é sempre o `belongsTo` do Eixo, então
+     * lemos a chave estrangeira em vez de carregar o registro do Eixo —
+     * numa listagem isso é a diferença entre zero consultas e uma por
+     * linha. Os trechos intermediários usam `loadMissing`, que carrega o
+     * que faltar sem estourar a proibição de lazy loading.
      */
     public function eixoId(): ?int
     {
@@ -95,17 +102,31 @@ trait AplicaEscopoDeEixo
             return $this->getKey();
         }
 
+        $segmentos = explode('.', $caminho);
+        $ultimo = array_pop($segmentos);
+
         $atual = $this;
 
-        foreach (explode('.', $caminho) as $relacao) {
-            $atual = $atual?->{$relacao};
+        foreach ($segmentos as $relacao) {
+            $atual->loadMissing($relacao);
+            $atual = $atual->{$relacao};
 
             if ($atual === null) {
                 return null;
             }
         }
 
-        return $atual->getKey();
+        $relacao = $atual->{$ultimo}();
+
+        if ($relacao instanceof BelongsTo) {
+            $chaveEstrangeira = $atual->{$relacao->getForeignKeyName()};
+
+            return $chaveEstrangeira === null ? null : (int) $chaveEstrangeira;
+        }
+
+        $atual->loadMissing($ultimo);
+
+        return $atual->{$ultimo}?->getKey();
     }
 
     /**

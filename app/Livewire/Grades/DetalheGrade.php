@@ -62,7 +62,7 @@ class DetalheGrade extends Component
 
     public function render(): View
     {
-        $this->grade->load(['curso.eixo', 'disciplinas.disciplina', 'turmas', 'origem']);
+        $this->grade->load(['curso.eixo', 'disciplinas.disciplina', 'turmas.curso.eixo', 'origem']);
 
         return view('grades.detalhe', [
             'porAno' => $this->grade->disciplinas->groupBy('ano_curso')->sortKeys(),

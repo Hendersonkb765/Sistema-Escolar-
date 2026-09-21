@@ -42,7 +42,7 @@ class CriarNovaVersaoDeGradeAction
                 'origem_grade_id' => $origem->getKey(),
             ]);
 
-            foreach ($origem->disciplinas as $item) {
+            foreach ($origem->disciplinas()->get() as $item) {
                 $nova->disciplinas()->create([
                     'disciplina_id' => $item->disciplina_id,
                     'ano_curso' => $item->ano_curso,
@@ -55,7 +55,7 @@ class CriarNovaVersaoDeGradeAction
                 ->causedBy($autor)
                 ->withProperties([
                     'origem_versao' => $origem->versao,
-                    'disciplinas_copiadas' => $origem->disciplinas->count(),
+                    'disciplinas_copiadas' => $origem->disciplinas()->count(),
                 ])
                 ->log("Versão {$proximaVersao} criada a partir da versão {$origem->versao}");
 

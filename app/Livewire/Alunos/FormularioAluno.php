@@ -181,7 +181,7 @@ class FormularioAluno extends Component
         return view('alunos.formulario', [
             'turmasDisponiveis' => Turma::query()
                 ->visivelPara(auth()->user())
-                ->with('curso:id,nome')
+                ->with('curso:id,nome,eixo_id')
                 ->orderBy('identificacao')
                 ->get(),
             'situacoes' => StatusAluno::opcoes(),
