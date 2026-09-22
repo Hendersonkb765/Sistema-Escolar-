@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Solicitacoes;
 
+use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Livewire\Concerns\ComTabela;
 use App\Models\Curso;
@@ -73,7 +74,12 @@ class ListaSolicitacoes extends Component
                 'disciplina:id,nome,curso_id',
                 'professor:id,nome',
             ])
-            ->withCount('questoes')
+            ->withCount([
+                'questoes',
+                // Destaque para o que voltou e espera o professor.
+                'questoes as questoes_devolvidas_count' => fn (Builder $q) => $q
+                    ->where('status', StatusQuestao::Rejeitada),
+            ])
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
@@ -98,7 +104,10 @@ class ListaSolicitacoes extends Component
                         ]))))
             ->when($this->filtroPrazo === 'pendentes', fn (Builder $q) => $q
                 ->whereNull('enviada_em')
-                ->where('status', StatusSolicitacao::Aberta));
+                ->where('status', StatusSolicitacao::Aberta))
+            ->when($this->filtroPrazo === 'devolvidas', fn (Builder $q) => $q
+                ->whereHas('questoes', fn (Builder $sub) => $sub
+                    ->where('status', StatusQuestao::Rejeitada)));
 
         return view('solicitacoes.lista', [
             'solicitacoes' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Models\Concerns\AplicaEscopoDeEixo;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -161,6 +163,24 @@ class SolicitacaoProva extends Model
     public function totalDeQuestoes(): int
     {
         return (int) $this->quantidade_questoes;
+    }
+
+    /** Questões que voltaram e aguardam correção do professor. */
+    public function questoesDevolvidas(): int
+    {
+        return $this->questoes()->where('status', StatusQuestao::Rejeitada)->count();
+    }
+
+    /** Ordens das questões devolvidas, para a tela citar quais são. */
+    public function ordensDevolvidas(): Collection
+    {
+        return $this->questoes()
+            ->where('status', StatusQuestao::Rejeitada)
+            ->with('item')
+            ->get()
+            ->map(fn (Questao $questao) => (int) $questao->item->ordem)
+            ->sort()
+            ->values();
     }
 
     /** Dias restantes até o prazo; negativo quando já venceu. */

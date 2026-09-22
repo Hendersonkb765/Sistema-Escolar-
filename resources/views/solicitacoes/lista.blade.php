@@ -31,6 +31,7 @@
                         <option value="">Todos</option>
                         <option value="pendentes">Aguardando envio</option>
                         <option value="atrasadas">Atrasadas</option>
+                        <option value="devolvidas">Com questão devolvida</option>
                     </x-select>
                 </x-campo>
             </div>
@@ -111,11 +112,20 @@
                                         @if ($rotulo = $solicitacao->rotuloDePrazo())
                                             <x-badge cor="vermelho" :rotulo="$rotulo"/>
                                         @endif
+                                        @if ($solicitacao->questoes_devolvidas_count > 0)
+                                            <x-badge cor="vermelho">
+                                                {{ $solicitacao->questoes_devolvidas_count }} devolvida(s)
+                                            </x-badge>
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-right sm:px-6">
                                     @can('responder', $solicitacao)
-                                        @if ($solicitacao->aceitaEnvio())
+                                        @if ($solicitacao->questoes_devolvidas_count > 0)
+                                            <x-botao href="{{ route('solicitacoes.responder', $solicitacao) }}" wire:navigate>
+                                                Corrigir {{ $solicitacao->questoes_devolvidas_count }}
+                                            </x-botao>
+                                        @elseif ($solicitacao->aceitaEnvio())
                                             <x-botao variante="secundario" href="{{ route('solicitacoes.responder', $solicitacao) }}" wire:navigate>
                                                 Responder
                                             </x-botao>

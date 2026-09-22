@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PerfilUsuario;
+use App\Enums\StatusQuestao;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,7 @@ class User extends Authenticatable
 
     /** @use HasFactory<UserFactory> */
     use HasFactory;
+
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
@@ -49,6 +51,8 @@ class User extends Authenticatable
 
     /** @var array<int, int>|null */
     protected ?array $disciplinaIdsCache = null;
+
+    protected ?int $questoesDevolvidasCache = null;
 
     protected function casts(): array
     {
@@ -200,11 +204,24 @@ class User extends Authenticatable
         parent::sendPasswordResetNotification($token);
     }
 
+    /**
+     * Quantas questões deste professor voltaram para correção. Fica em
+     * cache de requisição porque o menu lateral consulta em toda página.
+     */
+    public function questoesDevolvidas(): int
+    {
+        return $this->questoesDevolvidasCache ??= Questao::query()
+            ->where('professor_id', $this->getKey())
+            ->where('status', StatusQuestao::Rejeitada)
+            ->count();
+    }
+
     /** Invalida os caches de escopo após alterar vínculos. */
     public function esquecerEscopo(): static
     {
         $this->eixoIdsCache = null;
         $this->disciplinaIdsCache = null;
+        $this->questoesDevolvidasCache = null;
 
         return $this;
     }

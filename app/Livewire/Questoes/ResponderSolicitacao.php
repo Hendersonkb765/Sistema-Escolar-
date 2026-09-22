@@ -7,6 +7,7 @@ use App\Actions\Avaliacao\ReenviarQuestaoAction;
 use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\LinguagemCodigo;
+use App\Enums\StatusQuestao;
 use App\Enums\TipoBlocoQuestao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
@@ -363,6 +364,10 @@ class ResponderSolicitacao extends Component
             'pendencias' => $enviar->pendenciasPorQuestao($solicitacao),
             'podeEditar' => $solicitacao->aceitaEnvio(),
             'linguagens' => LinguagemCodigo::opcoes(),
+            // O que a coordenação devolveu, para o topo da tela avisar.
+            'devolvidas' => $questoes
+                ->filter(fn (Questao $questao) => $questao->status === StatusQuestao::Rejeitada)
+                ->values(),
             'somaDosPesos' => collect($this->formulario)->sum(fn (array $q) => (float) ($q['peso'] ?? 0)),
         ])->layout('components.layouts.app', [
             'titulo' => 'Responder: '.$solicitacao->disciplina->nome,

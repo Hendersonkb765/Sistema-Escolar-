@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\StatusQuestao;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
@@ -66,7 +67,10 @@ class Navegacao
                         ? self::item(
                             $usuario->ehGestao() ? 'Análise de questões' : 'Minhas questões',
                             'questoes.index',
-                            self::icone('questao')
+                            self::icone('questao'),
+                            // Um professor precisa ver que algo voltou para
+                            // ele sem abrir solicitação por solicitação.
+                            contador: self::contadorDeQuestoes($usuario),
                         ) : null,
                     Gate::forUser($usuario)->allows('viewAny', Prova::class)
                         ? self::item('Provas', 'provas.index', self::icone('prova')) : null,
@@ -98,9 +102,13 @@ class Navegacao
         ));
     }
 
-    /** @return array{rotulo: string, url: string, icone: string, ativo: bool} */
-    protected static function item(string $rotulo, string $rota, string $icone): array
-    {
+    /** @return array{rotulo: string, url: string, icone: string, ativo: bool, contador: ?array{valor: int, cor: string, titulo: string}} */
+    protected static function item(
+        string $rotulo,
+        string $rota,
+        string $icone,
+        ?array $contador = null,
+    ): array {
         $prefixo = Str::before($rota, '.');
 
         return [
@@ -108,6 +116,44 @@ class Navegacao
             'url' => Route::has($rota) ? route($rota) : '#',
             'icone' => $icone,
             'ativo' => request()->routeIs($prefixo.'*'),
+            'contador' => $contador,
+        ];
+    }
+
+    /**
+     * Selo ao lado de "Minhas questões" / "Análise de questões": o que
+     * exige ação de quem está olhando.
+     *
+     * @return array{valor: int, cor: string, titulo: string}|null
+     */
+    protected static function contadorDeQuestoes(User $usuario): ?array
+    {
+        if (! $usuario->ehGestao()) {
+            $devolvidas = $usuario->questoesDevolvidas();
+
+            return $devolvidas === 0 ? null : [
+                'valor' => $devolvidas,
+                'cor' => 'vermelho',
+                'titulo' => $devolvidas === 1
+                    ? '1 questão devolvida para correção'
+                    : "{$devolvidas} questões devolvidas para correção",
+            ];
+        }
+
+        $aguardando = Questao::query()
+            ->visivelPara($usuario)
+            ->whereIn('status', [
+                StatusQuestao::Enviada->value,
+                StatusQuestao::EmAnalise->value,
+            ])
+            ->count();
+
+        return $aguardando === 0 ? null : [
+            'valor' => $aguardando,
+            'cor' => 'azul',
+            'titulo' => $aguardando === 1
+                ? '1 questão aguardando análise'
+                : "{$aguardando} questões aguardando análise",
         ];
     }
 

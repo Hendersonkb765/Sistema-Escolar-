@@ -2,11 +2,13 @@
 
 namespace App\Livewire;
 
+use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\Questao;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
@@ -114,7 +116,21 @@ class Painel extends Component
             ->whereIn('status', [StatusSolicitacao::Enviada->value, StatusSolicitacao::EmAnalise->value])
             ->count();
 
+        $devolvidas = Questao::query()
+            ->visivelPara($usuario)
+            ->where('status', StatusQuestao::Rejeitada)
+            ->count();
+
+        $extras = $devolvidas === 0 ? [] : [[
+            'rotulo' => 'Devolvidas aos professores',
+            'valor' => $devolvidas,
+            'cor' => 'amarelo',
+            'href' => route('questoes.index', ['situacao' => StatusQuestao::Rejeitada->value]),
+            'detalhe' => 'Aguardando correção',
+        ]];
+
         return [
+            ...$extras,
             [
                 'rotulo' => 'Solicitações aguardando envio',
                 'valor' => $aguardando,
@@ -166,7 +182,24 @@ class Painel extends Component
             ->orderBy('prazo')
             ->value('prazo');
 
+        $devolvidas = $usuario->questoesDevolvidas();
+
+        $indicadores = [];
+
+        // O que voltou vem primeiro: é a única coisa que trava o resto do
+        // fluxo esperando ação do professor.
+        if ($devolvidas > 0) {
+            $indicadores[] = [
+                'rotulo' => 'Questões devolvidas',
+                'valor' => $devolvidas,
+                'cor' => 'vermelho',
+                'href' => route('questoes.index', ['situacao' => StatusQuestao::Rejeitada->value]),
+                'detalhe' => 'Precisam da sua correção',
+            ];
+        }
+
         return [
+            ...$indicadores,
             [
                 'rotulo' => 'A responder',
                 'valor' => $aResponder,

@@ -112,6 +112,49 @@
         @endif
     </x-cartao>
 
+    @if ($devolvidas->isNotEmpty())
+        <div class="rounded-xl border-2 border-rose-300 bg-rose-50 p-4 dark:border-rose-500/50 dark:bg-rose-950/40">
+            <div class="flex items-start gap-3">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-500 text-white">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+                    </svg>
+                </span>
+
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-base font-semibold text-rose-900 dark:text-rose-100">
+                        @if ($devolvidas->count() === 1)
+                            A coordenação devolveu 1 questão para correção
+                        @else
+                            A coordenação devolveu {{ $devolvidas->count() }} questões para correção
+                        @endif
+                    </h2>
+
+                    <p class="mt-0.5 text-sm text-rose-800 dark:text-rose-200">
+                        Leia o que foi pedido em cada uma, ajuste e clique em
+                        <strong>Reenviar corrigida</strong>. As demais questões seguem em análise.
+                    </p>
+
+                    <ul class="mt-3 space-y-2">
+                        @foreach ($devolvidas as $devolvida)
+                            @php $ultimo = $devolvida->feedbacks->first(); @endphp
+                            <li class="rounded-lg bg-white/70 p-2 text-sm dark:bg-slate-900/50">
+                                <a href="#questao-{{ $devolvida->id }}"
+                                   class="font-semibold text-rose-900 hover:underline dark:text-rose-100">
+                                    Questão {{ $devolvida->item->ordem }}
+                                </a>
+                                @if ($ultimo?->comentario)
+                                    <span class="text-slate-700 dark:text-slate-200">— {{ $ultimo->comentario }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($podeEditar)
         <x-alerta tipo="info">
             Você define o <strong>peso</strong> de cada questão — é ele que diz quanto ela vale na
@@ -138,8 +181,17 @@
             $bloqueado = ! $podeEditar || ! $questao->status->editavelPeloProfessor();
         @endphp
 
-        <x-cartao wire:key="questao-{{ $questao->id }}">
-            <x-slot:titulo>Questão {{ $questao->item->ordem }}</x-slot:titulo>
+        <x-cartao wire:key="questao-{{ $questao->id }}" id="questao-{{ $questao->id }}"
+                  @class([
+                    'scroll-mt-20',
+                    'border-2 border-rose-300 dark:border-rose-500/50' => $questao->status === App\Enums\StatusQuestao::Rejeitada,
+                  ])>
+            <x-slot:titulo>
+                Questão {{ $questao->item->ordem }}
+                @if ($questao->status === App\Enums\StatusQuestao::Rejeitada)
+                    <span class="text-rose-600 dark:text-rose-400">· devolvida para correção</span>
+                @endif
+            </x-slot:titulo>
             <x-slot:acoes>
                 @php $pendenciasDaQuestao = $pendencias[$questao->item->ordem] ?? []; @endphp
 

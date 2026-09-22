@@ -164,9 +164,23 @@ obrigatório, porque é o único texto que o professor vai ler. Há também um
 Cada decisão vira um registro em `questao_feedbacks`, que é **append-only**
 e guarda a versão da questão a que se referia. Nada é sobrescrito.
 
-O professor vê o motivo destacado na tela dele, corrige e clica em
-**Reenviar corrigida**: a questão vai como **versão nova** e volta para a
-fila. O histórico mostra as duas passagens:
+### A devolução é impossível de não notar
+
+Uma questão que volta precisa alcançar o professor sem que ele tenha de
+abrir solicitação por solicitação. Ela aparece em quatro lugares:
+
+1. **selo vermelho no menu lateral**, em "Minhas questões", com a
+   contagem;
+2. **indicador no painel**, em primeiro lugar entre os cartões, porque é o
+   que trava o resto do fluxo;
+3. **listagem de solicitações**: badge "N devolvida(s)" e a ação muda de
+   "Responder" para **"Corrigir N"**, com filtro próprio;
+4. **tela de resposta**: aviso vermelho no topo listando cada questão
+   devolvida com o motivo, âncora para o bloco correspondente, e a questão
+   em si com moldura e o título marcado.
+
+O professor corrige e clica em **Reenviar corrigida**: a questão vai como
+**versão nova** e volta para a fila. O histórico mostra as duas passagens:
 
 ```
 v1  Rejeitada  Coordenação PAEET: A alternativa C está ambígua; reescreva.

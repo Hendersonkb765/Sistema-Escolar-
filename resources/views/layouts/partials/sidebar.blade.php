@@ -25,6 +25,17 @@
                            @if ($item['ativo']) aria-current="page" @endif>
                             {!! $item['icone'] !!}
                             <span class="truncate">{{ $item['rotulo'] }}</span>
+
+                            @if ($item['contador'] ?? null)
+                                <span title="{{ $item['contador']['titulo'] }}"
+                                      @class([
+                                        'ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white',
+                                        'bg-rose-500' => $item['contador']['cor'] === 'vermelho',
+                                        'bg-sky-500' => $item['contador']['cor'] === 'azul',
+                                      ])>
+                                    {{ $item['contador']['valor'] }}
+                                </span>
+                            @endif
                         </a>
                     </li>
                 @endforeach
