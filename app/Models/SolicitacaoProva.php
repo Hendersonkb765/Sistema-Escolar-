@@ -135,9 +135,10 @@ class SolicitacaoProva extends Model
             && $this->cancelada_em === null;
     }
 
+    /** Soma dos pesos que o professor atribuiu às questões. */
     public function somaDosPesos(): float
     {
-        return (float) $this->itens()->sum('peso');
+        return (float) $this->questoes()->sum('peso');
     }
 
     /**
@@ -149,6 +150,7 @@ class SolicitacaoProva extends Model
         return $this->questoes()
             ->whereNotNull('enunciado')
             ->where('enunciado', '!=', '')
+            ->where('peso', '>', 0)
             ->whereHas('alternativas', fn ($q) => $q->where('correta', true))
             ->withCount('alternativas')
             ->get()

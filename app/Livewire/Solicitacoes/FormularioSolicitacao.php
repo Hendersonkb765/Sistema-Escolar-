@@ -38,16 +38,12 @@ class FormularioSolicitacao extends Component
 
     public string $observacoes = '';
 
-    /** Um peso por questão pedida, na ordem. @var array<int, string> */
-    public array $pesos = [];
-
     public function mount(): void
     {
         $this->authorize('create', SolicitacaoProva::class);
 
         $this->turma_id = (int) request()->query('turma') ?: null;
         $this->prazo = now()->addWeek()->format('Y-m-d\TH:i');
-        $this->ajustarPesos();
     }
 
     public function updatedTurmaId(): void
@@ -60,32 +56,6 @@ class FormularioSolicitacao extends Component
     {
         // Quem já leciona a disciplina é o palpite natural.
         $this->professor_id = $this->professoresSugeridos()->first()?->getKey();
-    }
-
-    public function updatedQuantidadeQuestoes(): void
-    {
-        $this->ajustarPesos();
-    }
-
-    /** Mantém a lista de pesos do tamanho da quantidade pedida. */
-    protected function ajustarPesos(): void
-    {
-        $quantidade = max(1, min(60, (int) $this->quantidade_questoes));
-
-        $this->quantidade_questoes = $quantidade;
-
-        $atuais = array_values($this->pesos);
-
-        $this->pesos = collect(range(1, $quantidade))
-            ->map(fn (int $ordem) => $atuais[$ordem - 1] ?? '1')
-            ->all();
-    }
-
-    public function aplicarPesoATodas(): void
-    {
-        $primeiro = $this->pesos[0] ?? '1';
-
-        $this->pesos = array_fill(0, count($this->pesos), $primeiro);
     }
 
     /** @return array<string, mixed> */
@@ -107,8 +77,6 @@ class FormularioSolicitacao extends Component
             'quantidade_alternativas' => ['required', 'integer', 'min:2', 'max:6'],
             'prazo' => ['required', 'date'],
             'observacoes' => ['nullable', 'string', 'max:2000'],
-            'pesos' => ['array', 'size:'.$this->quantidade_questoes],
-            'pesos.*' => ['required', 'numeric', 'gt:0', 'max:100'],
         ];
     }
 
@@ -122,8 +90,6 @@ class FormularioSolicitacao extends Component
             'quantidade_questoes' => 'quantidade de questões',
             'quantidade_alternativas' => 'quantidade de alternativas',
             'prazo' => 'prazo',
-            'pesos' => 'pesos',
-            'pesos.*' => 'peso',
         ];
     }
 
@@ -133,7 +99,6 @@ class FormularioSolicitacao extends Component
         return [
             'disciplina_id.in' => 'Selecione uma disciplina que esta turma cursa no período dela.',
             'professor_id.exists' => 'Selecione um professor com conta ativa.',
-            'pesos.*.gt' => 'O peso precisa ser maior que zero.',
         ];
     }
 
@@ -149,7 +114,7 @@ class FormularioSolicitacao extends Component
                 turma: Turma::query()->findOrFail($dados['turma_id']),
                 disciplina: Disciplina::query()->findOrFail($dados['disciplina_id']),
                 professor: User::query()->findOrFail($dados['professor_id']),
-                pesos: $dados['pesos'],
+                quantidadeQuestoes: $dados['quantidade_questoes'],
                 quantidadeAlternativas: $dados['quantidade_alternativas'],
                 prazo: now()->parse($dados['prazo']),
                 observacoes: $dados['observacoes'] ?: null,
@@ -161,8 +126,8 @@ class FormularioSolicitacao extends Component
         }
 
         session()->flash('sucesso',
-            "Solicitação aberta para {$solicitacao->professor->nome}: {$solicitacao->quantidade_questoes} questão(ões), soma dos pesos "
-            .number_format($solicitacao->somaDosPesos(), 2, ',', '.').'.');
+            "Solicitação aberta para {$solicitacao->professor->nome}: {$solicitacao->quantidade_questoes} questão(ões). "
+            .'O peso de cada uma será definido por quem escrever as questões.');
 
         $this->redirectRoute('solicitacoes.show', $solicitacao, navigate: true);
     }
@@ -245,10 +210,9 @@ class FormularioSolicitacao extends Component
             'sugeridos' => $this->professoresSugeridos(),
             'outros' => $this->outrosUsuarios(),
             'turmaSelecionada' => $this->turmaSelecionada(),
-            'somaDosPesos' => collect($this->pesos)->sum(fn ($peso) => (float) $peso),
         ])->layout('components.layouts.app', [
             'titulo' => 'Nova solicitação de questões',
-            'subtitulo' => 'O peso de cada questão é definido aqui e o professor não pode alterá-lo',
+            'subtitulo' => 'O peso de cada questão é definido pelo professor ao escrevê-la',
         ]);
     }
 }

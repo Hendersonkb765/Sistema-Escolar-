@@ -17,7 +17,7 @@ use App\Models\Questao;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Database\Eloquent\MassAssignmentException;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Activitylog\Models\Activity;
 
 beforeEach(function () {
@@ -42,14 +42,13 @@ beforeEach(function () {
     $this->criar = app(CriarSolicitacaoAction::class);
 });
 
-it('abre a solicitação com um item e uma questão em rascunho por peso', function () {
-    // O exemplo do enunciado: 5 questões de Lógica com pesos 1; 1; 0,5; 0,5; 0,75.
+it('abre a solicitação com um item e uma questão em rascunho por questão pedida', function () {
     $solicitacao = $this->criar->executar(
         autor: $this->paeet,
         turma: $this->turma,
         disciplina: $this->logica,
         professor: $this->professor,
-        pesos: [1, 1, 0.5, 0.5, 0.75],
+        quantidadeQuestoes: 5,
         quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     );
@@ -59,60 +58,56 @@ it('abre a solicitação com um item e uma questão em rascunho por peso', funct
         ->and($solicitacao->curso_id)->toBe($this->curso->id)
         ->and($solicitacao->criado_por)->toBe($this->paeet->id)
         ->and($solicitacao->itens()->count())->toBe(5)
-        ->and($solicitacao->itens()->orderBy('ordem')->pluck('peso')->map(fn ($p) => (float) $p)->all())
-        ->toBe([1.0, 1.0, 0.5, 0.5, 0.75])
-        ->and((float) $solicitacao->somaDosPesos())->toBe(3.75)
-        // Uma questão em rascunho por item, já com o peso copiado.
+        ->and($solicitacao->itens()->orderBy('ordem')->pluck('ordem')->all())->toBe([1, 2, 3, 4, 5])
         ->and($solicitacao->questoes()->count())->toBe(5)
         ->and($solicitacao->questoes()->where('status', StatusQuestao::Rascunho)->count())->toBe(5);
 
-    $primeira = $solicitacao->questoes()->with('item')->get()->firstWhere('item.ordem', 3);
+    $terceira = $solicitacao->questoes()->with('item')->get()->firstWhere('item.ordem', 3);
 
-    expect((float) $primeira->peso)->toBe(0.5)
-        ->and($primeira->professor_id)->toBe($this->professor->id)
-        ->and($primeira->disciplina_id)->toBe($this->logica->id);
+    // Peso 1 é só o ponto de partida; quem decide é o professor.
+    expect((float) $terceira->peso)->toBe(1.0)
+        ->and($terceira->professor_id)->toBe($this->professor->id)
+        ->and($terceira->disciplina_id)->toBe($this->logica->id);
 });
 
-it('o peso não é alterável por atribuição em massa', function () {
+it('o professor define o peso de cada questão', function () {
     $solicitacao = $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [2.5], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 5, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     );
 
-    $questao = $solicitacao->questoes()->first();
+    $salvar = app(SalvarQuestaoAction::class);
 
-    // Fora do fillable de propósito: é o que impede o professor de mexer
-    // no peso que o PAEET definiu. Sob shouldBeStrict a tentativa estoura;
-    // em produção seria descartada em silêncio — nos dois casos, ignorada.
-    expect(in_array('peso', $questao->getFillable(), true))->toBeFalse();
+    // Os pesos do exemplo do enunciado: 1; 1; 0,5; 0,5; 0,75 — soma 3,75.
+    $pesos = [1 => 1, 2 => 1, 3 => 0.5, 4 => 0.5, 5 => 0.75];
 
-    expect(fn () => $questao->fill(['peso' => 99]))
-        ->toThrow(MassAssignmentException::class);
+    foreach ($solicitacao->questoes()->with('item')->get() as $questao) {
+        $salvar->executar(
+            questao: $questao,
+            autor: $this->professor,
+            enunciado: 'Enunciado',
+            alternativas: [
+                ['letra' => 'A', 'texto' => 'A', 'correta' => true],
+                ['letra' => 'B', 'texto' => 'B', 'correta' => false],
+                ['letra' => 'C', 'texto' => 'C', 'correta' => false],
+                ['letra' => 'D', 'texto' => 'D', 'correta' => false],
+            ],
+            peso: $pesos[$questao->item->ordem],
+        );
+    }
 
-    expect((float) $questao->refresh()->peso)->toBe(2.5);
+    expect((float) $solicitacao->refresh()->somaDosPesos())->toBe(3.75)
+        ->and($solicitacao->questoes()->with('item')->get()
+            ->sortBy(fn ($q) => $q->item->ordem)
+            ->map(fn ($q) => (float) $q->peso)->values()->all())
+        ->toBe([1.0, 1.0, 0.5, 0.5, 0.75]);
 });
 
-it('o peso enviado pelo formulário do professor é ignorado', function () {
-    $solicitacao = $this->criar->executar(
-        autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [2.5], quantidadeAlternativas: 2,
-        prazo: now()->addWeek(),
-    );
-
-    $questao = $solicitacao->questoes()->first();
-
-    app(SalvarQuestaoAction::class)->executar(
-        questao: $questao,
-        autor: $this->professor,
-        enunciado: 'Enunciado qualquer',
-        alternativas: [
-            ['letra' => 'A', 'texto' => 'A', 'correta' => true],
-            ['letra' => 'B', 'texto' => 'B', 'correta' => false],
-        ],
-    );
-
-    expect((float) $questao->refresh()->peso)->toBe(2.5);
+it('o PAEET não define peso ao abrir a solicitação', function () {
+    // A tela do PAEET não tem campo de peso, e o item nem guarda a coluna.
+    expect(Schema::hasColumn('solicitacao_itens', 'peso'))->toBeFalse()
+        ->and(in_array('peso', (new Questao)->getFillable(), true))->toBeTrue();
 });
 
 it('cria o vínculo docente ao designar o professor', function () {
@@ -120,7 +115,7 @@ it('cria o vínculo docente ao designar o professor', function () {
 
     $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     );
 
@@ -131,7 +126,7 @@ it('recusa disciplina que a turma não cursa no período dela', function () {
     // Back-end é do 2º período; a turma está no 1º.
     expect(fn () => $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->backend,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(RegraDeNegocioException::class, 'não cursa Back-end no 1º período');
 
@@ -144,23 +139,15 @@ it('recusa disciplina de outro curso', function () {
 
     expect(fn () => $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $alheia,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(RegraDeNegocioException::class, 'não pertence ao curso desta turma');
 });
 
-it('recusa peso zero ou negativo', function (float $peso) {
-    expect(fn () => $this->criar->executar(
-        autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1, $peso], quantidadeAlternativas: 4,
-        prazo: now()->addWeek(),
-    ))->toThrow(RegraDeNegocioException::class, 'maior que zero');
-})->with([0, -1, -0.5]);
-
 it('recusa quantidade de alternativas fora da faixa', function (int $quantidade) {
     expect(fn () => $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: $quantidade,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: $quantidade,
         prazo: now()->addWeek(),
     ))->toThrow(RegraDeNegocioException::class, 'de 2 a 6 alternativas');
 })->with([1, 7]);
@@ -170,7 +157,7 @@ it('recusa designar professor inativo', function () {
 
     expect(fn () => $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor->refresh(), pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor->refresh(), quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(RegraDeNegocioException::class, 'conta do professor está inativa');
 });
@@ -178,15 +165,30 @@ it('recusa designar professor inativo', function () {
 it('recusa solicitação sem nenhuma questão', function () {
     expect(fn () => $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 0, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(RegraDeNegocioException::class, 'ao menos uma questão');
+});
+
+it('a soma dos pesos vem das questões, não dos itens', function () {
+    $solicitacao = $this->criar->executar(
+        autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
+        professor: $this->professor, quantidadeQuestoes: 3, quantidadeAlternativas: 2,
+        prazo: now()->addWeek(),
+    );
+
+    // Recém-abertas, todas em 1.
+    expect((float) $solicitacao->somaDosPesos())->toBe(3.0);
+
+    $solicitacao->questoes()->get()->first()->update(['peso' => 4]);
+
+    expect((float) $solicitacao->refresh()->somaDosPesos())->toBe(6.0);
 });
 
 it('nega a abertura ao professor', function () {
     expect(fn () => $this->criar->executar(
         autor: $this->professor, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(AuthorizationException::class);
 });
@@ -196,7 +198,7 @@ it('nega a abertura a um PAEET de outro eixo', function () {
 
     expect(fn () => $this->criar->executar(
         autor: $intruso, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 1, quantidadeAlternativas: 4,
         prazo: now()->addWeek(),
     ))->toThrow(AuthorizationException::class);
 
@@ -207,7 +209,7 @@ it('não deixa a solicitação pela metade quando a regra é violada', function 
     try {
         $this->criar->executar(
             autor: $this->paeet, turma: $this->turma, disciplina: $this->backend,
-            professor: $this->professor, pesos: [1, 1], quantidadeAlternativas: 4,
+            professor: $this->professor, quantidadeQuestoes: 2, quantidadeAlternativas: 4,
             prazo: now()->addWeek(),
         );
     } catch (RegraDeNegocioException) {
@@ -221,7 +223,7 @@ it('não deixa a solicitação pela metade quando a regra é violada', function 
 it('registra a abertura na auditoria', function () {
     $this->criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1, 0.5], quantidadeAlternativas: 5,
+        professor: $this->professor, quantidadeQuestoes: 2, quantidadeAlternativas: 5,
         prazo: now()->addWeek(),
     );
 
@@ -230,6 +232,6 @@ it('registra a abertura na auditoria', function () {
 
     expect($registro->description)->toBe('Solicitação de 2 questão(ões) aberta')
         ->and($registro->causer_id)->toBe($this->paeet->id)
-        ->and($registro->getProperty('soma_dos_pesos'))->toBe(1.5)
+        ->and($registro->getProperty('questoes'))->toBe(2)
         ->and($registro->getProperty('disciplina'))->toBe('Lógica de Programação');
 });

@@ -3,7 +3,10 @@
 namespace App\Livewire\Questoes;
 
 use App\Actions\Avaliacao\EnviarSolicitacaoAction;
+use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
+use App\Enums\LinguagemCodigo;
+use App\Enums\TipoBlocoQuestao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Models\Questao;
 use App\Models\SolicitacaoProva;
@@ -12,16 +15,19 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 /**
- * Área do professor: preencher e enviar as questões pedidas.
+ * Área do professor: escrever e enviar as questões pedidas.
  *
- * O peso de cada questão aparece, mas só para leitura — quem o define é o
- * PAEET, na solicitação.
+ * O enunciado é montado em blocos — parágrafos, trechos de código com a
+ * linguagem declarada e imagens — e o peso de cada questão é escolhido
+ * aqui, por quem a escreve.
  */
 class ResponderSolicitacao extends Component
 {
     use AuthorizesRequests;
+    use WithFileUploads;
 
     #[Locked]
     public int $solicitacaoId;
@@ -29,9 +35,12 @@ class ResponderSolicitacao extends Component
     /**
      * Rascunho de cada questão, indexado pelo id.
      *
-     * @var array<int, array{enunciado: ?string, alternativas: array<int, array{letra: string, texto: ?string, correta: bool}>}>
+     * @var array<int, array{enunciado: ?string, peso: string, alternativas: array<int, array{letra: string, texto: ?string, correta: bool}>, blocos: array<int, array<string, mixed>>}>
      */
     public array $formulario = [];
+
+    /** Upload em andamento, por questão. @var array<int, mixed> */
+    public array $imagens = [];
 
     public bool $confirmandoEnvio = false;
 
@@ -60,7 +69,7 @@ class ResponderSolicitacao extends Component
     {
         return Questao::query()
             ->where('solicitacao_id', $this->solicitacaoId)
-            ->with(['item', 'alternativas', 'feedbacks.analisadoPor'])
+            ->with(['item', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
             ->get()
             ->sortBy(fn (Questao $questao) => $questao->item->ordem)
             ->values();
@@ -72,6 +81,7 @@ class ResponderSolicitacao extends Component
             ->mapWithKeys(fn (Questao $questao) => [
                 $questao->getKey() => [
                     'enunciado' => $questao->enunciado,
+                    'peso' => (string) (float) $questao->peso,
                     'alternativas' => $questao->alternativas
                         ->sortBy('letra')
                         ->map(fn ($alternativa) => [
@@ -81,9 +91,93 @@ class ResponderSolicitacao extends Component
                         ])
                         ->values()
                         ->all(),
+                    'blocos' => $questao->blocos
+                        ->map(fn ($bloco) => [
+                            'tipo' => $bloco->tipo->value,
+                            'conteudo' => $bloco->conteudo,
+                            'linguagem' => $bloco->linguagem?->value,
+                            'caminho' => $bloco->caminho,
+                            'legenda' => $bloco->legenda,
+                        ])
+                        ->values()
+                        ->all(),
                 ],
             ])
             ->all();
+    }
+
+    // ------------------------------------------------------------------
+    // Blocos do enunciado
+    // ------------------------------------------------------------------
+
+    public function adicionarBloco(int $questaoId, string $tipo): void
+    {
+        $tipoBloco = TipoBlocoQuestao::tryFrom($tipo);
+
+        if ($tipoBloco === null || ! isset($this->formulario[$questaoId])) {
+            return;
+        }
+
+        $this->formulario[$questaoId]['blocos'][] = [
+            'tipo' => $tipoBloco->value,
+            'conteudo' => null,
+            'linguagem' => $tipoBloco === TipoBlocoQuestao::Codigo ? LinguagemCodigo::Python->value : null,
+            'caminho' => null,
+            'legenda' => null,
+        ];
+    }
+
+    public function removerBloco(int $questaoId, int $indice): void
+    {
+        if (! isset($this->formulario[$questaoId]['blocos'][$indice])) {
+            return;
+        }
+
+        unset($this->formulario[$questaoId]['blocos'][$indice]);
+
+        $this->formulario[$questaoId]['blocos'] = array_values($this->formulario[$questaoId]['blocos']);
+    }
+
+    public function moverBloco(int $questaoId, int $indice, int $direcao): void
+    {
+        $blocos = $this->formulario[$questaoId]['blocos'] ?? [];
+        $destino = $indice + $direcao;
+
+        if (! isset($blocos[$indice], $blocos[$destino])) {
+            return;
+        }
+
+        [$blocos[$indice], $blocos[$destino]] = [$blocos[$destino], $blocos[$indice]];
+
+        $this->formulario[$questaoId]['blocos'] = $blocos;
+    }
+
+    /**
+     * Guarda a imagem assim que ela é escolhida, para o professor ver o
+     * que subiu antes de salvar o resto da questão.
+     */
+    public function updatedImagens(mixed $arquivo, string $chave): void
+    {
+        [$questaoId, $indice] = array_pad(explode('.', $chave), 2, null);
+
+        $questao = Questao::query()->find((int) $questaoId);
+
+        if ($questao === null || auth()->user()->cannot('update', $questao)) {
+            return;
+        }
+
+        try {
+            $caminho = app(SalvarBlocosDaQuestaoAction::class)
+                ->guardarImagem($this->imagens[$questaoId][$indice], $questao);
+        } catch (RegraDeNegocioException $excecao) {
+            session()->flash('erro', $excecao->getMessage());
+            unset($this->imagens[$questaoId][$indice]);
+
+            return;
+        }
+
+        $this->formulario[(int) $questaoId]['blocos'][(int) $indice]['caminho'] = $caminho;
+        unset($this->imagens[$questaoId][$indice]);
     }
 
     /** Marcar uma correta desmarca as demais da mesma questão. */
@@ -117,6 +211,13 @@ class ResponderSolicitacao extends Component
                 autor: auth()->user(),
                 enunciado: $rascunho['enunciado'] ?: null,
                 alternativas: $rascunho['alternativas'],
+                peso: $rascunho['peso'] ?? null,
+            );
+
+            app(SalvarBlocosDaQuestaoAction::class)->executar(
+                questao: $questao,
+                autor: auth()->user(),
+                blocos: $rascunho['blocos'] ?? [],
             );
         } catch (RegraDeNegocioException $excecao) {
             session()->flash('erro', $excecao->getMessage());
@@ -142,6 +243,13 @@ class ResponderSolicitacao extends Component
                     autor: auth()->user(),
                     enunciado: $this->formulario[$questaoId]['enunciado'] ?: null,
                     alternativas: $this->formulario[$questaoId]['alternativas'],
+                    peso: $this->formulario[$questaoId]['peso'] ?? null,
+                );
+
+                app(SalvarBlocosDaQuestaoAction::class)->executar(
+                    questao: $questao,
+                    autor: auth()->user(),
+                    blocos: $this->formulario[$questaoId]['blocos'] ?? [],
                 );
             } catch (RegraDeNegocioException $excecao) {
                 session()->flash('erro', $excecao->getMessage());
@@ -187,6 +295,8 @@ class ResponderSolicitacao extends Component
             'questoes' => $questoes,
             'incompletas' => $enviar->questoesIncompletas($solicitacao),
             'podeEditar' => $solicitacao->aceitaEnvio(),
+            'linguagens' => LinguagemCodigo::opcoes(),
+            'somaDosPesos' => collect($this->formulario)->sum(fn (array $q) => (float) ($q['peso'] ?? 0)),
         ])->layout('components.layouts.app', [
             'titulo' => 'Responder: '.$solicitacao->disciplina->nome,
             'subtitulo' => 'Turma '.$solicitacao->turma->nome

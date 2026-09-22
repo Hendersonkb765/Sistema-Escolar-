@@ -116,10 +116,27 @@ disciplinas oferecidas são só as que **aquela turma cursa no período dela**,
 segundo a foto de grade que congelou — não dá para pedir Back-end a uma
 turma do 1º período.
 
-Cada questão pedida vira um item com seu peso, e uma questão em rascunho já
-ligada a ele. O professor abre a solicitação e encontra os campos prontos;
-o peso aparece, mas só para leitura. `peso` está fora do `$fillable` de
-`Questao` justamente para isso.
+Cada questão pedida vira um item e uma questão em rascunho ligada a ele. O
+professor abre a solicitação e encontra os campos prontos.
+
+**O peso é do professor.** É ele quem sabe quanto cada questão vale dentro
+da disciplina, então o peso é definido na tela de resposta, questão a
+questão, e não na abertura da solicitação. Peso 1 é apenas o ponto de
+partida.
+
+### Enunciado com imagem e código
+
+O enunciado tem um comando em texto e, depois dele, blocos ordenados:
+
+- **código**, com a linguagem declarada — Python, JavaScript, TypeScript,
+  React (JSX), HTML, CSS, Kotlin, Swift, Java, C#, C, C++, PHP, SQL, Shell
+  e JSON;
+- **imagem** (JPG, PNG, GIF ou WEBP até 4 MB), com legenda;
+- **texto**, para intercalar explicações entre trechos de código.
+
+Os blocos vivem em `questao_blocos` e são reordenáveis. O realce de sintaxe
+usa highlight.js, e a classe `language-…` gravada no bloco é a mesma que o
+PDF vai usar no milestone 5.
 
 Designar alguém para uma disciplina cria o vínculo docente se ele ainda não
 existir — é o que dará a esse professor acesso aos resultados dela.

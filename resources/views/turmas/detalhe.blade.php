@@ -86,8 +86,7 @@
                 @endif
 
                 <x-campo rotulo="Observações" para="observacoes-avanco">
-                    <textarea id="observacoes-avanco" wire:model="observacoesAvanco" rows="2"
-                              class="block w-full rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-marca-500 focus:ring-2 focus:ring-marca-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"></textarea>
+                    <x-area-texto id="observacoes-avanco" wire:model="observacoesAvanco" :linhas="2"/>
                 </x-campo>
 
                 <div class="flex justify-end gap-2">

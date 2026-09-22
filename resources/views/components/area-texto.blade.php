@@ -1,17 +1,11 @@
 @props([
-    'tipo' => 'text',
     'desabilitado' => false,
+    'linhas' => 3,
 ])
 
-{{--
-    `desabilitado` é uma prop em vez de `@disabled(...)` passado na tag:
-    o Blade não compila `<x-input @disabled(...)>` e deixa a tag literal
-    no HTML, fazendo o campo sumir da página.
---}}
-<input type="{{ $tipo }}" @disabled($desabilitado) {{ $attributes->class([
+<textarea rows="{{ $linhas }}" @disabled($desabilitado) {{ $attributes->class([
     'block w-full rounded-lg border-slate-300 bg-white text-sm text-slate-900 shadow-sm transition',
     'placeholder:text-slate-400 focus:border-marca-500 focus:ring-2 focus:ring-marca-500/30',
     'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500',
     'dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900',
-    'aria-[invalid=true]:border-rose-400 aria-[invalid=true]:focus:ring-rose-500/30',
-]) }}>
+]) }}>{{ $slot }}</textarea>

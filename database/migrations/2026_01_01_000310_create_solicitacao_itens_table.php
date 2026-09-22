@@ -12,7 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('solicitacao_id')->constrained('solicitacoes_prova')->cascadeOnDelete();
             $table->unsignedSmallInteger('ordem');
-            $table->decimal('peso', 5, 2);
+            // O peso vive em `questoes`: quem o define é o professor que
+            // escreve a questão, não quem abre a solicitação.
             $table->timestamps();
 
             $table->unique(['solicitacao_id', 'ordem']);

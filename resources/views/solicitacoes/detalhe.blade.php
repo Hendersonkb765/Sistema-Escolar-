@@ -118,7 +118,9 @@
                     </div>
 
                     @if ($questao->enunciado)
-                        <p class="mt-2 whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{{ $questao->enunciado }}</p>
+                        <div class="mt-2">
+                            <x-enunciado :questao="$questao"/>
+                        </div>
 
                         <ul class="mt-2 space-y-1">
                             @foreach ($questao->alternativas->sortBy('letra') as $alternativa)

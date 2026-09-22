@@ -80,34 +80,15 @@
 
             <x-campo rotulo="Observações ao professor" para="observacoes" class="mt-4"
                      :erro="$errors->first('observacoes')">
-                <textarea id="observacoes" wire:model="observacoes" rows="2"
-                          placeholder="Ex.: priorize conteúdo do segundo bimestre"
-                          class="block w-full rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-marca-500 focus:ring-2 focus:ring-marca-500/30 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"></textarea>
+                <x-area-texto id="observacoes" wire:model="observacoes" :linhas="2"
+                              placeholder="Ex.: priorize conteúdo do segundo bimestre"/>
             </x-campo>
         </x-cartao>
 
-        <x-cartao titulo="Peso de cada questão"
-                  :descricao="'Soma dos pesos: '.number_format($somaDosPesos, 2, ',', '.').'. A nota da disciplina é calculada por estes pesos.'">
-            <x-slot:acoes>
-                <x-botao variante="secundario" type="button" wire:click="aplicarPesoATodas">
-                    Repetir o 1º em todas
-                </x-botao>
-            </x-slot:acoes>
-
-            @error('pesos')
-                <x-alerta tipo="erro" class="mb-3">{{ $message }}</x-alerta>
-            @enderror
-
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-                @foreach ($pesos as $indice => $peso)
-                    <x-campo :rotulo="'Questão '.($indice + 1)" wire:key="peso-{{ $indice }}"
-                             :erro="$errors->first('pesos.'.$indice)">
-                        <x-input tipo="number" step="0.25" min="0.25" max="100"
-                                 wire:model.live.debounce.500ms="pesos.{{ $indice }}"/>
-                    </x-campo>
-                @endforeach
-            </div>
-        </x-cartao>
+        <x-alerta tipo="info">
+            O <strong>peso</strong> de cada questão é definido pelo professor ao escrevê-la — é ele
+            quem sabe quanto cada uma vale dentro da disciplina.
+        </x-alerta>
 
         <div class="flex items-center justify-end gap-2">
             <x-botao variante="secundario" href="{{ route('solicitacoes.index') }}" wire:navigate>Cancelar</x-botao>

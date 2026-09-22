@@ -50,7 +50,7 @@ beforeEach(function () {
         turma: $this->turma,
         disciplina: $this->logica,
         professor: $this->professor,
-        pesos: [1, 1, 0.5, 0.5, 0.75],
+        quantidadeQuestoes: 5,
         quantidadeAlternativas: 4,
         prazo: $prazo ? now()->parse($prazo) : now()->addWeek(),
     );

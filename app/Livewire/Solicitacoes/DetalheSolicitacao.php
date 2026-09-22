@@ -84,7 +84,7 @@ class DetalheSolicitacao extends Component
 
         return view('solicitacoes.detalhe', [
             'questoes' => $this->solicitacao->questoes()
-                ->with(['item', 'alternativas'])
+                ->with(['item', 'alternativas', 'blocos'])
                 ->get()
                 ->sortBy(fn ($questao) => $questao->item->ordem)
                 ->values(),

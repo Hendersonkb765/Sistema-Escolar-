@@ -61,6 +61,25 @@ sem dizer por quê.
 Quando a ação não cabe no estado atual, a Policy segue liberando e a **view**
 esconde o botão (`@can(...)` + `@if ($modelo->podeAlgo())`).
 
+## Componentes Blade e diretivas
+
+Nunca use `@disabled(...)`, `@checked(...)` ou `@readonly(...)` **dentro da
+tag de um componente** (`<x-input @disabled(...)>`): o Blade não compila a
+tag, ela fica literal no HTML e o campo desaparece da página sem erro
+nenhum. O componente declara uma prop (`:desabilitado="$expr"`) e aplica a
+diretiva no elemento HTML lá dentro.
+
+Pelo mesmo motivo, `:atributo="$php"` só é interpretado em componentes. Num
+`<button>` ou `<input>` puro ele vira uma diretiva do Alpine.
+
+O teste que pega isso conta os elementos de formulário no HTML renderizado
+(`tests/Feature/Avaliacao/CamposDaQuestaoTest.php`). Um `assertSee` de
+rótulo passa mesmo com a tag do componente literal.
+
+Ao afirmar que um campo está desabilitado, procure o atributo booleano
+(` disabled` seguido de espaço ou `>`), nunca a palavra solta: as classes
+utilitárias `disabled:bg-...` estão presentes sempre.
+
 ## Eager loading
 
 `Model::shouldBeStrict()` está ativo fora de produção. Regras:

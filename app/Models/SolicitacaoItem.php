@@ -8,7 +8,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-/** Uma linha por questão pedida, com o peso definido pelo PAEET. */
+/**
+ * Uma linha por questão pedida. Guarda apenas a ordem — o peso pertence
+ * à questão e é definido pelo professor que a escreve.
+ */
 class SolicitacaoItem extends Model
 {
     use AplicaEscopoDeEixo;
@@ -16,14 +19,11 @@ class SolicitacaoItem extends Model
 
     protected $table = 'solicitacao_itens';
 
-    protected $fillable = ['solicitacao_id', 'ordem', 'peso'];
+    protected $fillable = ['solicitacao_id', 'ordem'];
 
     protected function casts(): array
     {
-        return [
-            'ordem' => 'integer',
-            'peso' => 'decimal:2',
-        ];
+        return ['ordem' => 'integer'];
     }
 
     public static function caminhoDoEixo(): string

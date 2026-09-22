@@ -23,8 +23,8 @@ class Questao extends Model
     protected $table = 'questoes';
 
     /**
-     * `peso` fica fora do fillable de propósito: é copiado do item da
-     * solicitação e o professor nunca pode alterá-lo.
+     * O peso é escolhido pelo professor que escreve a questão: é ele quem
+     * sabe quanto ela vale dentro da disciplina.
      */
     protected $fillable = [
         'solicitacao_id',
@@ -32,6 +32,7 @@ class Questao extends Model
         'disciplina_id',
         'professor_id',
         'enunciado',
+        'peso',
         'status',
         'versao',
         'enviada_em',
@@ -39,7 +40,7 @@ class Questao extends Model
     ];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
-    protected $attributes = ['status' => 'rascunho', 'versao' => 1];
+    protected $attributes = ['status' => 'rascunho', 'versao' => 1, 'peso' => 1.0];
 
     protected function casts(): array
     {
@@ -101,6 +102,12 @@ class Questao extends Model
         return $this->hasMany(Alternativa::class)->orderBy('letra');
     }
 
+    /** Código, imagens e parágrafos que compõem o enunciado. */
+    public function blocos(): HasMany
+    {
+        return $this->hasMany(QuestaoBloco::class)->orderBy('ordem');
+    }
+
     /** @return HasMany<QuestaoFeedback, $this> */
     public function feedbacks(): HasMany
     {
@@ -124,7 +131,8 @@ class Questao extends Model
             ? $this->alternativas
             : $this->alternativas()->get();
 
-        return filled($this->enunciado)
+        return (float) $this->peso > 0
+            && filled($this->enunciado)
             && $alternativas->count() === (int) $quantidadeEsperada
             && $alternativas->every(fn (Alternativa $a) => filled($a->texto))
             && $alternativas->where('correta', true)->count() === 1;

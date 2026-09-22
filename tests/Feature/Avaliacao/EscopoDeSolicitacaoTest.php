@@ -31,7 +31,7 @@ beforeEach(function () {
 
         return $criar->executar(
             autor: $paeet, turma: $turma, disciplina: $montagem['disciplinas'][$disciplina],
-            professor: $professor, pesos: [1, 1], quantidadeAlternativas: 4,
+            professor: $professor, quantidadeQuestoes: 2, quantidadeAlternativas: 4,
             prazo: now()->addWeek(),
         );
     };

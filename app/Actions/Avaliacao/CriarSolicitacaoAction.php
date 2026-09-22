@@ -14,22 +14,18 @@ use Illuminate\Support\Facades\Gate;
 /**
  * Abre uma solicitação de questões a um professor.
  *
- * Cada questão pedida vira um item com seu peso e uma questão em rascunho
- * já ligada a ele — assim o professor abre a solicitação e encontra os
- * campos prontos, e o peso definido pelo PAEET nunca depende do que ele
- * digitar.
+ * Cada questão pedida vira um item e uma questão em rascunho ligada a
+ * ele — o professor abre a solicitação e encontra os campos prontos. O
+ * peso de cada questão é escolhido por ele ao escrevê-la.
  */
 class CriarSolicitacaoAction
 {
-    /**
-     * @param  array<int, float|string>  $pesos  um peso por questão pedida, na ordem
-     */
     public function executar(
         User $autor,
         Turma $turma,
         Disciplina $disciplina,
         User $professor,
-        array $pesos,
+        int $quantidadeQuestoes,
         int $quantidadeAlternativas,
         \DateTimeInterface $prazo,
         ?string $observacoes = null,
@@ -37,10 +33,10 @@ class CriarSolicitacaoAction
         Gate::forUser($autor)->authorize('create', SolicitacaoProva::class);
         Gate::forUser($autor)->authorize('view', $turma);
 
-        $this->validar($turma, $disciplina, $professor, $pesos, $quantidadeAlternativas);
+        $this->validar($turma, $disciplina, $professor, $quantidadeQuestoes, $quantidadeAlternativas);
 
         return DB::transaction(function () use (
-            $autor, $turma, $disciplina, $professor, $pesos,
+            $autor, $turma, $disciplina, $professor, $quantidadeQuestoes,
             $quantidadeAlternativas, $prazo, $observacoes
         ) {
             $solicitacao = SolicitacaoProva::create([
@@ -49,30 +45,24 @@ class CriarSolicitacaoAction
                 'disciplina_id' => $disciplina->getKey(),
                 'professor_id' => $professor->getKey(),
                 'criado_por' => $autor->getKey(),
-                'quantidade_questoes' => count($pesos),
+                'quantidade_questoes' => $quantidadeQuestoes,
                 'quantidade_alternativas' => $quantidadeAlternativas,
                 'prazo' => $prazo,
                 'status' => StatusSolicitacao::Aberta,
                 'observacoes' => $observacoes,
             ]);
 
-            foreach (array_values($pesos) as $indice => $peso) {
-                $item = $solicitacao->itens()->create([
-                    'ordem' => $indice + 1,
-                    'peso' => (float) $peso,
-                ]);
+            foreach (range(1, $quantidadeQuestoes) as $ordem) {
+                $item = $solicitacao->itens()->create(['ordem' => $ordem]);
 
-                // A questão nasce junto, em rascunho. O peso fica fora do
-                // `fillable` de propósito — é o que impede o professor de
-                // alterá-lo — então aqui ele é copiado do item à mão.
-                $questao = $solicitacao->questoes()->make([
+                // A questão nasce em rascunho, com peso 1 como ponto de
+                // partida; o professor ajusta ao escrevê-la.
+                $solicitacao->questoes()->create([
                     'solicitacao_item_id' => $item->getKey(),
                     'disciplina_id' => $disciplina->getKey(),
                     'professor_id' => $professor->getKey(),
+                    'peso' => 1,
                 ]);
-
-                $questao->peso = $item->peso;
-                $questao->save();
             }
 
             // Designar alguém para uma disciplina cria o vínculo docente se
@@ -91,8 +81,7 @@ class CriarSolicitacaoAction
                     'turma' => $turma->nome,
                     'disciplina' => $disciplina->nome,
                     'professor' => $professor->nome,
-                    'questoes' => count($pesos),
-                    'soma_dos_pesos' => array_sum(array_map('floatval', $pesos)),
+                    'questoes' => $quantidadeQuestoes,
                     'prazo' => $prazo->format('Y-m-d H:i'),
                 ])
                 ->log("Solicitação de {$solicitacao->quantidade_questoes} questão(ões) aberta");
@@ -101,22 +90,15 @@ class CriarSolicitacaoAction
         });
     }
 
-    /** @param array<int, float|string> $pesos */
     protected function validar(
         Turma $turma,
         Disciplina $disciplina,
         User $professor,
-        array $pesos,
+        int $quantidadeQuestoes,
         int $quantidadeAlternativas,
     ): void {
-        if ($pesos === []) {
-            throw RegraDeNegocioException::porque('Informe ao menos uma questão com peso.');
-        }
-
-        foreach ($pesos as $peso) {
-            if ((float) $peso <= 0) {
-                throw RegraDeNegocioException::porque('Todo peso precisa ser maior que zero.');
-            }
+        if ($quantidadeQuestoes < 1) {
+            throw RegraDeNegocioException::porque('Peça ao menos uma questão.');
         }
 
         if ($quantidadeAlternativas < 2 || $quantidadeAlternativas > 6) {

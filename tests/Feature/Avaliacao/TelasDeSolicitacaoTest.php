@@ -51,13 +51,13 @@ beforeEach(function () {
     // Duas solicitações, uma no prazo e outra vencida.
     $this->noPrazo = $criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, pesos: [1, 1, 0.5], quantidadeAlternativas: 4,
+        professor: $this->professor, quantidadeQuestoes: 3, quantidadeAlternativas: 4,
         prazo: now()->addWeek(), observacoes: 'Foco no segundo bimestre',
     );
 
     $this->vencida = $criar->executar(
         autor: $this->paeet, turma: $this->turma, disciplina: $this->redes,
-        professor: $this->outroProfessor, pesos: [1, 2], quantidadeAlternativas: 4,
+        professor: $this->outroProfessor, quantidadeQuestoes: 2, quantidadeAlternativas: 4,
         prazo: now()->subDays(2),
     );
 });
@@ -92,14 +92,12 @@ it('filtra por atrasadas', function () {
         ->assertDontSee('Lógica de Programação');
 });
 
-it('abre o detalhe com as questões pedidas e seus pesos', function () {
+it('abre o detalhe com as questões pedidas', function () {
     $this->actingAs($this->paeet)
         ->get(route('solicitacoes.show', $this->noPrazo))
         ->assertOk()
         ->assertSee('Lógica de Programação')
         ->assertSee('Foco no segundo bimestre')
-        ->assertSee('peso 1,00')
-        ->assertSee('peso 0,50')
         ->assertSee('0 de 3 preenchida(s)');
 });
 
@@ -110,8 +108,8 @@ it('abre a tela de resposta do professor com um bloco por questão', function ()
         ->assertSee('Questão 1')
         ->assertSee('Questão 2')
         ->assertSee('Questão 3')
-        ->assertSee('peso 0,50')
-        // O aviso de quantas faltam.
+        // O peso é campo do professor, não um rótulo fixo.
+        ->assertSee('Peso da questão')
         ->assertSee('Faltam 3 questão(ões) para poder enviar');
 });
 
@@ -188,16 +186,13 @@ it('o formulário oferece só as disciplinas do período da turma', function () 
         ->assertDontSee('Back-end');
 });
 
-it('o formulário mantém a lista de pesos do tamanho da quantidade pedida', function () {
-    $componente = Livewire::actingAs($this->paeet)
+it('o formulário do PAEET não pede peso', function () {
+    $html = Livewire::actingAs($this->paeet)
         ->test(FormularioSolicitacao::class)
-        ->set('quantidade_questoes', 7);
+        ->html();
 
-    expect($componente->get('pesos'))->toHaveCount(7);
-
-    $componente->set('quantidade_questoes', 3);
-
-    expect($componente->get('pesos'))->toHaveCount(3);
+    expect($html)->toContain('definido pelo professor ao escrevê-la')
+        ->and($html)->not->toContain('wire:model.live.debounce.500ms="pesos');
 });
 
 it('abre uma solicitação pelo formulário', function () {
@@ -207,7 +202,6 @@ it('abre uma solicitação pelo formulário', function () {
         ->set('disciplina_id', $this->logica->id)
         ->set('professor_id', $this->professor->id)
         ->set('quantidade_questoes', 2)
-        ->set('pesos', ['1.5', '2'])
         ->set('quantidade_alternativas', 5)
         ->set('prazo', now()->addDays(10)->format('Y-m-d\TH:i'))
         ->call('salvar')
@@ -217,8 +211,9 @@ it('abre uma solicitação pelo formulário', function () {
 
     expect($nova->quantidade_questoes)->toBe(2)
         ->and($nova->quantidade_alternativas)->toBe(5)
-        ->and((float) $nova->somaDosPesos())->toBe(3.5)
-        ->and($nova->questoes()->count())->toBe(2);
+        ->and($nova->questoes()->count())->toBe(2)
+        // Peso 1 de partida, para o professor ajustar.
+        ->and((float) $nova->somaDosPesos())->toBe(2.0);
 });
 
 it('recusa disciplina fora do período da turma no formulário', function () {

@@ -138,8 +138,7 @@ class DemonstracaoSeeder extends Seeder
             turma: $turmaDoPrimeiro,
             disciplina: $disciplinas->firstWhere('codigo', 'LOG'),
             professor: $professor,
-            // Os pesos do exemplo do enunciado: soma 3,75.
-            pesos: [1, 1, 0.5, 0.5, 0.75],
+            quantidadeQuestoes: 5,
             quantidadeAlternativas: 4,
             prazo: now()->addWeek(),
             observacoes: 'Priorize conteúdo do segundo bimestre.',
@@ -150,7 +149,7 @@ class DemonstracaoSeeder extends Seeder
             turma: $turmaDoPrimeiro,
             disciplina: $disciplinas->firstWhere('codigo', 'RED'),
             professor: $professor,
-            pesos: [1, 1, 1],
+            quantidadeQuestoes: 3,
             quantidadeAlternativas: 5,
             prazo: now()->subDays(3),
         );
@@ -160,7 +159,7 @@ class DemonstracaoSeeder extends Seeder
             turma: $turmaDoSegundo,
             disciplina: $disciplinas->firstWhere('codigo', 'FRT'),
             professor: $paeetQueLeciona,
-            pesos: [2, 2],
+            quantidadeQuestoes: 2,
             quantidadeAlternativas: 4,
             prazo: now()->addDays(3),
         );

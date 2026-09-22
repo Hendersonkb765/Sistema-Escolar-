@@ -74,33 +74,154 @@
         @endif
     </x-cartao>
 
+    @if ($podeEditar)
+        <x-alerta tipo="info">
+            Você define o <strong>peso</strong> de cada questão — é ele que diz quanto ela vale na
+            nota da disciplina. Soma atual: <strong>{{ number_format($somaDosPesos, 2, ',', '.') }}</strong>.
+        </x-alerta>
+    @endif
+
     @if ($incompletas->isNotEmpty() && $podeEditar)
         <x-alerta tipo="atencao" :titulo="'Faltam '.$incompletas->count().' questão(ões) para poder enviar'">
-            Questões pendentes: {{ $incompletas->join(', ') }}. Cada uma precisa de enunciado,
-            as {{ $solicitacao->quantidade_alternativas }} alternativas preenchidas e uma marcada como correta.
+            Questões pendentes: {{ $incompletas->join(', ') }}. Cada uma precisa de enunciado, peso
+            maior que zero, as {{ $solicitacao->quantidade_alternativas }} alternativas preenchidas
+            e uma marcada como correta.
         </x-alerta>
     @endif
 
     @foreach ($questoes as $questao)
-        @php $dados = $formulario[$questao->id] ?? ['enunciado' => null, 'alternativas' => []]; @endphp
+        @php
+            $dados = $formulario[$questao->id] ?? ['enunciado' => null, 'alternativas' => []];
+            $bloqueado = ! $podeEditar || ! $questao->status->editavelPeloProfessor();
+        @endphp
 
         <x-cartao wire:key="questao-{{ $questao->id }}">
             <x-slot:titulo>Questão {{ $questao->item->ordem }}</x-slot:titulo>
             <x-slot:acoes>
-                <x-badge cor="cinza">peso {{ number_format((float) $questao->peso, 2, ',', '.') }}</x-badge>
                 <x-badge :cor="$questao->status->cor()" :rotulo="$questao->status->rotulo()"/>
-                @if ($podeEditar && $questao->status->editavelPeloProfessor())
+                @unless ($bloqueado)
                     <x-botao variante="discreto" wire:click="salvarQuestao({{ $questao->id }})">Salvar</x-botao>
-                @endif
+                @endunless
             </x-slot:acoes>
 
             <div class="space-y-4">
-                <x-campo rotulo="Enunciado" :para="'enunciado-'.$questao->id" obrigatorio>
-                    <textarea id="enunciado-{{ $questao->id }}" rows="3"
-                              wire:model.blur="formulario.{{ $questao->id }}.enunciado"
-                              @disabled(! $podeEditar || ! $questao->status->editavelPeloProfessor())
-                              class="block w-full rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-marca-500 focus:ring-2 focus:ring-marca-500/30 disabled:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900"></textarea>
-                </x-campo>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                    <x-campo rotulo="Enunciado" :para="'enunciado-'.$questao->id" obrigatorio class="sm:col-span-3">
+                        <x-area-texto id="enunciado-{{ $questao->id }}" :linhas="3"
+                                      wire:model.blur="formulario.{{ $questao->id }}.enunciado"
+                                      :desabilitado="$bloqueado"
+                                      placeholder="O comando da questão"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Peso da questão" :para="'peso-'.$questao->id" obrigatorio
+                             ajuda="Quanto ela vale na nota da disciplina.">
+                        <x-input tipo="number" step="0.25" min="0.25" max="100"
+                                 id="peso-{{ $questao->id }}"
+                                 wire:model.live.debounce.500ms="formulario.{{ $questao->id }}.peso"
+                                 :desabilitado="$bloqueado"/>
+                    </x-campo>
+                </div>
+
+                {{-- Blocos do enunciado: código, imagem e parágrafos --}}
+                <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
+                            Conteúdo do enunciado
+                            <span class="font-normal text-slate-500">— código, imagem ou mais texto</span>
+                        </p>
+                        @unless ($bloqueado)
+                            <div class="flex gap-1">
+                                <x-botao variante="secundario" type="button"
+                                         wire:click="adicionarBloco({{ $questao->id }}, 'codigo')">+ Código</x-botao>
+                                <x-botao variante="secundario" type="button"
+                                         wire:click="adicionarBloco({{ $questao->id }}, 'imagem')">+ Imagem</x-botao>
+                                <x-botao variante="secundario" type="button"
+                                         wire:click="adicionarBloco({{ $questao->id }}, 'texto')">+ Texto</x-botao>
+                            </div>
+                        @endunless
+                    </div>
+
+                    @if (empty($dados['blocos']))
+                        <p class="mt-2 text-xs text-slate-400">
+                            Nenhum bloco. Use os botões acima para anexar um trecho de código, uma
+                            imagem ou um parágrafo extra.
+                        </p>
+                    @else
+                        <div class="mt-3 space-y-3">
+                            @foreach ($dados['blocos'] as $indice => $bloco)
+                                <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-800 dark:bg-slate-900/40"
+                                     wire:key="bloco-{{ $questao->id }}-{{ $indice }}">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <x-badge :cor="App\Enums\TipoBlocoQuestao::from($bloco['tipo'])->cor()"
+                                                 :rotulo="App\Enums\TipoBlocoQuestao::from($bloco['tipo'])->rotulo()"/>
+
+                                        @unless ($bloqueado)
+                                            <div class="flex items-center gap-1">
+                                                <x-botao variante="discreto" type="button"
+                                                         wire:click="moverBloco({{ $questao->id }}, {{ $indice }}, -1)"
+                                                         title="Mover para cima">↑</x-botao>
+                                                <x-botao variante="discreto" type="button"
+                                                         wire:click="moverBloco({{ $questao->id }}, {{ $indice }}, 1)"
+                                                         title="Mover para baixo">↓</x-botao>
+                                                <x-botao variante="discreto" type="button"
+                                                         wire:click="removerBloco({{ $questao->id }}, {{ $indice }})"
+                                                         class="text-rose-600 dark:text-rose-400">Remover</x-botao>
+                                            </div>
+                                        @endunless
+                                    </div>
+
+                                    @if ($bloco['tipo'] === 'codigo')
+                                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
+                                            <x-campo rotulo="Linguagem">
+                                                <x-select wire:model.live="formulario.{{ $questao->id }}.blocos.{{ $indice }}.linguagem"
+                                                          :desabilitado="$bloqueado">
+                                                    @foreach ($linguagens as $valor => $rotulo)
+                                                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                                    @endforeach
+                                                </x-select>
+                                            </x-campo>
+
+                                            <x-campo rotulo="Código" class="sm:col-span-3">
+                                                <x-area-texto :linhas="6"
+                                                              wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
+                                                              :desabilitado="$bloqueado"
+                                                              class="font-mono"
+                                                              placeholder="Cole aqui o trecho de código"/>
+                                            </x-campo>
+                                        </div>
+                                    @elseif ($bloco['tipo'] === 'imagem')
+                                        <div class="mt-2 space-y-2">
+                                            @if (! empty($bloco['caminho']))
+                                                <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($bloco['caminho']) }}"
+                                                     alt="{{ $bloco['legenda'] ?: 'Imagem do enunciado' }}"
+                                                     class="max-h-56 rounded-lg border border-slate-200 dark:border-slate-700">
+                                            @endif
+
+                                            @unless ($bloqueado)
+                                                <x-campo rotulo="Arquivo de imagem"
+                                                         ajuda="JPG, PNG, GIF ou WEBP, até 4 MB.">
+                                                    <x-input tipo="file" accept="image/*"
+                                                             wire:model="imagens.{{ $questao->id }}.{{ $indice }}"/>
+                                                </x-campo>
+                                            @endunless
+
+                                            <x-campo rotulo="Legenda (opcional)">
+                                                <x-input wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.legenda"
+                                                         :desabilitado="$bloqueado"/>
+                                            </x-campo>
+                                        </div>
+                                    @else
+                                        <x-campo rotulo="Texto" class="mt-2">
+                                            <x-area-texto :linhas="3"
+                                                          wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
+                                                          :desabilitado="$bloqueado"/>
+                                        </x-campo>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
 
                 <div class="space-y-2">
                     <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -111,20 +232,20 @@
                         <div class="flex items-start gap-2" wire:key="alt-{{ $questao->id }}-{{ $alternativa['letra'] }}">
                             <button type="button"
                                     wire:click="marcarCorreta({{ $questao->id }}, '{{ $alternativa['letra'] }}')"
-                                    @disabled(! $podeEditar || ! $questao->status->editavelPeloProfessor())
+                                    @disabled($bloqueado)
+                                    aria-pressed="{{ $alternativa['correta'] ? 'true' : 'false' }}"
                                     @class([
                                         'mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition',
                                         'bg-emerald-500 text-white' => $alternativa['correta'],
                                         'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300' => ! $alternativa['correta'],
                                     ])
-                                    :aria-pressed="$alternativa['correta'] ? 'true' : 'false'"
                                     title="Marcar {{ $alternativa['letra'] }} como correta">
                                 {{ $alternativa['letra'] }}
                             </button>
 
                             <x-input wire:model.blur="formulario.{{ $questao->id }}.alternativas.{{ $indice }}.texto"
                                      placeholder="Texto da alternativa {{ $alternativa['letra'] }}"
-                                     @disabled(! $podeEditar || ! $questao->status->editavelPeloProfessor())/>
+                                     :desabilitado="$bloqueado"/>
                         </div>
                     @endforeach
                 </div>

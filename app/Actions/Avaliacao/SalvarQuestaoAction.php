@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Grava o rascunho de uma questão: enunciado e alternativas.
+ * Grava o rascunho de uma questão: enunciado, peso e alternativas.
  *
- * O peso nunca entra aqui. Ele vem do item da solicitação e é somente
- * leitura para quem responde.
+ * O peso é do professor — é ele quem sabe quanto a questão vale dentro
+ * da disciplina.
  */
 class SalvarQuestaoAction
 {
@@ -25,6 +25,7 @@ class SalvarQuestaoAction
         User $autor,
         ?string $enunciado,
         array $alternativas,
+        float|string|null $peso = null,
     ): Questao {
         Gate::forUser($autor)->authorize('update', $questao);
 
@@ -58,8 +59,19 @@ class SalvarQuestaoAction
             throw RegraDeNegocioException::porque('Marque apenas uma alternativa como correta.');
         }
 
-        return DB::transaction(function () use ($questao, $enunciado, $alternativas, $esperadas) {
-            $questao->update(['enunciado' => $enunciado]);
+        if ($peso !== null && (float) $peso <= 0) {
+            throw RegraDeNegocioException::porque('O peso da questão precisa ser maior que zero.');
+        }
+
+        return DB::transaction(function () use ($questao, $enunciado, $alternativas, $esperadas, $peso) {
+            $atualizacao = ['enunciado' => $enunciado];
+
+            // Peso ausente significa "não mexa", e não "zere".
+            if ($peso !== null) {
+                $atualizacao['peso'] = (float) $peso;
+            }
+
+            $questao->update($atualizacao);
 
             foreach (array_values($alternativas) as $indice => $dados) {
                 $letra = $dados['letra'] ?? chr(65 + $indice);
