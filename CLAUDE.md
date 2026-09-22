@@ -72,6 +72,11 @@ diretiva no elemento HTML lá dentro.
 Pelo mesmo motivo, `:atributo="$php"` só é interpretado em componentes. Num
 `<button>` ou `<input>` puro ele vira uma diretiva do Alpine.
 
+E `:disabled="$expr"` num componente **não resolve**: um valor falso ainda
+é renderizado como atributo e desabilita o elemento para sempre. Use a prop
+`desabilitado`, que `x-input`, `x-select`, `x-area-texto` e `x-botao`
+aceitam.
+
 O teste que pega isso conta os elementos de formulário no HTML renderizado
 (`tests/Feature/Avaliacao/CamposDaQuestaoTest.php`). Um `assertSee` de
 rótulo passa mesmo com a tag do componente literal.
@@ -90,6 +95,19 @@ utilitárias `disabled:bg-...` estão presentes sempre.
   quebra, vira N+1 silencioso;
 - `AplicaEscopoDeEixo::eixoId()` lê a chave estrangeira do último trecho do
   caminho em vez de carregar o Eixo, então basta `eixo_id` no select.
+
+## Avisos ao usuário
+
+Ação que **fica na mesma tela** notifica por evento:
+`$this->notificarSucesso(...)` (trait `App\Livewire\Concerns\Notifica`).
+Um `session()->flash()` aqui só apareceria na próxima navegação — ou seja,
+nunca, do ponto de vista de quem clicou.
+
+Ação que **redireciona** usa `flashSucesso()`, que sobrevive à navegação.
+
+Os dois caminhos desembocam no mesmo painel flutuante
+(`x-notificacoes`, montado no layout). Testes usam
+`assertDispatched('notificar', ...)`.
 
 ## Histórico nunca é reescrito
 

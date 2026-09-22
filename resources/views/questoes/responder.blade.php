@@ -3,16 +3,14 @@
         <x-slot:acoes>
             @if ($podeEditar)
                 <x-botao variante="secundario" wire:click="salvarTudo" wire:loading.attr="disabled">
-                    Salvar rascunho
+                    <span wire:loading.remove wire:target="salvarTudo">Salvar rascunho</span>
+                    <span wire:loading wire:target="salvarTudo">Salvando…</span>
                 </x-botao>
-                @if ($confirmandoEnvio)
-                    <x-botao wire:click="enviar" wire:loading.attr="disabled">Confirmar envio</x-botao>
-                    <x-botao variante="discreto" wire:click="$set('confirmandoEnvio', false)">Voltar</x-botao>
-                @else
-                    <x-botao wire:click="$set('confirmandoEnvio', true)" :disabled="$incompletas->isNotEmpty()">
+                @unless ($confirmandoEnvio)
+                    <x-botao wire:click="$set('confirmandoEnvio', true)" :desabilitado="$incompletas->isNotEmpty()">
                         Enviar para análise
                     </x-botao>
-                @endif
+                @endunless
             @endif
         </x-slot:acoes>
 
@@ -65,12 +63,48 @@
         @endif
 
         @if ($confirmandoEnvio)
-            <x-alerta tipo="info" class="mt-4" titulo="Enviar as {{ $solicitacao->quantidade_questoes }} questões para análise?">
-                Depois do envio elas ficam bloqueadas para edição até a coordenação analisar.
-                @if ($solicitacao->estaAtrasada())
-                    O envio será marcado como <strong>em atraso</strong>.
-                @endif
-            </x-alerta>
+            <div class="mt-4 space-y-3 rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-500/30 dark:bg-sky-500/5">
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Enviar {{ $solicitacao->quantidade_questoes }} questão(ões) para análise?
+                </h3>
+
+                <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                    <div>
+                        <dt class="text-xs text-slate-500 dark:text-slate-400">Disciplina</dt>
+                        <dd class="font-medium text-slate-800 dark:text-slate-100">{{ $solicitacao->disciplina->nome }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs text-slate-500 dark:text-slate-400">Turma</dt>
+                        <dd class="font-medium text-slate-800 dark:text-slate-100">{{ $solicitacao->turma->nome }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs text-slate-500 dark:text-slate-400">Questões</dt>
+                        <dd class="font-medium text-slate-800 dark:text-slate-100">{{ $questoes->count() }} completas</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs text-slate-500 dark:text-slate-400">Soma dos pesos</dt>
+                        <dd class="font-medium text-slate-800 dark:text-slate-100">{{ number_format($somaDosPesos, 2, ',', '.') }}</dd>
+                    </div>
+                </dl>
+
+                <p class="text-sm text-slate-700 dark:text-slate-200">
+                    Depois do envio as questões ficam bloqueadas para edição até a coordenação
+                    analisar. Se alguma for devolvida para correção, você poderá editá-la de novo.
+                    @if ($solicitacao->estaAtrasada())
+                        <strong class="text-amber-700 dark:text-amber-300">
+                            O envio será registrado como feito em atraso — e será aceito assim mesmo.
+                        </strong>
+                    @endif
+                </p>
+
+                <div class="flex justify-end gap-2">
+                    <x-botao variante="secundario" wire:click="$set('confirmandoEnvio', false)">Voltar</x-botao>
+                    <x-botao wire:click="enviar" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="enviar">Confirmar envio</span>
+                        <span wire:loading wire:target="enviar">Enviando…</span>
+                    </x-botao>
+                </div>
+            </div>
         @endif
     </x-cartao>
 
@@ -273,8 +307,11 @@
     @if ($podeEditar)
         <div class="flex items-center justify-end gap-2">
             <x-botao variante="secundario" href="{{ route('solicitacoes.index') }}" wire:navigate>Voltar</x-botao>
-            <x-botao variante="secundario" wire:click="salvarTudo">Salvar rascunho</x-botao>
-            <x-botao wire:click="$set('confirmandoEnvio', true)" :disabled="$incompletas->isNotEmpty()">
+            <x-botao variante="secundario" wire:click="salvarTudo" wire:loading.attr="disabled">
+                <span wire:loading.remove wire:target="salvarTudo">Salvar rascunho</span>
+                <span wire:loading wire:target="salvarTudo">Salvando…</span>
+            </x-botao>
+            <x-botao wire:click="$set('confirmandoEnvio', true)" :desabilitado="$incompletas->isNotEmpty()">
                 Enviar para análise
             </x-botao>
         </div>

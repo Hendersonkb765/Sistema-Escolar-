@@ -2,6 +2,7 @@
     'variante' => 'primario',
     'href' => null,
     'tipo' => 'button',
+    'desabilitado' => false,
 ])
 
 @php
@@ -20,8 +21,13 @@
     ];
 @endphp
 
+{{--
+    `desabilitado` é prop, e não `:disabled` solto nos atributos: um
+    `disabled` com valor falso ainda é renderizado como atributo e
+    desabilita o botão do mesmo jeito.
+--}}
 @if ($href)
     <a href="{{ $href }}" {{ $attributes->class($classes) }}>{{ $slot }}</a>
 @else
-    <button type="{{ $tipo }}" {{ $attributes->class($classes) }}>{{ $slot }}</button>
+    <button type="{{ $tipo }}" @disabled($desabilitado) {{ $attributes->class($classes) }}>{{ $slot }}</button>
 @endif

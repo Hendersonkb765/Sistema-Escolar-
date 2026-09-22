@@ -4,6 +4,7 @@ namespace App\Livewire\Solicitacoes;
 
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,6 +17,7 @@ use Livewire\Component;
 class DetalheSolicitacao extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
 
     public SolicitacaoProva $solicitacao;
 
@@ -56,7 +58,7 @@ class DetalheSolicitacao extends Component
                 $this->motivo ?: null,
             );
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
             $this->cancelarConfirmacao();
 
             return;
@@ -68,7 +70,7 @@ class DetalheSolicitacao extends Component
             'reabrir' => 'Solicitação reaberta para envio.',
         ];
 
-        session()->flash('sucesso', $mensagens[$acao]);
+        $this->notificarSucesso($mensagens[$acao]);
 
         $this->cancelarConfirmacao();
     }

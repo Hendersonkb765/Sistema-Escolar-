@@ -5,6 +5,7 @@ namespace App\Livewire\Solicitacoes;
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Enums\StatusTurma;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Disciplina;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
@@ -23,6 +24,7 @@ use Livewire\Component;
 class FormularioSolicitacao extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
 
     public ?int $turma_id = null;
 
@@ -120,7 +122,7 @@ class FormularioSolicitacao extends Component
                 observacoes: $dados['observacoes'] ?: null,
             );
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
 
             return;
         }

@@ -85,17 +85,11 @@
         </header>
 
         <main class="px-4 py-6 sm:px-6 lg:px-8">
-            @if (session('sucesso'))
-                <x-alerta tipo="sucesso" class="mb-4">{{ session('sucesso') }}</x-alerta>
-            @endif
-            @if (session('erro'))
-                <x-alerta tipo="erro" class="mb-4">{{ session('erro') }}</x-alerta>
-            @endif
-
             {{ $slot }}
         </main>
     </div>
 </div>
+<x-notificacoes/>
 @livewireScripts
 </body>
 </html>

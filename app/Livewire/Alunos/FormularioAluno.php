@@ -6,6 +6,7 @@ use App\Actions\Academico\MoverAlunoDeTurmaAction;
 use App\Enums\EventoHistorico;
 use App\Enums\StatusAluno;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Aluno;
 use App\Models\AlunoHistorico;
 use App\Models\Turma;
@@ -19,6 +20,7 @@ use Livewire\Component;
 class FormularioAluno extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
 
     public ?Aluno $aluno = null;
 
@@ -166,7 +168,7 @@ class FormularioAluno extends Component
                 }
             });
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
 
             return;
         }

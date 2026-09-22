@@ -5,6 +5,7 @@ namespace App\Livewire\Cursos;
 use App\Actions\Academico\CompararGradeComCursoAction;
 use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Curso;
 use App\Models\GradeCurricular;
 use Illuminate\Contracts\View\View;
@@ -18,6 +19,7 @@ use Livewire\Component;
 class DetalheCurso extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
 
     public Curso $curso;
 
@@ -48,7 +50,7 @@ class DetalheCurso extends Component
                 observacoes: $this->observacoesPublicacao ?: null,
             );
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
             $this->confirmandoPublicacao = false;
 
             return;

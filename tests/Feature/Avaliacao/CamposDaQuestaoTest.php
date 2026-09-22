@@ -11,6 +11,7 @@
 
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
+use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Livewire\Questoes\ResponderSolicitacao;
 use App\Models\Eixo;
 use App\Models\Turma;
@@ -100,4 +101,36 @@ it('desabilita os campos quando a solicitação está encerrada', function () {
 
     expect(($this->desabilitados)($html, 'textarea'))->toBe(3)
         ->and(($this->desabilitados)($html, 'input', 'alternativas.'))->toBe(12);
+});
+
+it('libera o botão de enviar quando todas as questões estão completas', function () {
+    $salvar = app(SalvarQuestaoAction::class);
+
+    foreach ($this->solicitacao->questoes()->get() as $questao) {
+        $salvar->executar(
+            questao: $questao,
+            autor: $this->professor,
+            enunciado: 'Enunciado',
+            alternativas: [
+                ['letra' => 'A', 'texto' => 'A', 'correta' => true],
+                ['letra' => 'B', 'texto' => 'B', 'correta' => false],
+                ['letra' => 'C', 'texto' => 'C', 'correta' => false],
+                ['letra' => 'D', 'texto' => 'D', 'correta' => false],
+            ],
+            peso: 1,
+        );
+    }
+
+    $html = ($this->html)();
+
+    // O botão precisa estar clicável. Um `disabled` renderizado com valor
+    // falso desabilita do mesmo jeito, e por isso o envio nunca liberava.
+    expect(preg_match_all('/<button[^>]*confirmandoEnvio/', $html))->toBeGreaterThan(0)
+        ->and(($this->desabilitados)($html, 'button', 'confirmandoEnvio'))->toBe(0);
+});
+
+it('mantém o botão de enviar bloqueado enquanto faltam questões', function () {
+    $html = ($this->html)();
+
+    expect(($this->desabilitados)($html, 'button', 'confirmandoEnvio'))->toBeGreaterThan(0);
 });

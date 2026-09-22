@@ -4,6 +4,7 @@ namespace App\Livewire\Usuarios;
 
 use App\Enums\PerfilUsuario;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\Notifica;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +16,7 @@ class ListaUsuarios extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use Notifica;
 
     #[Url(as: 'perfil', except: '')]
     public string $filtroPerfil = '';
@@ -63,9 +65,9 @@ class ListaUsuarios extends Component
 
         $this->confirmandoDesativacao = null;
 
-        session()->flash('sucesso', $alvo->ativo
+        $this->notificarSucesso($alvo->ativo
             ? "Acesso de {$alvo->nome} reativado."
-            : "Acesso de {$alvo->nome} desativado.");
+            : "Acesso de {$alvo->nome} desativado. A sessão dele cai na próxima requisição.");
     }
 
     public function confirmarDesativacao(int $usuarioId): void

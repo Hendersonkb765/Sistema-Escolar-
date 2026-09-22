@@ -5,6 +5,7 @@ namespace App\Livewire\Turmas;
 use App\Actions\Academico\AvancarTurmaAction;
 use App\Enums\StatusGrade;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\GradeCurricular;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -15,6 +16,7 @@ use Livewire\Component;
 class DetalheTurma extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
 
     public Turma $turma;
 
@@ -60,7 +62,7 @@ class DetalheTurma extends Component
             : $this->turmasDestinoPossiveis()->firstWhere('id', (int) $this->turmaDestinoId);
 
         if ($this->turmaDestinoId !== '' && $destino === null) {
-            session()->flash('erro', 'Turma de destino inválida.');
+            $this->notificarErro('Turma de destino inválida.');
 
             return;
         }
@@ -75,7 +77,7 @@ class DetalheTurma extends Component
                 observacoes: $this->observacoesAvanco ?: null,
             );
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
 
             return;
         }

@@ -141,6 +141,19 @@ PDF vai usar no milestone 5.
 Designar alguém para uma disciplina cria o vínculo docente se ele ainda não
 existir — é o que dará a esse professor acesso aos resultados dela.
 
+### Enviar para análise
+
+O professor salva rascunhos quantas vezes quiser — cada gravação confirma
+com um aviso flutuante, sem recarregar a página. O botão **Enviar para
+análise** só libera quando todas as questões estão completas: enunciado,
+peso maior que zero, todas as alternativas preenchidas e uma marcada como
+correta. Enquanto faltar alguma, a tela diz quais.
+
+Ao confirmar, um resumo mostra disciplina, turma, quantidade e soma dos
+pesos, e avisa que as questões ficarão bloqueadas para edição até a
+análise. O que estiver digitado na tela é gravado antes do envio, mesmo
+sem ter salvo o rascunho.
+
 ### Prazo não bloqueia
 
 Esta é a regra que mais costuma ser implementada errado:

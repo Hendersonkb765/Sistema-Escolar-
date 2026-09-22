@@ -8,6 +8,7 @@ use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\LinguagemCodigo;
 use App\Enums\TipoBlocoQuestao;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Questao;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
@@ -27,6 +28,7 @@ use Livewire\WithFileUploads;
 class ResponderSolicitacao extends Component
 {
     use AuthorizesRequests;
+    use Notifica;
     use WithFileUploads;
 
     #[Locked]
@@ -169,8 +171,10 @@ class ResponderSolicitacao extends Component
         try {
             $caminho = app(SalvarBlocosDaQuestaoAction::class)
                 ->guardarImagem($this->imagens[$questaoId][$indice], $questao);
+
+            $this->notificarSucesso('Imagem anexada ao enunciado.');
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
             unset($this->imagens[$questaoId][$indice]);
 
             return;
@@ -195,7 +199,9 @@ class ResponderSolicitacao extends Component
 
     public function salvarQuestao(int $questaoId, SalvarQuestaoAction $action): void
     {
-        $questao = Questao::query()->findOrFail($questaoId);
+        // `item` entra no eager load porque a mensagem cita o número da
+        // questão.
+        $questao = Questao::query()->with('item')->findOrFail($questaoId);
 
         $this->authorize('update', $questao);
 
@@ -220,15 +226,18 @@ class ResponderSolicitacao extends Component
                 blocos: $rascunho['blocos'] ?? [],
             );
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
 
             return;
         }
 
-        session()->flash('sucesso', 'Rascunho salvo.');
+        $this->notificarSucesso(
+            "Questão {$questao->item->ordem} salva como rascunho. Nada foi enviado ainda.",
+            'Rascunho salvo',
+        );
     }
 
-    public function salvarTudo(SalvarQuestaoAction $action): void
+    public function salvarTudo(SalvarQuestaoAction $action, bool $avisar = true): void
     {
         foreach (array_keys($this->formulario) as $questaoId) {
             $questao = Questao::query()->find($questaoId);
@@ -252,13 +261,22 @@ class ResponderSolicitacao extends Component
                     blocos: $this->formulario[$questaoId]['blocos'] ?? [],
                 );
             } catch (RegraDeNegocioException $excecao) {
-                session()->flash('erro', $excecao->getMessage());
+                $this->notificarErro($excecao->getMessage());
 
                 return;
             }
         }
 
-        session()->flash('sucesso', 'Rascunhos salvos.');
+        if ($avisar) {
+            $quantidade = count($this->formulario);
+
+            $this->notificarSucesso(
+                $quantidade === 1
+                    ? 'A questão foi salva como rascunho. Nada foi enviado ainda.'
+                    : "As {$quantidade} questões foram salvas como rascunho. Nada foi enviado ainda.",
+                'Rascunho salvo',
+            );
+        }
     }
 
     public function enviar(SalvarQuestaoAction $salvar, EnviarSolicitacaoAction $enviar): void
@@ -267,19 +285,21 @@ class ResponderSolicitacao extends Component
 
         $this->authorize('responder', $solicitacao);
 
-        $this->salvarTudo($salvar);
+        // Grava o que estiver na tela antes de enviar, sem avisar duas
+        // vezes: quem manda a mensagem é o envio.
+        $this->salvarTudo($salvar, avisar: false);
 
         try {
             $enviada = $enviar->executar($solicitacao->refresh(), auth()->user());
         } catch (RegraDeNegocioException $excecao) {
-            session()->flash('erro', $excecao->getMessage());
+            $this->notificarErro($excecao->getMessage());
             $this->confirmandoEnvio = false;
 
             return;
         }
 
-        session()->flash('sucesso', $enviada->enviada_em_atraso
-            ? 'Questões enviadas. O envio ficou registrado como em atraso, mas foi aceito normalmente.'
+        $this->flashSucesso($enviada->enviada_em_atraso
+            ? 'Questões enviadas para análise. O envio ficou registrado como em atraso, mas foi aceito normalmente.'
             : 'Questões enviadas para análise dentro do prazo.');
 
         $this->redirectRoute('solicitacoes.show', $enviada, navigate: true);
