@@ -2,10 +2,12 @@
 
 namespace App\Livewire;
 
+use App\Enums\StatusSolicitacao;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -35,14 +37,7 @@ class Painel extends Component
     protected function indicadores(User $usuario): array
     {
         if (! $usuario->ehGestao()) {
-            return [
-                [
-                    'rotulo' => 'Disciplinas que leciono',
-                    'valor' => count($usuario->disciplinaIds()),
-                    'cor' => 'azul',
-                    'href' => null,
-                ],
-            ];
+            return $this->indicadoresDoProfessor($usuario);
         }
 
         $indicadores = [
@@ -87,7 +82,120 @@ class Painel extends Component
             ];
         }
 
-        return $indicadores;
+        return [...$this->indicadoresDeAvaliacao($usuario), ...$indicadores];
+    }
+
+    /**
+     * O que a gestão precisa ver primeiro: o que está pendente com os
+     * professores e o que já passou do prazo.
+     *
+     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string}>
+     */
+    protected function indicadoresDeAvaliacao(User $usuario): array
+    {
+        $visiveis = fn () => SolicitacaoProva::query()->visivelPara($usuario);
+
+        $aguardando = (clone $visiveis())
+            ->where('status', StatusSolicitacao::Aberta)
+            ->whereNull('enviada_em')
+            ->count();
+
+        $atrasadas = (clone $visiveis())
+            ->whereNull('enviada_em')
+            ->where('prazo', '<', now())
+            ->whereIn('status', [
+                StatusSolicitacao::Aberta->value,
+                StatusSolicitacao::Enviada->value,
+                StatusSolicitacao::EmAnalise->value,
+            ])
+            ->count();
+
+        $aguardandoAnalise = (clone $visiveis())
+            ->whereIn('status', [StatusSolicitacao::Enviada->value, StatusSolicitacao::EmAnalise->value])
+            ->count();
+
+        return [
+            [
+                'rotulo' => 'Solicitações aguardando envio',
+                'valor' => $aguardando,
+                'cor' => $aguardando > 0 ? 'amarelo' : 'verde',
+                'href' => route('solicitacoes.index', ['prazo' => 'pendentes']),
+            ],
+            [
+                'rotulo' => 'Atrasadas',
+                'valor' => $atrasadas,
+                'cor' => $atrasadas > 0 ? 'vermelho' : 'verde',
+                'href' => route('solicitacoes.index', ['prazo' => 'atrasadas']),
+                'detalhe' => 'Prazo vencido não bloqueia o envio',
+            ],
+            [
+                'rotulo' => 'Questões aguardando análise',
+                'valor' => $aguardandoAnalise,
+                'cor' => $aguardandoAnalise > 0 ? 'azul' : 'cinza',
+                'href' => route('solicitacoes.index', ['situacao' => StatusSolicitacao::Enviada->value]),
+            ],
+        ];
+    }
+
+    /**
+     * Área do professor: o que lhe foi pedido, o que está atrasado e o
+     * que já seguiu para análise.
+     *
+     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string}>
+     */
+    protected function indicadoresDoProfessor(User $usuario): array
+    {
+        $minhas = fn () => SolicitacaoProva::query()->visivelPara($usuario);
+
+        $aResponder = (clone $minhas())
+            ->where('status', StatusSolicitacao::Aberta)
+            ->whereNull('enviada_em')
+            ->count();
+
+        $atrasadas = (clone $minhas())
+            ->where('status', StatusSolicitacao::Aberta)
+            ->whereNull('enviada_em')
+            ->where('prazo', '<', now())
+            ->count();
+
+        $enviadas = (clone $minhas())->whereNotNull('enviada_em')->count();
+
+        $proximoPrazo = (clone $minhas())
+            ->where('status', StatusSolicitacao::Aberta)
+            ->whereNull('enviada_em')
+            ->orderBy('prazo')
+            ->value('prazo');
+
+        return [
+            [
+                'rotulo' => 'A responder',
+                'valor' => $aResponder,
+                'cor' => $aResponder > 0 ? 'amarelo' : 'verde',
+                'href' => route('solicitacoes.index'),
+                'detalhe' => $proximoPrazo !== null
+                    ? 'Próximo prazo: '.now()->parse($proximoPrazo)->format('d/m/Y')
+                    : null,
+            ],
+            [
+                'rotulo' => 'Com prazo vencido',
+                'valor' => $atrasadas,
+                'cor' => $atrasadas > 0 ? 'vermelho' : 'verde',
+                'href' => route('solicitacoes.index', ['prazo' => 'atrasadas']),
+                'detalhe' => 'Você ainda pode enviar',
+            ],
+            [
+                'rotulo' => 'Já enviadas',
+                'valor' => $enviadas,
+                'cor' => 'azul',
+                'href' => route('solicitacoes.index'),
+            ],
+            [
+                'rotulo' => 'Disciplinas que leciono',
+                'valor' => count($usuario->disciplinaIds()),
+                'cor' => 'cinza',
+                'href' => null,
+            ],
+        ];
     }
 
     protected function contarUsuariosVisiveis(User $usuario): int

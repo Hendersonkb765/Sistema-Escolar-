@@ -22,6 +22,9 @@ beforeEach(function () {
 
     $alheio = cursoComGrade($this->administracao, [1 => ['Contabilidade']]);
     $this->cursoAlheio = $alheio['curso'];
+    // Nome inequívoco: a factory sorteia de uma lista fixa e os dois
+    // cursos podiam sair com o mesmo nome, quebrando o assertDontSee.
+    $this->cursoAlheio->update(['nome' => 'Logística Integrada']);
     $this->gradeAlheia = $alheio['grade'];
     $this->turmaAlheia = Turma::factory()->doCurso($this->cursoAlheio, $this->gradeAlheia)->create();
     $this->alunoAlheio = Aluno::factory()->naTurma($this->turmaAlheia)->create();
@@ -65,6 +68,7 @@ it('responde 403 em recurso de outro eixo acessado por id', function (string $ro
 
 it('não vaza registros de outro eixo nas listagens novas', function () {
     $proprio = cursoComGrade($this->tecnologia, [1 => ['Lógica de Programação']]);
+    $proprio['curso']->update(['nome' => 'Desenvolvimento de Sistemas']);
     $turmaPropria = Turma::factory()->doCurso($proprio['curso'], $proprio['grade'])->create([
         'nome' => '1 A',
     ]);
@@ -90,6 +94,7 @@ it('não vaza registros de outro eixo nas listagens novas', function () {
 
 it('impede mover um aluno para turma fora do escopo', function () {
     $proprio = cursoComGrade($this->tecnologia, [1 => ['Lógica']]);
+    $proprio['curso']->update(['nome' => 'Desenvolvimento de Sistemas']);
     $turmaPropria = Turma::factory()->doCurso($proprio['curso'], $proprio['grade'])->create();
     $aluno = Aluno::factory()->naTurma($turmaPropria)->create();
 

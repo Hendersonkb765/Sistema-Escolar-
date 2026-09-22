@@ -17,13 +17,15 @@ class CursoFactory extends Factory
 
     public function definition(): array
     {
+        // Nome único: dois cursos com o mesmo nome tornavam intermitente
+        // qualquer teste que afirme "não vejo o curso do outro eixo".
         $nome = fake()->randomElement([
             'Desenvolvimento de Sistemas',
             'Administração',
             'Enfermagem',
             'Mecatrônica',
             'Logística',
-        ]);
+        ]).' '.fake()->unique()->numberBetween(100, 999);
 
         return [
             'eixo_id' => Eixo::factory(),

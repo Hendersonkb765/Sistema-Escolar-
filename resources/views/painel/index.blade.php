@@ -12,7 +12,8 @@
                 :rotulo="$indicador['rotulo']"
                 :valor="$indicador['valor']"
                 :cor="$indicador['cor']"
-                :href="$indicador['href']"/>
+                :href="$indicador['href']"
+                :detalhe="$indicador['detalhe'] ?? null"/>
         @endforeach
     </div>
 
@@ -20,8 +21,9 @@
               descricao="Perfil: {{ $usuario->perfil->rotulo() }}">
         <p class="text-sm text-slate-600 dark:text-slate-300">
             @if ($usuario->ehProfessor())
-                Aqui você acompanha as solicitações de questões recebidas, seus prazos, o andamento
-                das questões enviadas e os feedbacks da análise.
+                Aqui você acompanha as solicitações de questões recebidas e seus prazos. Um prazo
+                vencido não impede o envio — a solicitação apenas fica marcada como atrasada, e o
+                envio continua sendo aceito.
             @else
                 Use o menu lateral para gerenciar a estrutura acadêmica, solicitar questões aos
                 professores, analisar o que foi enviado, montar provas e importar resultados.
@@ -29,7 +31,7 @@
         </p>
 
         <p class="mt-3 text-xs text-slate-400 dark:text-slate-500">
-            Indicadores completos por perfil chegam no milestone 8.
+            Os indicadores de provas e resultados entram junto com os milestones 5 a 7.
         </p>
     </x-cartao>
 </div>

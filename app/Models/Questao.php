@@ -38,6 +38,9 @@ class Questao extends Model
         'analisada_em',
     ];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'rascunho', 'versao' => 1];
+
     protected function casts(): array
     {
         return [
@@ -107,6 +110,24 @@ class Questao extends Model
     public function alternativaCorreta(): ?Alternativa
     {
         return $this->alternativas->firstWhere('correta', true);
+    }
+
+    /**
+     * Uma questão está completa quando tem enunciado, o número de
+     * alternativas que a solicitação pediu e exatamente uma correta.
+     */
+    public function estaCompleta(?int $quantidadeEsperada = null): bool
+    {
+        $quantidadeEsperada ??= $this->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
+
+        $alternativas = $this->relationLoaded('alternativas')
+            ? $this->alternativas
+            : $this->alternativas()->get();
+
+        return filled($this->enunciado)
+            && $alternativas->count() === (int) $quantidadeEsperada
+            && $alternativas->every(fn (Alternativa $a) => filled($a->texto))
+            && $alternativas->where('correta', true)->count() === 1;
     }
 
     /** @return Builder<Questao> */

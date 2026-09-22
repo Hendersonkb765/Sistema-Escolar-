@@ -14,6 +14,10 @@ use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
 use App\Livewire\Painel;
+use App\Livewire\Questoes\ResponderSolicitacao;
+use App\Livewire\Solicitacoes\DetalheSolicitacao;
+use App\Livewire\Solicitacoes\FormularioSolicitacao;
+use App\Livewire\Solicitacoes\ListaSolicitacoes;
 use App\Livewire\Turmas\DetalheTurma;
 use App\Livewire\Turmas\FormularioTurma;
 use App\Livewire\Turmas\ListaTurmas;
@@ -64,9 +68,11 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/alunos/criar', FormularioAluno::class)->name('alunos.criar');
     Route::get('/alunos/{aluno}/editar', FormularioAluno::class)->name('alunos.editar');
 
-    // --- Avaliações (milestones 3 a 7) -----------------------------------
-    Route::get('/solicitacoes', ModuloEmConstrucaoController::class)->name('solicitacoes.index');
-    Route::get('/solicitacoes/criar', ModuloEmConstrucaoController::class)->name('solicitacoes.criar');
+    // --- Avaliações -------------------------------------------------------
+    Route::get('/solicitacoes', ListaSolicitacoes::class)->name('solicitacoes.index');
+    Route::get('/solicitacoes/criar', FormularioSolicitacao::class)->name('solicitacoes.criar');
+    Route::get('/solicitacoes/{solicitacao}', DetalheSolicitacao::class)->name('solicitacoes.show');
+    Route::get('/solicitacoes/{solicitacao}/responder', ResponderSolicitacao::class)->name('solicitacoes.responder');
 
     Route::get('/questoes', ModuloEmConstrucaoController::class)->name('questoes.index');
 

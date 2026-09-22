@@ -39,6 +39,9 @@ class SolicitacaoProva extends Model
         'observacoes',
     ];
 
+    /** Espelha o default da coluna, para valer já no objeto recém-criado. */
+    protected $attributes = ['status' => 'aberta', 'enviada_em_atraso' => false];
+
     protected function casts(): array
     {
         return [
@@ -135,5 +138,46 @@ class SolicitacaoProva extends Model
     public function somaDosPesos(): float
     {
         return (float) $this->itens()->sum('peso');
+    }
+
+    /**
+     * Quantas questões já estão preenchidas a ponto de poderem ser
+     * enviadas — o que a barra de progresso do professor mostra.
+     */
+    public function questoesCompletas(): int
+    {
+        return $this->questoes()
+            ->whereNotNull('enunciado')
+            ->where('enunciado', '!=', '')
+            ->whereHas('alternativas', fn ($q) => $q->where('correta', true))
+            ->withCount('alternativas')
+            ->get()
+            ->filter(fn (Questao $questao) => $questao->alternativas_count === $this->quantidade_alternativas)
+            ->count();
+    }
+
+    public function totalDeQuestoes(): int
+    {
+        return (int) $this->quantidade_questoes;
+    }
+
+    /** Dias restantes até o prazo; negativo quando já venceu. */
+    public function diasAteOPrazo(): int
+    {
+        return (int) now()->startOfDay()->diffInDays($this->prazo->startOfDay(), false);
+    }
+
+    /** Rótulo do estado de prazo, para os badges da interface. */
+    public function rotuloDePrazo(): ?string
+    {
+        if ($this->enviada_em !== null) {
+            return $this->enviada_em_atraso ? 'Enviada em atraso' : null;
+        }
+
+        if (! $this->estaAtrasada()) {
+            return null;
+        }
+
+        return 'Atrasada';
     }
 }

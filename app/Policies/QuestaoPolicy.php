@@ -28,13 +28,15 @@ class QuestaoPolicy extends PolicyBase
         return $usuario->ativo;
     }
 
-    /** Preencher/corrigir: só o autor, e só em rascunho ou após rejeição. */
+    /**
+     * Preencher ou corrigir é do autor da questão. Se o momento permite —
+     * rascunho ou devolvida para correção, solicitação ainda aberta — quem
+     * decide é a SalvarQuestaoAction, com a razão explicada.
+     */
     public function update(User $usuario, Model $registro): bool
     {
         return (int) $registro->professor_id === (int) $usuario->getKey()
-            && $usuario->ativo
-            && $registro->status->editavelPeloProfessor()
-            && $registro->solicitacao->aceitaEnvio();
+            && $usuario->ativo;
     }
 
     public function enviar(User $usuario, Questao $questao): bool

@@ -96,7 +96,7 @@ em `professor_disciplina` e independe do perfil.
 |---|---|---|
 | 1 | Setup, auth sem registro público, perfis, escopo, policies, testes | ✅ concluído |
 | 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | ✅ concluído |
-| 3 | Solicitações de questões, área do professor, prazos | schema pronto, UI pendente |
+| 3 | Solicitações de questões, área do professor, prazos | ✅ concluído |
 | 4 | Análise, feedbacks, reenvio e versionamento | schema pronto, UI pendente |
 | 5 | Montagem da prova, modelo e PDF | schema pronto, UI pendente |
 | 6 | Importação XLS em dois passos | schema pronto, UI pendente |
@@ -106,8 +106,34 @@ em `professor_disciplina` e independe do perfil.
 Todas as 24 tabelas de domínio já existem com chaves estrangeiras, índices e
 constraints. Os módulos ainda sem tela respondem por
 `ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
-um professor recebe 403 em `/solicitacoes/criar`, `/provas/criar` e
-`/importacoes/criar` desde hoje, não quando a tela ficar pronta.
+um professor recebe 403 em `/provas/criar` e `/importacoes/criar` desde
+hoje, não quando a tela ficar pronta.
+
+## Solicitação de questões
+
+O PAEET abre uma solicitação escolhendo turma, disciplina e professor. As
+disciplinas oferecidas são só as que **aquela turma cursa no período dela**,
+segundo a foto de grade que congelou — não dá para pedir Back-end a uma
+turma do 1º período.
+
+Cada questão pedida vira um item com seu peso, e uma questão em rascunho já
+ligada a ele. O professor abre a solicitação e encontra os campos prontos;
+o peso aparece, mas só para leitura. `peso` está fora do `$fillable` de
+`Questao` justamente para isso.
+
+Designar alguém para uma disciplina cria o vínculo docente se ele ainda não
+existir — é o que dará a esse professor acesso aos resultados dela.
+
+### Prazo não bloqueia
+
+Esta é a regra que mais costuma ser implementada errado:
+
+- prazo vencido deixa a solicitação **"Atrasada"**, e ela continua
+  aceitando questões;
+- o envio depois do prazo é aceito e fica **"Enviada em atraso"**, com o
+  prazo original e a data real preservados;
+- o que fecha o envio é o **encerramento ou cancelamento manual** pelo
+  PAEET — reversível por `reabrir`.
 
 ## Estrutura acadêmica
 

@@ -27,6 +27,19 @@ Por isso:
 
 Os cenários completos ficam em `tests/Feature/Interface/RenderizacaoComDadosTest.php`.
 
+### Dados de teste determinísticos
+
+Um `assertDontSee` só vale se o texto procurado for exclusivo do registro
+que deve estar ausente. Factories que sorteiam de uma lista fixa fazem dois
+registros colidirem de vez em quando e o teste falha uma vez a cada tantas
+execuções.
+
+- nomes, códigos e e-mails usados em asserções são fixados no teste ou
+  nascem únicos na factory;
+- lembre que a busca costuma cobrir mais de uma coluna: um termo que casa
+  com o e-mail derruba um teste que só pensava no nome;
+- antes de fechar uma etapa, a suíte roda várias vezes seguidas.
+
 ### Escopo e autorização
 
 Todo recurso novo escopado por Eixo precisa de teste para:

@@ -6,6 +6,11 @@ use App\Models\SolicitacaoProva;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Responde só "este recurso é seu?". Se a solicitação já foi encerrada ou
+ * ainda tem questões incompletas, quem recusa são as Actions, com a razão
+ * explicada — um "ainda não dá" nunca vira 403 mudo.
+ */
 class SolicitacaoProvaPolicy extends PolicyBase
 {
     /** O professor acessa a área dele para ver o que lhe foi pedido. */
@@ -32,9 +37,7 @@ class SolicitacaoProvaPolicy extends PolicyBase
     /** Encerrar manualmente — o que de fato bloqueia novos envios. */
     public function encerrar(User $usuario, SolicitacaoProva $solicitacao): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $solicitacao)
-            && $solicitacao->aceitaEnvio();
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $solicitacao);
     }
 
     public function cancelar(User $usuario, SolicitacaoProva $solicitacao): bool
@@ -43,13 +46,13 @@ class SolicitacaoProvaPolicy extends PolicyBase
     }
 
     /**
-     * Responder a solicitação: exclusivo do professor destinatário.
-     * Prazo vencido não bloqueia — só encerramento ou cancelamento.
+     * Responder a solicitação é exclusivo do professor destinatário.
+     * Prazo vencido não entra nesta conta: vencer o prazo não tira de
+     * ninguém o direito de responder.
      */
     public function responder(User $usuario, SolicitacaoProva $solicitacao): bool
     {
         return (int) $solicitacao->professor_id === (int) $usuario->getKey()
-            && $usuario->ativo
-            && $solicitacao->aceitaEnvio();
+            && $usuario->ativo;
     }
 }

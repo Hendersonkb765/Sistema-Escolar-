@@ -106,7 +106,9 @@ class Turma extends Model
      */
     public function disciplinasDoPeriodo(?int $periodo = null): Collection
     {
-        return $this->grade
+        // loadMissing: o método é chamado de views, actions e comandos, e
+        // nem todos passam pela consulta que já traz a grade.
+        return $this->loadMissing('grade')->grade
             ->disciplinas()
             ->with('disciplina')
             ->where('periodo', $periodo ?? $this->periodo)
@@ -117,7 +119,7 @@ class Turma extends Model
     /** Último período previsto pelo curso. */
     public function periodoFinal(): int
     {
-        return (int) $this->curso->duracao_anos;
+        return (int) $this->loadMissing('curso')->curso->duracao_anos;
     }
 
     public function podeAvancar(): bool

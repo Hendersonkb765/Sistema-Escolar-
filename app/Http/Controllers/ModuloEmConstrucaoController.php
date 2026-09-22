@@ -7,7 +7,6 @@ use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
 use App\Models\ResultadoAluno;
-use App\Models\SolicitacaoProva;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -25,20 +24,6 @@ class ModuloEmConstrucaoController extends Controller
      * @var array<string, array{model: class-string, habilidade: string, titulo: string, descricao: string, etapa: string}>
      */
     protected array $modulos = [
-        'solicitacoes.index' => [
-            'model' => SolicitacaoProva::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Solicitações de questões',
-            'descricao' => 'Pedidos de questões aos professores, com pesos por item e controle de prazo.',
-            'etapa' => 'Milestone 3',
-        ],
-        'solicitacoes.criar' => [
-            'model' => SolicitacaoProva::class,
-            'habilidade' => 'create',
-            'titulo' => 'Nova solicitação',
-            'descricao' => 'Criação de solicitações de questões — exclusiva de PAEET e PAEET Admin.',
-            'etapa' => 'Milestone 3',
-        ],
         'questoes.index' => [
             'model' => Questao::class,
             'habilidade' => 'viewAny',
