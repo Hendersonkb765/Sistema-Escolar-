@@ -96,6 +96,24 @@ utilitárias `disabled:bg-...` estão presentes sempre.
 - `AplicaEscopoDeEixo::eixoId()` lê a chave estrangeira do último trecho do
   caminho em vez de carregar o Eixo, então basta `eixo_id` no select.
 
+## Quando a interface bloqueia algo, ela diz o quê
+
+Um botão desabilitado sem explicação vira um chamado de suporte. Toda
+restrição na tela vem acompanhada do motivo, no nível do item:
+
+- não "faltam 3 questões", e sim "Questão 2: marque qual alternativa é a
+  correta";
+- o próprio botão bloqueado carrega a explicação no `title`;
+- o estado de cada item aparece junto dele ("Pronta para enviar" /
+  "2 pendência(s)").
+
+As razões vêm do domínio (`Questao::pendencias()`), não de texto solto na
+view, e por isso são testáveis.
+
+Vale para os controles também: se a ação é escolher uma opção entre várias,
+use um `radio` de verdade. Um círculo clicável que "parece" um enfeite faz
+o usuário travar sem saber que precisa clicar.
+
 ## Avisos ao usuário
 
 Ação que **fica na mesma tela** notifica por evento:

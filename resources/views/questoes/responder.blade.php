@@ -7,7 +7,11 @@
                     <span wire:loading wire:target="salvarTudo">Salvando…</span>
                 </x-botao>
                 @unless ($confirmandoEnvio)
-                    <x-botao wire:click="$set('confirmandoEnvio', true)" :desabilitado="$incompletas->isNotEmpty()">
+                    <x-botao wire:click="$set('confirmandoEnvio', true)"
+                             :desabilitado="$incompletas->isNotEmpty()"
+                             title="{{ $incompletas->isNotEmpty()
+                                ? 'Complete as questões '.$incompletas->join(', ').' para liberar o envio'
+                                : 'Enviar as questões para a coordenação analisar' }}">
                         Enviar para análise
                     </x-botao>
                 @endunless
@@ -116,10 +120,15 @@
     @endif
 
     @if ($incompletas->isNotEmpty() && $podeEditar)
-        <x-alerta tipo="atencao" :titulo="'Faltam '.$incompletas->count().' questão(ões) para poder enviar'">
-            Questões pendentes: {{ $incompletas->join(', ') }}. Cada uma precisa de enunciado, peso
-            maior que zero, as {{ $solicitacao->quantidade_alternativas }} alternativas preenchidas
-            e uma marcada como correta.
+        <x-alerta tipo="atencao"
+                  :titulo="$incompletas->count() === 1
+                    ? 'Falta 1 questão para liberar o envio'
+                    : 'Faltam '.$incompletas->count().' questões para liberar o envio'">
+            <ul class="mt-1 space-y-0.5">
+                @foreach ($pendencias as $ordem => $itens)
+                    <li><strong>Questão {{ $ordem }}:</strong> {{ implode('; ', $itens) }}.</li>
+                @endforeach
+            </ul>
         </x-alerta>
     @endif
 
@@ -132,7 +141,16 @@
         <x-cartao wire:key="questao-{{ $questao->id }}">
             <x-slot:titulo>Questão {{ $questao->item->ordem }}</x-slot:titulo>
             <x-slot:acoes>
+                @php $pendenciasDaQuestao = $pendencias[$questao->item->ordem] ?? []; @endphp
+
+                @if ($pendenciasDaQuestao === [])
+                    <x-badge cor="verde">Pronta para enviar</x-badge>
+                @else
+                    <x-badge cor="amarelo">{{ count($pendenciasDaQuestao) }} pendência(s)</x-badge>
+                @endif
+
                 <x-badge :cor="$questao->status->cor()" :rotulo="$questao->status->rotulo()"/>
+
                 @unless ($bloqueado)
                     <x-botao variante="discreto" wire:click="salvarQuestao({{ $questao->id }})">Salvar</x-botao>
                 @endunless
@@ -258,28 +276,55 @@
                 </div>
 
                 <div class="space-y-2">
-                    <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Alternativas <span class="font-normal text-slate-500">— marque a correta</span>
-                    </p>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-sm font-medium text-slate-700 dark:text-slate-300">Alternativas</p>
+
+                        @php $temCorreta = collect($dados['alternativas'])->where('correta', true)->isNotEmpty(); @endphp
+
+                        @if ($temCorreta)
+                            <span class="text-xs text-emerald-600 dark:text-emerald-400">
+                                Correta: {{ collect($dados['alternativas'])->firstWhere('correta', true)['letra'] }}
+                            </span>
+                        @else
+                            <span class="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                Clique no círculo à esquerda para marcar qual é a correta
+                            </span>
+                        @endif
+                    </div>
 
                     @foreach ($dados['alternativas'] as $indice => $alternativa)
-                        <div class="flex items-start gap-2" wire:key="alt-{{ $questao->id }}-{{ $alternativa['letra'] }}">
-                            <button type="button"
-                                    wire:click="marcarCorreta({{ $questao->id }}, '{{ $alternativa['letra'] }}')"
-                                    @disabled($bloqueado)
-                                    aria-pressed="{{ $alternativa['correta'] ? 'true' : 'false' }}"
-                                    @class([
-                                        'mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition',
-                                        'bg-emerald-500 text-white' => $alternativa['correta'],
-                                        'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300' => ! $alternativa['correta'],
-                                    ])
-                                    title="Marcar {{ $alternativa['letra'] }} como correta">
-                                {{ $alternativa['letra'] }}
-                            </button>
+                        <div @class([
+                                'flex items-center gap-2 rounded-lg border p-2 transition',
+                                'border-emerald-300 bg-emerald-50/60 dark:border-emerald-500/40 dark:bg-emerald-500/5' => $alternativa['correta'],
+                                'border-slate-200 dark:border-slate-800' => ! $alternativa['correta'],
+                             ])
+                             wire:key="alt-{{ $questao->id }}-{{ $alternativa['letra'] }}">
+
+                            {{-- Rádio de verdade: uma escolha entre as alternativas,
+                                 com o mesmo `name` por questão. --}}
+                            <label class="flex shrink-0 cursor-pointer items-center gap-2"
+                                   title="Marcar {{ $alternativa['letra'] }} como a alternativa correta">
+                                <input type="radio"
+                                       name="correta-{{ $questao->id }}"
+                                       value="{{ $alternativa['letra'] }}"
+                                       wire:click="marcarCorreta({{ $questao->id }}, '{{ $alternativa['letra'] }}')"
+                                       @checked($alternativa['correta'])
+                                       @disabled($bloqueado)
+                                       class="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:cursor-not-allowed dark:border-slate-600 dark:bg-slate-950">
+                                <span @class([
+                                    'flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold',
+                                    'bg-emerald-500 text-white' => $alternativa['correta'],
+                                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' => ! $alternativa['correta'],
+                                ])>{{ $alternativa['letra'] }}</span>
+                            </label>
 
                             <x-input wire:model.blur="formulario.{{ $questao->id }}.alternativas.{{ $indice }}.texto"
                                      placeholder="Texto da alternativa {{ $alternativa['letra'] }}"
                                      :desabilitado="$bloqueado"/>
+
+                            @if ($alternativa['correta'])
+                                <x-badge cor="verde" class="shrink-0">correta</x-badge>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -328,9 +373,19 @@
                 <span wire:loading.remove wire:target="salvarTudo">Salvar rascunho</span>
                 <span wire:loading wire:target="salvarTudo">Salvando…</span>
             </x-botao>
-            <x-botao wire:click="$set('confirmandoEnvio', true)" :desabilitado="$incompletas->isNotEmpty()">
+            <x-botao wire:click="$set('confirmandoEnvio', true)"
+                     :desabilitado="$incompletas->isNotEmpty()"
+                     title="{{ $incompletas->isNotEmpty()
+                        ? 'Complete as questões '.$incompletas->join(', ').' para liberar o envio'
+                        : 'Enviar as questões para a coordenação analisar' }}">
                 Enviar para análise
             </x-botao>
         </div>
+
+        @if ($incompletas->isNotEmpty())
+            <p class="text-right text-xs text-slate-500 dark:text-slate-400">
+                O envio libera quando todas as questões estiverem prontas.
+            </p>
+        @endif
     @endif
 </div>

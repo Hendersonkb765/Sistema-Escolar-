@@ -88,12 +88,25 @@ class EnviarSolicitacaoAction
      */
     public function questoesIncompletas(SolicitacaoProva $solicitacao): Collection
     {
+        return $this->pendenciasPorQuestao($solicitacao)->keys()->values();
+    }
+
+    /**
+     * O que falta em cada questão, indexado pela ordem — é o texto que a
+     * tela mostra ao professor, em vez de um "faltam 3 questões" que não
+     * diz o que fazer.
+     *
+     * @return Collection<int, array<int, string>>
+     */
+    public function pendenciasPorQuestao(SolicitacaoProva $solicitacao): Collection
+    {
         return $solicitacao->questoes()
             ->with(['alternativas', 'item'])
             ->get()
-            ->reject(fn (Questao $questao) => $questao->estaCompleta($solicitacao->quantidade_alternativas))
-            ->map(fn (Questao $questao) => (int) $questao->item->ordem)
-            ->sort()
-            ->values();
+            ->mapWithKeys(fn (Questao $questao) => [
+                (int) $questao->item->ordem => $questao->pendencias($solicitacao->quantidade_alternativas),
+            ])
+            ->reject(fn (array $pendencias) => $pendencias === [])
+            ->sortKeys();
     }
 }

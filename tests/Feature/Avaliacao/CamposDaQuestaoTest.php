@@ -134,3 +134,73 @@ it('mantém o botão de enviar bloqueado enquanto faltam questões', function ()
 
     expect(($this->desabilitados)($html, 'button', 'confirmandoEnvio'))->toBeGreaterThan(0);
 });
+
+it('diz o que falta em cada questão, não só quantas faltam', function () {
+    $questao = $this->solicitacao->questoes()->with('item')->get()->firstWhere('item.ordem', 1);
+
+    // Tudo preenchido menos a alternativa correta — o caso que mais trava
+    // o envio sem o professor entender por quê.
+    app(SalvarQuestaoAction::class)->executar(
+        questao: $questao,
+        autor: $this->professor,
+        enunciado: 'Enunciado pronto',
+        alternativas: [
+            ['letra' => 'A', 'texto' => 'A', 'correta' => false],
+            ['letra' => 'B', 'texto' => 'B', 'correta' => false],
+            ['letra' => 'C', 'texto' => 'C', 'correta' => false],
+            ['letra' => 'D', 'texto' => 'D', 'correta' => false],
+        ],
+        peso: 1,
+    );
+
+    expect($questao->refresh()->pendencias(4))->toBe(['marque qual alternativa é a correta']);
+
+    $html = ($this->html)();
+
+    expect($html)->toContain('Questão 1:')
+        ->toContain('marque qual alternativa é a correta')
+        // E o aviso fica visível junto às alternativas.
+        ->toContain('Clique no círculo à esquerda para marcar qual é a correta');
+});
+
+it('lista cada pendência de uma questão vazia', function () {
+    $questao = $this->solicitacao->questoes()->first();
+    $questao->update(['peso' => 0]);
+
+    expect($questao->refresh()->pendencias(4))->toBe([
+        'escreva o enunciado',
+        'informe um peso maior que zero',
+        'preencha as 4 alternativa(s) que faltam',
+        'marque qual alternativa é a correta',
+    ]);
+});
+
+it('marca a alternativa correta com um controle de seleção reconhecível', function () {
+    $html = ($this->html)();
+
+    // Rádio de verdade, um grupo por questão: 3 questões × 4 alternativas.
+    expect(preg_match_all('/<input[^>]*type="radio"[^>]*name="correta-\d+"/', $html))->toBe(12)
+        ->and(preg_match_all('/wire:click="marcarCorreta\(/', $html))->toBe(12);
+});
+
+it('mostra quando a questão fica pronta para enviar', function () {
+    $questao = $this->solicitacao->questoes()->first();
+
+    app(SalvarQuestaoAction::class)->executar(
+        questao: $questao,
+        autor: $this->professor,
+        enunciado: 'Enunciado pronto',
+        alternativas: [
+            ['letra' => 'A', 'texto' => 'A', 'correta' => true],
+            ['letra' => 'B', 'texto' => 'B', 'correta' => false],
+            ['letra' => 'C', 'texto' => 'C', 'correta' => false],
+            ['letra' => 'D', 'texto' => 'D', 'correta' => false],
+        ],
+        peso: 1,
+    );
+
+    $html = ($this->html)();
+
+    expect($html)->toContain('Pronta para enviar')
+        ->toContain('Correta: A');
+});

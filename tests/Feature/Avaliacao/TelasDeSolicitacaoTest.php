@@ -110,7 +110,10 @@ it('abre a tela de resposta do professor com um bloco por questão', function ()
         ->assertSee('Questão 3')
         // O peso é campo do professor, não um rótulo fixo.
         ->assertSee('Peso da questão')
-        ->assertSee('Faltam 3 questão(ões) para poder enviar');
+        ->assertSee('Faltam 3 questões para liberar o envio')
+        // A tela diz o que falta em cada uma, não só quantas faltam.
+        ->assertSee('escreva o enunciado')
+        ->assertSee('marque qual alternativa é a correta');
 });
 
 it('avisa na tela de resposta que o prazo venceu mas o envio continua aberto', function () {

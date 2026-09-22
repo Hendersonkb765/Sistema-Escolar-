@@ -360,6 +360,7 @@ class ResponderSolicitacao extends Component
             'solicitacao' => $solicitacao,
             'questoes' => $questoes,
             'incompletas' => $enviar->questoesIncompletas($solicitacao),
+            'pendencias' => $enviar->pendenciasPorQuestao($solicitacao),
             'podeEditar' => $solicitacao->aceitaEnvio(),
             'linguagens' => LinguagemCodigo::opcoes(),
             'somaDosPesos' => collect($this->formulario)->sum(fn (array $q) => (float) ($q['peso'] ?? 0)),

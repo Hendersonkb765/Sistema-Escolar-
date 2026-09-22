@@ -120,7 +120,53 @@ class Questao extends Model
     }
 
     /**
-     * Uma questão está completa quando tem enunciado, o número de
+     * O que ainda impede esta questão de ser enviada, em texto que o
+     * professor entenda. Lista vazia significa pronta.
+     *
+     * @return array<int, string>
+     */
+    public function pendencias(?int $quantidadeEsperada = null): array
+    {
+        $quantidadeEsperada ??= $this->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
+
+        $alternativas = $this->relationLoaded('alternativas')
+            ? $this->alternativas
+            : $this->alternativas()->get();
+
+        $pendencias = [];
+
+        if (blank($this->enunciado)) {
+            $pendencias[] = 'escreva o enunciado';
+        }
+
+        if ((float) $this->peso <= 0) {
+            $pendencias[] = 'informe um peso maior que zero';
+        }
+
+        $semTexto = $alternativas->filter(fn (Alternativa $a) => blank($a->texto))->count();
+
+        if ($alternativas->count() < $quantidadeEsperada) {
+            $faltando = $quantidadeEsperada - $alternativas->count();
+            $pendencias[] = "preencha as {$faltando} alternativa(s) que faltam";
+        } elseif ($semTexto > 0) {
+            $pendencias[] = $semTexto === 1
+                ? 'preencha o texto da alternativa que ficou vazia'
+                : "preencha o texto das {$semTexto} alternativas vazias";
+        }
+
+        $corretas = $alternativas->where('correta', true)->count();
+
+        if ($corretas === 0) {
+            $pendencias[] = 'marque qual alternativa é a correta';
+        } elseif ($corretas > 1) {
+            $pendencias[] = 'deixe apenas uma alternativa marcada como correta';
+        }
+
+        return $pendencias;
+    }
+
+    /**
+     * Uma questão está completa quando tem enunciado, peso, o número de
      * alternativas que a solicitação pediu e exatamente uma correta.
      */
     public function estaCompleta(?int $quantidadeEsperada = null): bool
