@@ -43,6 +43,18 @@ enum StatusQuestao: string implements Rotulavel
         return $this === self::Aprovada;
     }
 
+    /** Já chegou à mesa da coordenação e ainda espera uma decisão. */
+    public function analisavel(): bool
+    {
+        return in_array($this, [self::Enviada, self::EmAnalise], true);
+    }
+
+    /** Aguarda ação do professor. */
+    public function aguardaProfessor(): bool
+    {
+        return in_array($this, [self::Rascunho, self::Rejeitada], true);
+    }
+
     /** O professor edita enquanto a questão não está sob análise nem aprovada. */
     public function editavelPeloProfessor(): bool
     {

@@ -285,19 +285,36 @@
                 </div>
 
                 @if ($questao->feedbacks->isNotEmpty())
-                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/50">
+                    <div @class([
+                        'rounded-lg border p-3',
+                        'border-amber-200 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/5' => $questao->status === App\Enums\StatusQuestao::Rejeitada,
+                        'border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50' => $questao->status !== App\Enums\StatusQuestao::Rejeitada,
+                    ])>
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            Feedback da análise
+                            {{ $questao->status === App\Enums\StatusQuestao::Rejeitada ? 'O que a coordenação pediu' : 'Histórico da análise' }}
                         </p>
+
                         @foreach ($questao->feedbacks as $feedback)
                             <div class="mt-2 text-sm">
                                 <x-badge :cor="$feedback->acao->cor()" :rotulo="$feedback->acao->rotulo()"/>
-                                <span class="text-slate-600 dark:text-slate-300">{{ $feedback->comentario }}</span>
+                                <span class="text-xs text-slate-400">v{{ $feedback->versao_questao }}</span>
+                                @if ($feedback->comentario)
+                                    <span class="text-slate-700 dark:text-slate-200">— {{ $feedback->comentario }}</span>
+                                @endif
                                 <span class="block text-xs text-slate-400">
                                     {{ $feedback->analisadoPor->nome }} · {{ $feedback->created_at?->format('d/m/Y H:i') }}
                                 </span>
                             </div>
                         @endforeach
+
+                        @if ($questao->status === App\Enums\StatusQuestao::Rejeitada && $podeEditar)
+                            <div class="mt-3 flex justify-end">
+                                <x-botao wire:click="reenviarQuestao({{ $questao->id }})" wire:loading.attr="disabled">
+                                    <span wire:loading.remove wire:target="reenviarQuestao({{ $questao->id }})">Reenviar corrigida</span>
+                                    <span wire:loading wire:target="reenviarQuestao({{ $questao->id }})">Reenviando…</span>
+                                </x-botao>
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>

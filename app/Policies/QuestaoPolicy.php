@@ -44,11 +44,17 @@ class QuestaoPolicy extends PolicyBase
         return $this->update($usuario, $questao);
     }
 
-    /** Analisar é atribuição da gestão, nunca do autor da questão. */
+    /**
+     * Analisar é atribuição da gestão, nunca de quem escreveu a questão —
+     * vale inclusive para o PAEET que também leciona.
+     *
+     * A comparação é pela chave estrangeira, e não carregando a relação:
+     * a Policy roda uma vez por linha nas listagens.
+     */
     public function analisar(User $usuario, Questao $questao): bool
     {
         return $usuario->ehGestao()
-            && ! $usuario->is($questao->professor)
+            && (int) $questao->professor_id !== (int) $usuario->getKey()
             && $this->noEscopo($usuario, $questao);
     }
 

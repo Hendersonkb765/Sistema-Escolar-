@@ -5,6 +5,13 @@
                 <x-botao href="{{ route('solicitacoes.responder', $solicitacao) }}" wire:navigate>Responder questões</x-botao>
             @endif
 
+            @if ($resumo['aguardando'] > 0 && auth()->user()->ehGestao())
+                <x-botao wire:click="aprovarPendentes"
+                         wire:confirm="Aprovar as {{ $resumo['aguardando'] }} questão(ões) que ainda aguardam análise?">
+                    Aprovar {{ $resumo['aguardando'] }} pendente(s)
+                </x-botao>
+            @endif
+
             @can('encerrar', $solicitacao)
                 @if ($solicitacao->aceitaEnvio())
                     <x-botao variante="secundario" wire:click="confirmar('encerrar')">Encerrar</x-botao>
@@ -97,8 +104,23 @@
         @endif
     </x-cartao>
 
-    <x-cartao titulo="Questões pedidas"
+    <x-cartao titulo="Questões"
               :descricao="$completas.' de '.$solicitacao->quantidade_questoes.' preenchida(s) · soma dos pesos '.number_format($solicitacao->somaDosPesos(), 2, ',', '.')">
+        <x-slot:acoes>
+            @if ($resumo['aprovadas'] > 0)
+                <x-badge cor="verde">{{ $resumo['aprovadas'] }} aprovada(s)</x-badge>
+            @endif
+            @if ($resumo['aguardando'] > 0)
+                <x-badge cor="azul">{{ $resumo['aguardando'] }} aguardando análise</x-badge>
+            @endif
+            @if ($resumo['devolvidas'] > 0)
+                <x-badge cor="vermelho">{{ $resumo['devolvidas'] }} devolvida(s)</x-badge>
+            @endif
+            @if ($resumo['rascunho'] > 0)
+                <x-badge cor="cinza">{{ $resumo['rascunho'] }} em rascunho</x-badge>
+            @endif
+        </x-slot:acoes>
+
         <div class="space-y-3">
             @foreach ($questoes as $questao)
                 <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
@@ -140,6 +162,72 @@
                     @else
                         <p class="mt-2 text-sm text-slate-400">Ainda não preenchida.</p>
                     @endif
+
+                    @if ($questao->feedbacks->isNotEmpty())
+                        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900/50">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                Histórico da análise
+                            </p>
+                            @foreach ($questao->feedbacks as $feedback)
+                                <div class="mt-1.5 text-sm">
+                                    <x-badge :cor="$feedback->acao->cor()" :rotulo="$feedback->acao->rotulo()"/>
+                                    <span class="text-xs text-slate-400">v{{ $feedback->versao_questao }}</span>
+                                    @if ($feedback->comentario)
+                                        <span class="text-slate-600 dark:text-slate-300">— {{ $feedback->comentario }}</span>
+                                    @endif
+                                    <span class="block text-xs text-slate-400">
+                                        {{ $feedback->analisadoPor->nome }} · {{ $feedback->created_at?->format('d/m/Y H:i') }}
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @can('analisar', $questao)
+                        @if ($questao->status->analisavel())
+                            @if ($devolvendoQuestao === $questao->id)
+                                <div class="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-500/30 dark:bg-amber-500/5">
+                                    <x-campo rotulo="O que precisa ser corrigido?" :para="'motivo-'.$questao->id" obrigatorio
+                                             ajuda="O professor vê exatamente este texto.">
+                                        <x-area-texto id="motivo-{{ $questao->id }}" :linhas="2"
+                                                      wire:model="comentarioDaDevolucao"
+                                                      placeholder="Ex.: a alternativa C está ambígua; reescreva deixando uma única leitura possível."/>
+                                    </x-campo>
+
+                                    <div class="flex justify-end gap-2">
+                                        <x-botao variante="secundario" wire:click="fecharDevolucao">Cancelar</x-botao>
+                                        <x-botao variante="perigo" wire:click="devolverQuestao">Devolver para correção</x-botao>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="mt-3 flex flex-wrap items-end justify-between gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                    <x-campo rotulo="Comentário na aprovação (opcional)" class="min-w-0 flex-1">
+                                        <x-input wire:model="comentarioDaAprovacao.{{ $questao->id }}"
+                                                 placeholder="Ex.: ótima cobertura do conteúdo"/>
+                                    </x-campo>
+
+                                    <div class="flex shrink-0 gap-2">
+                                        <x-botao variante="secundario" wire:click="abrirDevolucao({{ $questao->id }})">
+                                            Devolver
+                                        </x-botao>
+                                        <x-botao wire:click="aprovarQuestao({{ $questao->id }})">Aprovar</x-botao>
+                                    </div>
+                                </div>
+                            @endif
+                        @elseif ($questao->status === App\Enums\StatusQuestao::Aprovada)
+                            <p class="mt-3 border-t border-slate-100 pt-2 text-xs text-emerald-600 dark:border-slate-800 dark:text-emerald-400">
+                                Aprovada — já pode entrar em uma prova.
+                            </p>
+                        @elseif ($questao->status === App\Enums\StatusQuestao::Rejeitada)
+                            <p class="mt-3 border-t border-slate-100 pt-2 text-xs text-amber-600 dark:border-slate-800 dark:text-amber-400">
+                                Devolvida — aguardando a correção do professor.
+                            </p>
+                        @endif
+                    @elseif (auth()->user()->ehGestao() && $questao->status->analisavel())
+                        <p class="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400 dark:border-slate-800">
+                            Você escreveu esta questão, então a análise cabe a outra pessoa da coordenação.
+                        </p>
+                    @endcan
                 </div>
             @endforeach
         </div>

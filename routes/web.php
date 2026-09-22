@@ -14,6 +14,7 @@ use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
 use App\Livewire\Painel;
+use App\Livewire\Questoes\ListaQuestoes;
 use App\Livewire\Questoes\ResponderSolicitacao;
 use App\Livewire\Solicitacoes\DetalheSolicitacao;
 use App\Livewire\Solicitacoes\FormularioSolicitacao;
@@ -74,7 +75,7 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/solicitacoes/{solicitacao}', DetalheSolicitacao::class)->name('solicitacoes.show');
     Route::get('/solicitacoes/{solicitacao}/responder', ResponderSolicitacao::class)->name('solicitacoes.responder');
 
-    Route::get('/questoes', ModuloEmConstrucaoController::class)->name('questoes.index');
+    Route::get('/questoes', ListaQuestoes::class)->name('questoes.index');
 
     Route::get('/provas', ModuloEmConstrucaoController::class)->name('provas.index');
     Route::get('/provas/criar', ModuloEmConstrucaoController::class)->name('provas.criar');

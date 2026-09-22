@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
-use App\Models\Questao;
 use App\Models\ResultadoAluno;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -24,13 +23,6 @@ class ModuloEmConstrucaoController extends Controller
      * @var array<string, array{model: class-string, habilidade: string, titulo: string, descricao: string, etapa: string}>
      */
     protected array $modulos = [
-        'questoes.index' => [
-            'model' => Questao::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Questões',
-            'descricao' => 'Preenchimento pelo professor, análise pela gestão, feedbacks e reenvio versionado.',
-            'etapa' => 'Milestones 3 e 4',
-        ],
         'provas.index' => [
             'model' => Prova::class,
             'habilidade' => 'viewAny',

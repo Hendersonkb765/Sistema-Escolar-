@@ -97,7 +97,7 @@ em `professor_disciplina` e independe do perfil.
 | 1 | Setup, auth sem registro público, perfis, escopo, policies, testes | ✅ concluído |
 | 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | ✅ concluído |
 | 3 | Solicitações de questões, área do professor, prazos | ✅ concluído |
-| 4 | Análise, feedbacks, reenvio e versionamento | schema pronto, UI pendente |
+| 4 | Análise, feedbacks, reenvio e versionamento | ✅ concluído |
 | 5 | Montagem da prova, modelo e PDF | schema pronto, UI pendente |
 | 6 | Importação XLS em dois passos | schema pronto, UI pendente |
 | 7 | Cálculo de notas por disciplina | schema pronto, UI pendente |
@@ -153,6 +153,41 @@ Ao confirmar, um resumo mostra disciplina, turma, quantidade e soma dos
 pesos, e avisa que as questões ficarão bloqueadas para edição até a
 análise. O que estiver digitado na tela é gravado antes do envio, mesmo
 sem ter salvo o rascunho.
+
+## Análise das questões
+
+A coordenação abre a solicitação e decide questão a questão: **Aprovar**
+(com comentário opcional) ou **Devolver para correção** — aqui o motivo é
+obrigatório, porque é o único texto que o professor vai ler. Há também um
+"Aprovar todas as pendentes" para o caso comum.
+
+Cada decisão vira um registro em `questao_feedbacks`, que é **append-only**
+e guarda a versão da questão a que se referia. Nada é sobrescrito.
+
+O professor vê o motivo destacado na tela dele, corrige e clica em
+**Reenviar corrigida**: a questão vai como **versão nova** e volta para a
+fila. O histórico mostra as duas passagens:
+
+```
+v1  Rejeitada  Coordenação PAEET: A alternativa C está ambígua; reescreva.
+v2  Aprovada   Coordenação PAEET: (sem comentário)
+```
+
+**Só questão aprovada entra em prova** (`Questao::aprovadas()`). Pendentes
+e devolvidas ficam de fora.
+
+Quem escreveu a questão não a analisa — vale inclusive para o PAEET que
+também leciona, e a tela explica por que os botões não estão ali.
+
+`/questoes` é a fila: a coordenação abre já filtrada pelas enviadas, o
+professor vê as próprias com atalho para corrigir as devolvidas.
+
+### Concluída não é o mesmo que encerrada
+
+`encerrada_em` é reservado ao **fechamento manual**, que bloqueia o envio.
+Uma solicitação marcada como *concluída* porque todas as questões foram
+aprovadas continua aceitando correção se a coordenação devolver alguma
+depois. Confundir as duas coisas travaria o reenvio.
 
 ### Prazo não bloqueia
 

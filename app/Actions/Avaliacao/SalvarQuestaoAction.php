@@ -33,7 +33,10 @@ class SalvarQuestaoAction
         // conhecer as regras da questão, venha a questão de onde vier.
         $solicitacao = $questao->loadMissing('solicitacao')->solicitacao;
 
-        if (! $solicitacao->aceitaEnvio()) {
+        // Fechamento manual é o que impede alterações. Uma solicitação
+        // concluída por aprovação ainda aceita a correção de uma questão
+        // que voltou para o professor.
+        if ($solicitacao->encerrada_em !== null || $solicitacao->cancelada_em !== null) {
             throw RegraDeNegocioException::porque(
                 'Esta solicitação foi encerrada e não aceita mais alterações.'
             );

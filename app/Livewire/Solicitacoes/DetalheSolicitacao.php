@@ -2,17 +2,24 @@
 
 namespace App\Livewire\Solicitacoes;
 
+use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
+use App\Enums\StatusQuestao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
+use App\Models\Questao;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 /**
- * Acompanhamento de uma solicitação. O professor destinatário também
- * chega aqui e vê o caminho para responder.
+ * Acompanhamento e análise de uma solicitação.
+ *
+ * É aqui que a coordenação aprova cada questão ou devolve para correção,
+ * com o motivo. O professor destinatário também chega a esta tela e vê o
+ * caminho para responder.
  */
 class DetalheSolicitacao extends Component
 {
@@ -24,6 +31,14 @@ class DetalheSolicitacao extends Component
     public string $acaoConfirmando = '';
 
     public string $motivo = '';
+
+    /** Questão cuja devolução está sendo escrita. */
+    public ?int $devolvendoQuestao = null;
+
+    public string $comentarioDaDevolucao = '';
+
+    /** Comentário opcional na aprovação, por questão. @var array<int, string> */
+    public array $comentarioDaAprovacao = [];
 
     public function mount(SolicitacaoProva $solicitacao): void
     {
@@ -75,6 +90,128 @@ class DetalheSolicitacao extends Component
         $this->cancelarConfirmacao();
     }
 
+    // ------------------------------------------------------------------
+    // Análise das questões
+    // ------------------------------------------------------------------
+
+    public function aprovarQuestao(int $questaoId, AnalisarQuestaoAction $action): void
+    {
+        $questao = $this->questaoDaSolicitacao($questaoId);
+
+        $this->authorize('analisar', $questao);
+
+        try {
+            $action->aprovar(
+                questao: $questao,
+                analista: auth()->user(),
+                comentario: $this->comentarioDaAprovacao[$questaoId] ?? null,
+            );
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        unset($this->comentarioDaAprovacao[$questaoId]);
+
+        $this->notificarSucesso(
+            "Questão {$questao->item->ordem} aprovada. Ela já pode entrar em uma prova.",
+            'Aprovada',
+        );
+
+        $this->solicitacao->refresh();
+    }
+
+    public function abrirDevolucao(int $questaoId): void
+    {
+        $this->authorize('analisar', $this->questaoDaSolicitacao($questaoId));
+
+        $this->devolvendoQuestao = $questaoId;
+        $this->comentarioDaDevolucao = '';
+    }
+
+    public function fecharDevolucao(): void
+    {
+        $this->devolvendoQuestao = null;
+        $this->comentarioDaDevolucao = '';
+    }
+
+    public function devolverQuestao(AnalisarQuestaoAction $action): void
+    {
+        $questao = $this->questaoDaSolicitacao((int) $this->devolvendoQuestao);
+
+        $this->authorize('analisar', $questao);
+
+        try {
+            $action->rejeitar(
+                questao: $questao,
+                analista: auth()->user(),
+                comentario: $this->comentarioDaDevolucao,
+            );
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        $this->notificarAtencao(
+            "Questão {$questao->item->ordem} devolvida. O professor vê o seu comentário e pode corrigi-la.",
+            'Devolvida para correção',
+        );
+
+        $this->fecharDevolucao();
+        $this->solicitacao->refresh();
+    }
+
+    /** Aprova de uma vez as questões ainda sem decisão. */
+    public function aprovarPendentes(AnalisarQuestaoAction $action): void
+    {
+        $aprovadas = 0;
+
+        foreach ($this->questoesAnalisaveis() as $questao) {
+            if (auth()->user()->cannot('analisar', $questao)) {
+                continue;
+            }
+
+            try {
+                $action->aprovar($questao, auth()->user());
+                $aprovadas++;
+            } catch (RegraDeNegocioException $excecao) {
+                $this->notificarErro($excecao->getMessage());
+
+                return;
+            }
+        }
+
+        $this->solicitacao->refresh();
+
+        $aprovadas === 0
+            ? $this->notificarInfo('Nenhuma questão pendente de análise.')
+            : $this->notificarSucesso(
+                $aprovadas === 1
+                    ? 'Uma questão aprovada.'
+                    : "{$aprovadas} questões aprovadas.",
+                'Análise concluída',
+            );
+    }
+
+    protected function questaoDaSolicitacao(int $questaoId): Questao
+    {
+        return Questao::query()
+            ->where('solicitacao_id', $this->solicitacao->getKey())
+            ->with(['item', 'solicitacao'])
+            ->findOrFail($questaoId);
+    }
+
+    /** @return Collection<int, Questao> */
+    protected function questoesAnalisaveis(): Collection
+    {
+        return $this->solicitacao->questoes()
+            ->whereIn('status', [StatusQuestao::Enviada->value, StatusQuestao::EmAnalise->value])
+            ->with(['item', 'solicitacao'])
+            ->get();
+    }
+
     public function render(): View
     {
         $this->solicitacao->load([
@@ -84,15 +221,23 @@ class DetalheSolicitacao extends Component
             'criadoPor',
         ]);
 
+        $questoes = $this->solicitacao->questoes()
+            ->with(['item', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
+            ->get()
+            ->sortBy(fn (Questao $questao) => $questao->item->ordem)
+            ->values();
+
         return view('solicitacoes.detalhe', [
-            'questoes' => $this->solicitacao->questoes()
-                ->with(['item', 'alternativas', 'blocos'])
-                ->get()
-                ->sortBy(fn ($questao) => $questao->item->ordem)
-                ->values(),
+            'questoes' => $questoes,
             'completas' => $this->solicitacao->questoesCompletas(),
             'podeResponder' => auth()->user()->can('responder', $this->solicitacao)
                 && $this->solicitacao->aceitaEnvio(),
+            'resumo' => [
+                'aprovadas' => $questoes->filter(fn (Questao $q) => $q->status === StatusQuestao::Aprovada)->count(),
+                'devolvidas' => $questoes->filter(fn (Questao $q) => $q->status === StatusQuestao::Rejeitada)->count(),
+                'aguardando' => $questoes->filter(fn (Questao $q) => $q->status->analisavel())->count(),
+                'rascunho' => $questoes->filter(fn (Questao $q) => $q->status === StatusQuestao::Rascunho)->count(),
+            ],
         ])->layout('components.layouts.app', [
             'titulo' => $this->solicitacao->disciplina->nome,
             'subtitulo' => 'Turma '.$this->solicitacao->turma->nome

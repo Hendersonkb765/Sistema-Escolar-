@@ -3,6 +3,7 @@
 namespace App\Livewire\Questoes;
 
 use App\Actions\Avaliacao\EnviarSolicitacaoAction;
+use App\Actions\Avaliacao\ReenviarQuestaoAction;
 use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\LinguagemCodigo;
@@ -277,6 +278,51 @@ class ResponderSolicitacao extends Component
                 'Rascunho salvo',
             );
         }
+    }
+
+    /**
+     * Reenvia uma questão que voltou para correção. Vai como versão nova,
+     * e o feedback anterior continua no histórico apontando para a versão
+     * a que se referia.
+     */
+    public function reenviarQuestao(int $questaoId, SalvarQuestaoAction $salvar, ReenviarQuestaoAction $reenviar): void
+    {
+        $questao = Questao::query()->with('item')->findOrFail($questaoId);
+
+        $this->authorize('update', $questao);
+
+        $rascunho = $this->formulario[$questaoId] ?? null;
+
+        try {
+            if ($rascunho !== null) {
+                $salvar->executar(
+                    questao: $questao,
+                    autor: auth()->user(),
+                    enunciado: $rascunho['enunciado'] ?: null,
+                    alternativas: $rascunho['alternativas'],
+                    peso: $rascunho['peso'] ?? null,
+                );
+
+                app(SalvarBlocosDaQuestaoAction::class)->executar(
+                    questao: $questao,
+                    autor: auth()->user(),
+                    blocos: $rascunho['blocos'] ?? [],
+                );
+            }
+
+            $reenviada = $reenviar->executar($questao->refresh(), auth()->user());
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        $this->notificarSucesso(
+            "Questão {$questao->item->ordem} reenviada como versão {$reenviada->versao}. A coordenação vai analisar de novo.",
+            'Correção enviada',
+        );
+
+        $this->carregarFormulario();
     }
 
     public function enviar(SalvarQuestaoAction $salvar, EnviarSolicitacaoAction $enviar): void
