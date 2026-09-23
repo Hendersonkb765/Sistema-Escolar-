@@ -98,7 +98,7 @@ em `professor_disciplina` e independe do perfil.
 | 2 | Estrutura acadêmica, grade versionada, avanço de ano, históricos | ✅ concluído |
 | 3 | Solicitações de questões, área do professor, prazos | ✅ concluído |
 | 4 | Análise, feedbacks, reenvio e versionamento | ✅ concluído |
-| 5 | Montagem da prova, modelo e PDF | schema pronto, UI pendente |
+| 5 | Montagem da prova, modelo, pré-visualização, PDF e Word | ✅ concluído |
 | 6 | Importação XLS em dois passos | schema pronto, UI pendente |
 | 7 | Cálculo de notas por disciplina | schema pronto, UI pendente |
 | 8 | Dashboards, auditoria e refino de UI | parcial |
@@ -106,8 +106,8 @@ em `professor_disciplina` e independe do perfil.
 Todas as 24 tabelas de domínio já existem com chaves estrangeiras, índices e
 constraints. Os módulos ainda sem tela respondem por
 `ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
-um professor recebe 403 em `/provas/criar` e `/importacoes/criar` desde
-hoje, não quando a tela ficar pronta.
+um professor recebe 403 em `/importacoes/criar` desde hoje, não quando a
+tela ficar pronta.
 
 ## Solicitação de questões
 
@@ -239,6 +239,59 @@ Esta é a regra que mais costuma ser implementada errado:
   prazo original e a data real preservados;
 - o que fecha o envio é o **encerramento ou cancelamento manual** pelo
   PAEET — reversível por `reabrir`.
+
+## Montagem da prova
+
+A prova é montada a partir das questões **já aprovadas** de uma turma. O
+sistema não pergunta qual é a numeração: ele agrupa por disciplina, na
+ordem em que as disciplinas foram pedidas na solicitação, e numera em
+sequência contínua.
+
+```
+Lógica          5 questões  →  1 a 5
+Processos       6 questões  →  6 a 11
+Banco de Dados  4 questões  →  12 a 15
+```
+
+O aluno vê apenas o número. O sistema guarda, por dentro de cada número,
+a disciplina, o professor, o peso e a letra correta — é isso que permite
+depois calcular **uma nota por disciplina** em vez de uma nota só.
+
+### O que fica congelado
+
+`ProvaQuestao` não aponta apenas para a questão: ela **copia** enunciado,
+blocos (texto, código e imagem), alternativas, letra correta, peso e o
+número da versão da questão. Editar a questão original depois disso não
+muda prova nenhuma já montada.
+
+A moldura — instituição, logo, cabeçalho, rodapé — vem do **modelo de
+prova** e é lida na hora de imprimir, de propósito: corrigir um erro no
+papel timbrado vale também para a reimpressão de provas antigas.
+Desativar um modelo o esconde da montagem sem tocar nas provas que já o
+usaram.
+
+### Duas colunas, mesma folha para tela e papel
+
+A pré-visualização dentro do sistema, o PDF e o Word saem da **mesma**
+view (`resources/views/provas/folha/`). O que o PAEET confere na tela é
+exatamente o que imprime.
+
+- tela e PDF: `column-count` no CSS, com `break-inside: avoid` para não
+  partir uma questão entre colunas;
+- Word: seção com `breakType: continuous` e `colsNum`, depois do
+  cabeçalho — que fica em uma coluna só;
+- a única diferença entre tela e PDF é a origem das imagens: o navegador
+  usa URL, o dompdf lê o arquivo no disco.
+
+O download é gerado **na hora**, a partir do snapshot, para nunca
+entregar uma versão velha guardada em disco.
+
+### Gabarito
+
+O gabarito completo é da coordenação (`ProvaPolicy::verGabarito`). O
+professor abre a prova porque tem questões nela, mas não recebe as
+respostas das outras disciplinas — nem pela tela, nem por `?gabarito=1`
+na URL do download.
 
 ## Estrutura acadêmica
 

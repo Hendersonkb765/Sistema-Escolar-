@@ -16,7 +16,11 @@ return new class extends Migration
             $table->date('data_aplicacao')->nullable();
             $table->unsignedInteger('versao')->default(1);
             $table->string('status', 20)->default('rascunho')->index();
+            $table->text('instrucoes')->nullable();
+            // Layout escolhido na montagem (colunas, fonte, gabarito).
+            $table->json('configuracao')->nullable();
             $table->string('pdf_path')->nullable();
+            $table->string('docx_path')->nullable();
             $table->foreignId('gerada_por')->nullable()->constrained('usuarios')->nullOnDelete();
             $table->dateTime('gerada_em')->nullable();
             $table->timestamps();

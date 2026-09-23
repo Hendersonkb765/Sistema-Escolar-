@@ -4,13 +4,22 @@ namespace Database\Seeders;
 
 use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
+use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
+use App\Actions\Avaliacao\EnviarParteAction;
+use App\Actions\Avaliacao\SalvarQuestaoAction;
+use App\Actions\Prova\MontarProvaAction;
 use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\ModeloProva;
+use App\Models\Prova;
+use App\Models\Questao;
+use App\Models\QuestaoBloco;
+use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
@@ -109,9 +118,33 @@ class DemonstracaoSeeder extends Seeder
             );
         }
 
+        $modeloTecnologia = $this->modeloDeProva($tecnologia, $admin);
+        $this->modeloDeProva($gestao, $admin);
+
         $this->solicitacoes($curso, $admin, $professor, $paeetTecnologia, $disciplinas);
+        $this->provaMontada($admin, $modeloTecnologia);
 
         $this->command?->info('Demonstração pronta. Senha de todos: senha-forte-123');
+    }
+
+    /** Sem ao menos um modelo não há como montar prova; cada Eixo tem o seu. */
+    protected function modeloDeProva(Eixo $eixo, User $autor): ModeloProva
+    {
+        return ModeloProva::query()->firstOrCreate(
+            ['eixo_id' => $eixo->id, 'nome' => 'Padrão — '.$eixo->nome],
+            [
+                'instituicao' => config('app.name'),
+                'nome_avaliacao' => 'Avaliação Bimestral',
+                'cabecalho' => 'Eixo de '.$eixo->nome,
+                'instrucoes' => 'Leia cada questão com atenção e marque apenas uma alternativa. '
+                    .'Não é permitido consulta.',
+                'rodape' => 'Boa prova!',
+                'campos_identificacao' => ['aluno', 'matricula', 'turma', 'data'],
+                'layout' => ['fonte' => 'sans', 'tamanho' => 11],
+                'ativo' => true,
+                'criado_por' => $autor->id,
+            ]
+        );
     }
 
     /**
@@ -180,6 +213,94 @@ class DemonstracaoSeeder extends Seeder
             prazo: now()->subDays(3),
             titulo: 'Recuperação',
         );
+    }
+
+    /**
+     * Fecha o ciclo da primeira solicitação — professores respondem, a
+     * coordenação aprova — e monta a prova, para que a montagem, a
+     * pré-visualização e os downloads tenham o que mostrar.
+     */
+    protected function provaMontada(User $admin, ModeloProva $modelo): void
+    {
+        if (Prova::query()->exists()) {
+            return;
+        }
+
+        $solicitacao = SolicitacaoProva::query()
+            ->where('titulo', 'Avaliação do 2º bimestre')
+            ->with('turma')
+            ->first();
+
+        if ($solicitacao === null) {
+            return;
+        }
+
+        $salvar = app(SalvarQuestaoAction::class);
+        $enviar = app(EnviarParteAction::class);
+        $analisar = app(AnalisarQuestaoAction::class);
+
+        $partes = $solicitacao->partes()->with('professor')->orderBy('ordem')->get();
+
+        foreach ($partes as $parte) {
+            foreach ($parte->questoes()->orderBy('ordem')->get() as $questao) {
+                $salvar->executar(
+                    questao: $questao,
+                    autor: $parte->professor,
+                    enunciado: $this->enunciado($parte, $questao),
+                    alternativas: $this->alternativas($solicitacao->quantidade_alternativas),
+                    peso: $questao->ordem === 1 ? 1.5 : 1,
+                );
+            }
+
+            $enviar->executar($parte->refresh(), $parte->professor);
+        }
+
+        // Uma questão com bloco de código, para a folha mostrar o
+        // tratamento de trecho em monoespaçada.
+        $comCodigo = $solicitacao->questoes()->orderBy('id')->first();
+
+        QuestaoBloco::query()->firstOrCreate(
+            ['questao_id' => $comCodigo->id, 'ordem' => 1],
+            [
+                'tipo' => 'codigo',
+                'linguagem' => 'python',
+                'conteudo' => "for i in range(1, 6):\n    print(i * i)",
+            ]
+        );
+
+        foreach ($solicitacao->questoes()->get() as $questao) {
+            $analisar->aprovar($questao, $admin);
+        }
+
+        app(MontarProvaAction::class)->executar(
+            autor: $admin,
+            turma: $solicitacao->turma,
+            modelo: $modelo,
+            titulo: 'Avaliação do 2º bimestre',
+            dataAplicacao: now()->addWeek(),
+            configuracao: ['colunas' => 2, 'gabarito' => true, 'mostrar_pesos' => false],
+        );
+    }
+
+    protected function enunciado(SolicitacaoParte $parte, Questao $questao): string
+    {
+        return sprintf(
+            '(%s) Questão %d — enunciado de demonstração.',
+            $parte->loadMissing('disciplina')->disciplina->nome,
+            $questao->ordem,
+        );
+    }
+
+    /** @return array<int, array{letra: string, texto: string, correta: bool}> */
+    protected function alternativas(int $quantidade): array
+    {
+        return collect(range(0, $quantidade - 1))
+            ->map(fn (int $indice) => [
+                'letra' => chr(65 + $indice),
+                'texto' => 'Alternativa '.chr(65 + $indice),
+                'correta' => $indice === 0,
+            ])
+            ->all();
     }
 
     protected function usuario(string $email, string $nome, PerfilUsuario $perfil, ?User $autor = null): User

@@ -13,7 +13,9 @@ return new class extends Migration
             $table->foreignId('eixo_id')->constrained('eixos')->restrictOnDelete();
             $table->string('nome');
             $table->string('nome_avaliacao')->nullable();
+            $table->string('instituicao')->nullable();
             $table->text('cabecalho')->nullable();
+            $table->text('instrucoes')->nullable();
             $table->string('logo_path')->nullable();
             $table->json('campos_identificacao')->nullable();
             $table->json('layout')->nullable();

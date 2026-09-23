@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -29,7 +30,10 @@ class Prova extends Model
         'data_aplicacao',
         'versao',
         'status',
+        'instrucoes',
+        'configuracao',
         'pdf_path',
+        'docx_path',
         'gerada_por',
         'gerada_em',
     ];
@@ -39,6 +43,7 @@ class Prova extends Model
         return [
             'status' => StatusProva::class,
             'data_aplicacao' => 'date',
+            'configuracao' => 'array',
             'gerada_em' => 'datetime',
             'versao' => 'integer',
         ];
@@ -97,5 +102,80 @@ class Prova extends Model
     public function geradaPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'gerada_por');
+    }
+
+    /**
+     * Questões agrupadas por disciplina, na ordem em que aparecem na
+     * prova — é assim que a folha impressa é lida.
+     *
+     * @return Collection<string, Collection<int, ProvaQuestao>>
+     */
+    public function questoesPorDisciplina(): Collection
+    {
+        return $this->questoes()
+            // A tela de detalhe mostra de quem veio cada bloco; sem o
+            // professor aqui, a view quebra por lazy loading.
+            ->with(['disciplina', 'professor'])
+            ->get()
+            ->groupBy(fn (ProvaQuestao $questao) => $questao->disciplina->nome)
+            ->sortBy(fn ($questoes) => $questoes->min('numero'));
+    }
+
+    /** Quantas colunas o texto ocupa na folha. */
+    public function colunas(): int
+    {
+        return (int) ($this->configuracao['colunas'] ?? 2);
+    }
+
+    public function mostrarGabarito(): bool
+    {
+        return (bool) ($this->configuracao['gabarito'] ?? false);
+    }
+
+    public function mostrarPesos(): bool
+    {
+        return (bool) ($this->configuracao['mostrar_pesos'] ?? false);
+    }
+
+    public function totalDeQuestoes(): int
+    {
+        return $this->questoes()->count();
+    }
+
+    public function somaDosPesos(): float
+    {
+        return (float) $this->questoes()->sum('peso');
+    }
+
+    /** Gabarito completo: número da questão => letra correta. */
+    public function gabarito(): Collection
+    {
+        return $this->questoes()
+            ->orderBy('numero')
+            ->get()
+            ->mapWithKeys(fn (ProvaQuestao $questao) => [$questao->numero => $questao->letra_correta]);
+    }
+
+    /** Uma prova já gerada tem snapshot imutável. */
+    public function foiGerada(): bool
+    {
+        return $this->gerada_em !== null;
+    }
+
+    /** Só se aplica o que já foi gerado e ainda não foi aplicado. */
+    public function podeSerAplicada(): bool
+    {
+        return $this->status === StatusProva::Gerada;
+    }
+
+    /** Por que a aplicação não cabe agora — a tela mostra este texto. */
+    public function motivoParaNaoAplicar(): ?string
+    {
+        return match (true) {
+            $this->status === StatusProva::Rascunho => 'A prova ainda não foi gerada.',
+            $this->status === StatusProva::Aplicada => 'Esta prova já foi marcada como aplicada.',
+            $this->status === StatusProva::Encerrada => 'Esta prova já foi encerrada.',
+            default => null,
+        };
     }
 }

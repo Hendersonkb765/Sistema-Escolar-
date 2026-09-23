@@ -13,6 +13,7 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.0",
         "maatwebsite/excel": "^4.0",
+        "phpoffice/phpword": "^1.4",
         "spatie/laravel-activitylog": "^5.1"
     },
     "require-dev": {

@@ -24,7 +24,9 @@ class ModeloProva extends Model
         'eixo_id',
         'nome',
         'nome_avaliacao',
+        'instituicao',
         'cabecalho',
+        'instrucoes',
         'logo_path',
         'campos_identificacao',
         'layout',
@@ -59,6 +61,17 @@ class ModeloProva extends Model
     {
         return $this->belongsTo(Eixo::class);
     }
+
+    /** Campos que a folha imprime no quadro de identificação do aluno. */
+    public const CAMPOS_DE_IDENTIFICACAO = [
+        'aluno' => 'Nome do aluno',
+        'matricula' => 'Matrícula',
+        'turma' => 'Turma',
+        'curso' => 'Curso',
+        'data' => 'Data',
+        'nota' => 'Nota',
+        'assinatura' => 'Assinatura do professor',
+    ];
 
     /** @return HasMany<Prova, $this> */
     public function provas(): HasMany

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 /**
  * Snapshot imutável de uma questão dentro de uma prova. Alterações
@@ -27,6 +28,7 @@ class ProvaQuestao extends Model
         'professor_id',
         'peso',
         'enunciado_snapshot',
+        'blocos_snapshot',
         'alternativas_snapshot',
         'letra_correta',
         'versao_questao',
@@ -36,6 +38,7 @@ class ProvaQuestao extends Model
     {
         return [
             'alternativas_snapshot' => 'array',
+            'blocos_snapshot' => 'array',
             'peso' => 'decimal:2',
             'numero' => 'integer',
             'versao_questao' => 'integer',
@@ -81,5 +84,16 @@ class ProvaQuestao extends Model
     public function letrasValidas(): array
     {
         return array_column($this->alternativas_snapshot ?? [], 'letra');
+    }
+
+    /**
+     * Blocos do enunciado congelados: texto, código com linguagem e
+     * imagens (pelo caminho relativo no disco público).
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function blocos(): Collection
+    {
+        return collect($this->blocos_snapshot ?? []);
     }
 }

@@ -17,6 +17,9 @@ return new class extends Migration
             $table->foreignId('professor_id')->constrained('usuarios')->restrictOnDelete();
             $table->decimal('peso', 5, 2);
             $table->text('enunciado_snapshot');
+            // Código, imagens e parágrafos do enunciado, congelados junto:
+            // mexer na questão depois não pode mudar a prova aplicada.
+            $table->json('blocos_snapshot')->nullable();
             $table->json('alternativas_snapshot');
             $table->char('letra_correta', 1);
             $table->unsignedInteger('versao_questao')->default(1);

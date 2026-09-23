@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Importacao;
-use App\Models\ModeloProva;
-use App\Models\Prova;
 use App\Models\ResultadoAluno;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,27 +21,6 @@ class ModuloEmConstrucaoController extends Controller
      * @var array<string, array{model: class-string, habilidade: string, titulo: string, descricao: string, etapa: string}>
      */
     protected array $modulos = [
-        'provas.index' => [
-            'model' => Prova::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Provas',
-            'descricao' => 'Montagem automática a partir das questões aprovadas, com snapshot imutável e PDF.',
-            'etapa' => 'Milestone 5',
-        ],
-        'provas.criar' => [
-            'model' => Prova::class,
-            'habilidade' => 'create',
-            'titulo' => 'Nova prova',
-            'descricao' => 'Montagem de prova — exclusiva de PAEET e PAEET Admin.',
-            'etapa' => 'Milestone 5',
-        ],
-        'modelos-prova.index' => [
-            'model' => ModeloProva::class,
-            'habilidade' => 'viewAny',
-            'titulo' => 'Modelos de prova',
-            'descricao' => 'Cabeçalho institucional, logo, campos de identificação, layout e rodapé.',
-            'etapa' => 'Milestone 5',
-        ],
         'importacoes.index' => [
             'model' => Importacao::class,
             'habilidade' => 'viewAny',

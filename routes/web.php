@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\ModuloEmConstrucaoController;
+use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
 use App\Livewire\Cursos\DetalheCurso;
@@ -13,7 +14,12 @@ use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
+use App\Livewire\ModelosProva\FormularioModeloProva;
+use App\Livewire\ModelosProva\ListaModelosProva;
 use App\Livewire\Painel;
+use App\Livewire\Provas\DetalheProva;
+use App\Livewire\Provas\ListaProvas;
+use App\Livewire\Provas\MontarProva;
 use App\Livewire\Questoes\ListaQuestoes;
 use App\Livewire\Questoes\ResponderSolicitacao;
 use App\Livewire\Solicitacoes\DetalheSolicitacao;
@@ -77,9 +83,17 @@ Route::middleware(['auth', 'ativo'])->group(function () {
 
     Route::get('/questoes', ListaQuestoes::class)->name('questoes.index');
 
-    Route::get('/provas', ModuloEmConstrucaoController::class)->name('provas.index');
-    Route::get('/provas/criar', ModuloEmConstrucaoController::class)->name('provas.criar');
-    Route::get('/modelos-prova', ModuloEmConstrucaoController::class)->name('modelos-prova.index');
+    // A prova gerada tem snapshot imutável: não há rota de edição, só de
+    // consulta e de download. Para mudar o conteúdo, monta-se outra.
+    Route::get('/provas', ListaProvas::class)->name('provas.index');
+    Route::get('/provas/criar', MontarProva::class)->name('provas.criar');
+    Route::get('/provas/{prova}', DetalheProva::class)->name('provas.show');
+    Route::get('/provas/{prova}/pdf', [ProvaArquivoController::class, 'pdf'])->name('provas.pdf');
+    Route::get('/provas/{prova}/word', [ProvaArquivoController::class, 'docx'])->name('provas.docx');
+
+    Route::get('/modelos-prova', ListaModelosProva::class)->name('modelos-prova.index');
+    Route::get('/modelos-prova/criar', FormularioModeloProva::class)->name('modelos-prova.criar');
+    Route::get('/modelos-prova/{modelo}/editar', FormularioModeloProva::class)->name('modelos-prova.editar');
 
     Route::get('/importacoes', ModuloEmConstrucaoController::class)->name('importacoes.index');
     Route::get('/importacoes/criar', ModuloEmConstrucaoController::class)->name('importacoes.criar');

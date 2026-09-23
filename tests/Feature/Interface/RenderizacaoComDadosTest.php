@@ -19,6 +19,8 @@ use App\Actions\Academico\AvancarTurmaAction;
 use App\Actions\Academico\MoverAlunoDeTurmaAction;
 use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
+use App\Actions\Avaliacao\AnalisarQuestaoAction;
+use App\Actions\Prova\MontarProvaAction;
 use App\Enums\EventoHistorico;
 use App\Enums\StatusAluno;
 use App\Livewire\Turmas\DetalheTurma;
@@ -27,6 +29,8 @@ use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\GradeCurricular;
+use App\Models\ModeloProva;
+use App\Models\Prova;
 use App\Models\Turma;
 use App\Models\User;
 use Spatie\Activitylog\Models\Activity;
@@ -250,4 +254,69 @@ it('abre o painel de avanço de período com turmas de destino', function () {
         ->assertOk()
         ->assertSee('2 A')
         ->assertSee('2 B');
+});
+
+it('abre as telas de prova com duas provas, dois modelos e duas disciplinas', function () {
+    $professorLogica = professor($this->eixo);
+    $professorRedes = professor($this->eixo);
+
+    $logica = Disciplina::query()->where('nome', 'Lógica de Programação')->sole();
+    $redes = Disciplina::query()->where('nome', 'Redes de Computadores')->sole();
+
+    $solicitacao = solicitacaoCom($this->admin, $this->outraTurma, [
+        ['disciplina' => $logica, 'professor' => $professorLogica, 'questoes' => 2],
+        ['disciplina' => $redes, 'professor' => $professorRedes, 'questoes' => 2],
+    ], titulo: 'Avaliação bimestral');
+
+    $professores = [$professorLogica, $professorRedes];
+
+    foreach ($solicitacao->partes()->orderBy('ordem')->get() as $indice => $parte) {
+        enviarParte($parte, $professores[$indice]);
+    }
+
+    $analisar = app(AnalisarQuestaoAction::class);
+
+    foreach ($solicitacao->questoes()->get() as $questao) {
+        $analisar->aprovar($questao, $this->admin);
+    }
+
+    // Dois modelos e duas provas: nenhuma coleção destas telas fica com
+    // uma linha só.
+    $modelo = ModeloProva::factory()->create([
+        'eixo_id' => $this->eixo->id,
+        'nome' => 'Padrão institucional',
+        'criado_por' => $this->admin->id,
+    ]);
+    ModeloProva::factory()->create([
+        'eixo_id' => $this->outroEixo->id,
+        'nome' => 'Recuperação',
+        'criado_por' => $this->admin->id,
+    ]);
+
+    $montar = app(MontarProvaAction::class);
+
+    $prova = $montar->executar(
+        autor: $this->admin, turma: $this->outraTurma, modelo: $modelo,
+        titulo: 'Avaliação bimestral',
+    );
+    $montar->executar(
+        autor: $this->admin, turma: $this->outraTurma, modelo: $modelo,
+        titulo: 'Segunda chamada',
+    );
+
+    expect(Prova::query()->count())->toBe(2)
+        ->and(ModeloProva::query()->count())->toBe(2);
+
+    $como = fn (string $rota, $parametro = null) => $this->actingAs($this->admin)
+        ->get($parametro === null ? route($rota) : route($rota, $parametro))
+        ->assertOk();
+
+    $como('provas.index');
+    $como('provas.criar');
+    $como('provas.show', $prova);
+    $como('provas.pdf', $prova);
+    $como('provas.docx', $prova);
+    $como('modelos-prova.index');
+    $como('modelos-prova.criar');
+    $como('modelos-prova.editar', $modelo);
 });
