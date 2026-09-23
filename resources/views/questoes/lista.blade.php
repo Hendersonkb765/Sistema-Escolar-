@@ -103,8 +103,10 @@
                                         </x-botao>
                                     @else
                                         @can('update', $questao)
+                                            {{-- Abre só esta questão, não a disciplina inteira. --}}
                                             <x-botao variante="{{ $questao->status === App\Enums\StatusQuestao::Rejeitada ? 'primario' : 'discreto' }}"
-                                                     href="{{ route('solicitacoes.responder', $questao->solicitacao) }}" wire:navigate>
+                                                     href="{{ route('solicitacoes.responder', ['solicitacao' => $questao->solicitacao, 'questao' => $questao->id]) }}"
+                                                     wire:navigate>
                                                 {{ $questao->status === App\Enums\StatusQuestao::Rejeitada ? 'Corrigir' : 'Abrir' }}
                                             </x-botao>
                                         @else

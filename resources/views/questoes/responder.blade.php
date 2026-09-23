@@ -62,6 +62,17 @@
 
     </x-cartao>
 
+    @if ($emFoco)
+        <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50/60 px-4 py-3 dark:border-sky-500/30 dark:bg-sky-500/5">
+            <p class="text-sm text-slate-700 dark:text-slate-200">
+                Você está vendo apenas a questão que abriu.
+            </p>
+            <x-botao variante="secundario" wire:click="limparFoco">
+                Ver todas as questões da disciplina
+            </x-botao>
+        </div>
+    @endif
+
     @if ($devolvidas->isNotEmpty())
         <div class="rounded-xl border-2 border-rose-300 bg-rose-50 p-4 dark:border-rose-500/50 dark:bg-rose-950/40">
             <div class="flex items-start gap-3">
@@ -90,7 +101,8 @@
                         @foreach ($devolvidas as $devolvida)
                             @php $ultimo = $devolvida->feedbacks->first(); @endphp
                             <li class="rounded-lg bg-white/70 p-2 text-sm dark:bg-slate-900/50">
-                                <a href="#questao-{{ $devolvida->id }}"
+                                <a href="{{ route('solicitacoes.responder', ['solicitacao' => $solicitacao, 'questao' => $devolvida->id]) }}"
+                                   wire:navigate
                                    class="font-semibold text-rose-900 hover:underline dark:text-rose-100">
                                     {{ $devolvida->parte->disciplina->nome }} · questão {{ $devolvida->ordem }}
                                 </a>
@@ -116,7 +128,10 @@
         @php
             $questoesDaParte = $questoesPorParte[$parte->id] ?? collect();
             $pendenciasDaParte = $pendenciasPorParte[$parte->id] ?? collect();
-            $parteBloqueada = ! $podeEditar || ! $parte->aceitaEnvio();
+            // A parte entregue não aceita mais envio, mas uma questão
+            // devolvida volta a ser editável — é justamente o que o
+            // professor precisa corrigir.
+            $parteEntregue = ! $parte->aceitaEnvio();
             $somaDaParte = $questoesDaParte->sum(fn ($q) => (float) ($formulario[$q->id]['peso'] ?? $q->peso));
         @endphp
 
@@ -194,7 +209,7 @@
             @foreach ($questoesDaParte as $questao)
                 @php
                     $dados = $formulario[$questao->id] ?? ['enunciado' => null, 'peso' => '1', 'alternativas' => [], 'blocos' => []];
-                    $bloqueado = $parteBloqueada || ! $questao->status->editavelPeloProfessor();
+                    $bloqueado = ! $podeEditar || ! $questao->status->editavelPeloProfessor();
                     $pendenciasDaQuestao = $pendenciasDaParte[$questao->ordem] ?? [];
                 @endphp
 

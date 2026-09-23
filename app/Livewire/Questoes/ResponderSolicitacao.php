@@ -18,6 +18,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -54,17 +55,47 @@ class ResponderSolicitacao extends Component
     /** Parte cujo envio está sendo confirmado. */
     public ?int $confirmandoEnvio = null;
 
-    public function mount(SolicitacaoProva $solicitacao, SalvarQuestaoAction $action): void
+    /**
+     * Quando o professor chega por uma questão específica — o link de
+     * "Corrigir", por exemplo — a tela mostra só ela, em vez da
+     * disciplina inteira.
+     */
+    #[Url(as: 'questao', except: null)]
+    public ?int $questaoEmFoco = null;
+
+    public function mount(SolicitacaoProva $solicitacao, SalvarQuestaoAction $action, ?int $questao = null): void
     {
         $this->authorize('responder', $solicitacao);
 
         $this->solicitacaoId = $solicitacao->getKey();
+
+        $foco = $questao ?? $this->questaoEmFoco;
+
+        if ($foco !== null) {
+            // O id vem da URL: só vale se a questão for desta solicitação
+            // e de quem está respondendo.
+            $daSolicitacao = Questao::query()
+                ->where('solicitacao_id', $this->solicitacaoId)
+                ->whereKey($foco)
+                ->first();
+
+            abort_if($daSolicitacao === null, 404);
+            $this->authorize('update', $daSolicitacao);
+
+            $this->questaoEmFoco = $daSolicitacao->getKey();
+        }
 
         foreach ($this->questoes() as $questao) {
             $action->prepararAlternativas($questao);
         }
 
         $this->carregarFormulario();
+    }
+
+    /** Volta a mostrar todas as questões da disciplina. */
+    public function limparFoco(): void
+    {
+        $this->questaoEmFoco = null;
     }
 
     /**
@@ -100,6 +131,8 @@ class ResponderSolicitacao extends Component
         return Questao::query()
             ->where('solicitacao_id', $this->solicitacaoId)
             ->where('professor_id', auth()->id())
+            // Foco: o professor veio corrigir uma questão específica.
+            ->when($this->questaoEmFoco !== null, fn ($q) => $q->whereKey($this->questaoEmFoco))
             ->with(['parte.disciplina', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
             ->get()
             ->sortBy(fn (Questao $questao) => [$questao->parte->ordem, $questao->ordem])
@@ -407,8 +440,12 @@ class ResponderSolicitacao extends Component
     public function render(EnviarParteAction $enviar): View
     {
         $solicitacao = $this->solicitacao();
-        $partes = $this->minhasPartes();
         $questoes = $this->questoes();
+
+        // Em foco, só a disciplina da questão aparece.
+        $partes = $this->questaoEmFoco === null
+            ? $this->minhasPartes()
+            : $this->minhasPartes()->whereIn('id', $questoes->pluck('solicitacao_parte_id'));
 
         return view('questoes.responder', [
             'solicitacao' => $solicitacao,
@@ -420,6 +457,7 @@ class ResponderSolicitacao extends Component
                 fn (SolicitacaoParte $parte) => [$parte->getKey() => $enviar->pendenciasPorQuestao($parte)]
             ),
             'podeEditar' => $solicitacao->aceitaEnvio(),
+            'emFoco' => $this->questaoEmFoco !== null,
             'linguagens' => LinguagemCodigo::opcoes(),
             // O que a coordenação devolveu, para o topo da tela avisar.
             'devolvidas' => $questoes

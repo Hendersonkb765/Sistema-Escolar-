@@ -197,6 +197,14 @@ abrir solicitação por solicitação. Ela aparece em quatro lugares:
    devolvida com o motivo, âncora para o bloco correspondente, e a questão
    em si com moldura e o título marcado.
 
+Clicar em **Corrigir**, seja na lista de questões ou no aviso do topo, abre
+**apenas aquela questão** — não a disciplina inteira. Um botão devolve a
+visão completa quando ele quiser.
+
+A questão devolvida volta a ser editável mesmo com a parte já entregue: é
+exatamente o que ele precisa mexer. As demais seguem bloqueadas enquanto
+aguardam análise.
+
 O professor corrige e clica em **Reenviar corrigida**: a questão vai como
 **versão nova** e volta para a fila. O histórico mostra as duas passagens:
 
