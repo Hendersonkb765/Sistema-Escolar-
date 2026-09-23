@@ -15,6 +15,13 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * Pedido de questões para montar uma prova.
+ *
+ * A prova reúne várias disciplinas, cada uma com seu professor: esses
+ * pares são as partes (`solicitacao_partes`). O prazo é da prova inteira;
+ * o envio é de cada parte, feito por seu professor.
+ */
 class SolicitacaoProva extends Model
 {
     use AplicaEscopoDeEixo;
@@ -27,14 +34,10 @@ class SolicitacaoProva extends Model
     protected $fillable = [
         'curso_id',
         'turma_id',
-        'disciplina_id',
-        'professor_id',
         'criado_por',
-        'quantidade_questoes',
+        'titulo',
         'quantidade_alternativas',
         'prazo',
-        'enviada_em',
-        'enviada_em_atraso',
         'encerrada_em',
         'cancelada_em',
         'status',
@@ -42,18 +45,15 @@ class SolicitacaoProva extends Model
     ];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
-    protected $attributes = ['status' => 'aberta', 'enviada_em_atraso' => false];
+    protected $attributes = ['status' => 'aberta'];
 
     protected function casts(): array
     {
         return [
             'status' => StatusSolicitacao::class,
             'prazo' => 'datetime',
-            'enviada_em' => 'datetime',
             'encerrada_em' => 'datetime',
             'cancelada_em' => 'datetime',
-            'enviada_em_atraso' => 'boolean',
-            'quantidade_questoes' => 'integer',
             'quantidade_alternativas' => 'integer',
         ];
     }
@@ -68,11 +68,18 @@ class SolicitacaoProva extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty()->useLogName('solicitacao');
     }
 
-    /** O professor só enxerga as solicitações endereçadas a ele. */
+    /** O professor enxerga as solicitações em que tem alguma parte. */
     protected function aplicarEscopoDeProfessor(Builder $query, User $usuario): Builder
     {
-        return $query->where('professor_id', $usuario->getKey());
+        return $query->whereHas(
+            'partes',
+            fn (Builder $q) => $q->where('professor_id', $usuario->getKey())
+        );
     }
+
+    // ------------------------------------------------------------------
+    // Relações
+    // ------------------------------------------------------------------
 
     /** @return BelongsTo<Curso, $this> */
     public function curso(): BelongsTo
@@ -86,28 +93,16 @@ class SolicitacaoProva extends Model
         return $this->belongsTo(Turma::class);
     }
 
-    /** @return BelongsTo<Disciplina, $this> */
-    public function disciplina(): BelongsTo
-    {
-        return $this->belongsTo(Disciplina::class);
-    }
-
-    /** @return BelongsTo<User, $this> */
-    public function professor(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'professor_id');
-    }
-
     /** @return BelongsTo<User, $this> */
     public function criadoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'criado_por');
     }
 
-    /** @return HasMany<SolicitacaoItem, $this> */
-    public function itens(): HasMany
+    /** Pares disciplina + professor que compõem a prova. */
+    public function partes(): HasMany
     {
-        return $this->hasMany(SolicitacaoItem::class, 'solicitacao_id')->orderBy('ordem');
+        return $this->hasMany(SolicitacaoParte::class, 'solicitacao_id')->orderBy('ordem');
     }
 
     /** @return HasMany<Questao, $this> */
@@ -116,70 +111,75 @@ class SolicitacaoProva extends Model
         return $this->hasMany(Questao::class, 'solicitacao_id');
     }
 
+    // ------------------------------------------------------------------
+    // Estado
+    // ------------------------------------------------------------------
+
     /**
-     * Prazo vencido não bloqueia o envio — apenas marca a solicitação
-     * como atrasada na interface.
+     * Prazo vencido não bloqueia: só o encerramento ou o cancelamento
+     * manual pelo PAEET fecham o envio.
      */
-    public function estaAtrasada(): bool
-    {
-        if ($this->enviada_em !== null) {
-            return $this->enviada_em_atraso;
-        }
-
-        return $this->status->aceitaEnvio() && $this->prazo->isPast();
-    }
-
-    /** Só o encerramento ou o cancelamento manual fecham o envio. */
     public function aceitaEnvio(): bool
     {
-        return $this->status->aceitaEnvio()
-            && $this->encerrada_em === null
-            && $this->cancelada_em === null;
+        return $this->encerrada_em === null && $this->cancelada_em === null;
     }
 
-    /** Soma dos pesos que o professor atribuiu às questões. */
+    /** Pendente com prazo vencido, ou com alguma parte entregue atrasada. */
+    public function estaAtrasada(): bool
+    {
+        if ($this->partes()->where('enviada_em_atraso', true)->exists()) {
+            return true;
+        }
+
+        return $this->aceitaEnvio()
+            && $this->prazo->isPast()
+            && $this->partes()->whereNull('enviada_em')->exists();
+    }
+
+    public function rotuloDePrazo(): ?string
+    {
+        if (! $this->estaAtrasada()) {
+            return null;
+        }
+
+        return $this->partes()->whereNull('enviada_em')->exists()
+            ? 'Atrasada'
+            : 'Entregue em atraso';
+    }
+
+    public function totalDeQuestoes(): int
+    {
+        return (int) $this->partes()->sum('quantidade_questoes');
+    }
+
+    public function questoesCompletas(): int
+    {
+        return $this->questoes()
+            ->with('alternativas')
+            ->get()
+            ->filter(fn (Questao $questao) => $questao->estaCompleta($this->quantidade_alternativas))
+            ->count();
+    }
+
+    /** Soma dos pesos que os professores atribuíram às questões. */
     public function somaDosPesos(): float
     {
         return (float) $this->questoes()->sum('peso');
     }
 
-    /**
-     * Quantas questões já estão preenchidas a ponto de poderem ser
-     * enviadas — o que a barra de progresso do professor mostra.
-     */
-    public function questoesCompletas(): int
-    {
-        return $this->questoes()
-            ->whereNotNull('enunciado')
-            ->where('enunciado', '!=', '')
-            ->where('peso', '>', 0)
-            ->whereHas('alternativas', fn ($q) => $q->where('correta', true))
-            ->withCount('alternativas')
-            ->get()
-            ->filter(fn (Questao $questao) => $questao->alternativas_count === $this->quantidade_alternativas)
-            ->count();
-    }
-
-    public function totalDeQuestoes(): int
-    {
-        return (int) $this->quantidade_questoes;
-    }
-
-    /** Questões que voltaram e aguardam correção do professor. */
     public function questoesDevolvidas(): int
     {
         return $this->questoes()->where('status', StatusQuestao::Rejeitada)->count();
     }
 
-    /** Ordens das questões devolvidas, para a tela citar quais são. */
-    public function ordensDevolvidas(): Collection
+    /** Disciplinas devolvidas, para a tela dizer onde está o problema. */
+    public function disciplinasDevolvidas(): Collection
     {
-        return $this->questoes()
-            ->where('status', StatusQuestao::Rejeitada)
-            ->with('item')
+        return $this->partes()
+            ->whereHas('questoes', fn (Builder $q) => $q->where('status', StatusQuestao::Rejeitada))
+            ->with('disciplina')
             ->get()
-            ->map(fn (Questao $questao) => (int) $questao->item->ordem)
-            ->sort()
+            ->map(fn (SolicitacaoParte $parte) => $parte->disciplina->nome)
             ->values();
     }
 
@@ -189,17 +189,15 @@ class SolicitacaoProva extends Model
         return (int) now()->startOfDay()->diffInDays($this->prazo->startOfDay(), false);
     }
 
-    /** Rótulo do estado de prazo, para os badges da interface. */
-    public function rotuloDePrazo(): ?string
+    /** Nome curto para listagens: o título dado ou a turma e o período. */
+    public function identificacao(): string
     {
-        if ($this->enviada_em !== null) {
-            return $this->enviada_em_atraso ? 'Enviada em atraso' : null;
+        if (filled($this->titulo)) {
+            return $this->titulo;
         }
 
-        if (! $this->estaAtrasada()) {
-            return null;
-        }
+        $turma = $this->loadMissing('turma')->turma;
 
-        return 'Atrasada';
+        return "Prova · {$turma->nome} · {$turma->periodo_letivo}";
     }
 }

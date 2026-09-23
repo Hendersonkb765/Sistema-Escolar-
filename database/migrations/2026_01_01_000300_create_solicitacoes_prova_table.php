@@ -12,14 +12,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('curso_id')->constrained('cursos')->restrictOnDelete();
             $table->foreignId('turma_id')->constrained('turmas')->restrictOnDelete();
-            $table->foreignId('disciplina_id')->constrained('disciplinas')->restrictOnDelete();
-            $table->foreignId('professor_id')->constrained('usuarios')->restrictOnDelete();
             $table->foreignId('criado_por')->constrained('usuarios')->restrictOnDelete();
-            $table->unsignedSmallInteger('quantidade_questoes');
+            $table->string('titulo')->nullable();
+            // Uma solicitação cobre a prova inteira; cada disciplina e seu
+            // professor entram como uma parte (solicitacao_partes).
             $table->unsignedTinyInteger('quantidade_alternativas');
             $table->dateTime('prazo');
-            $table->dateTime('enviada_em')->nullable();
-            $table->boolean('enviada_em_atraso')->default(false);
             $table->dateTime('encerrada_em')->nullable();
             $table->dateTime('cancelada_em')->nullable();
             $table->string('status', 20)->default('aberta')->index();
@@ -27,8 +25,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['professor_id', 'status']);
-            $table->index(['turma_id', 'disciplina_id']);
+            $table->index(['turma_id', 'status']);
             $table->index('prazo');
         });
     }

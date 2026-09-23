@@ -8,7 +8,6 @@
  * próxima navegação.
  */
 
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\StatusQuestao;
@@ -33,11 +32,14 @@ beforeEach(function () {
         'periodo' => 1, 'nome' => '1 A',
     ]);
 
-    $this->abrir = fn (int $questoes = 2, ?string $prazo = null) => app(CriarSolicitacaoAction::class)->executar(
-        autor: $this->paeet, turma: $this->turma,
-        disciplina: $montagem['disciplinas']['Lógica de Programação'],
-        professor: $this->professor, quantidadeQuestoes: $questoes,
-        quantidadeAlternativas: 4,
+    $this->abrir = fn (int $questoes = 2, ?string $prazo = null) => solicitacaoCom(
+        $this->paeet,
+        $this->turma,
+        [[
+            'disciplina' => $montagem['disciplinas']['Lógica de Programação'],
+            'professor' => $this->professor,
+            'questoes' => $questoes,
+        ]],
         prazo: $prazo ? now()->parse($prazo) : now()->addWeek(),
     );
 
@@ -49,19 +51,22 @@ beforeEach(function () {
     ];
 
     $this->completar = function (SolicitacaoProva $solicitacao) {
-        $salvar = app(SalvarQuestaoAction::class);
-
         foreach ($solicitacao->questoes()->get() as $questao) {
-            $salvar->executar($questao, $this->professor, 'Enunciado', $this->alternativas, peso: 1);
+            completarQuestao($questao, $this->professor);
         }
     };
+
+    /** A única parte da solicitação, nos testes de fluxo simples. */
+    $this->parteDe = fn (SolicitacaoProva $solicitacao) => $solicitacao->partes()
+        ->with(['disciplina', 'solicitacao'])
+        ->first();
 });
 
 // ---------------------------------------------------------------- avisos
 
 it('avisa que o rascunho foi salvo, sem recarregar a página', function () {
     $solicitacao = ($this->abrir)();
-    $questao = $solicitacao->questoes()->with('item')->first();
+    $questao = $solicitacao->questoes()->with('parte')->first();
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao])
@@ -75,7 +80,7 @@ it('avisa que o rascunho foi salvo, sem recarregar a página', function () {
 
 it('cita o número da questão no aviso de rascunho', function () {
     $solicitacao = ($this->abrir)();
-    $segunda = $solicitacao->questoes()->with('item')->get()->firstWhere('item.ordem', 2);
+    $segunda = $solicitacao->questoes()->with('parte')->get()->firstWhere('ordem', 2);
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao])
@@ -101,7 +106,7 @@ it('avisa ao salvar todas as questões de uma vez', function () {
 
 it('avisa por erro quando a regra impede salvar', function () {
     $solicitacao = ($this->abrir)();
-    $questao = $solicitacao->questoes()->with('item')->first();
+    $questao = $solicitacao->questoes()->with('parte')->first();
 
     app(EncerrarSolicitacaoAction::class)->encerrar($solicitacao, $this->paeet);
 
@@ -124,19 +129,19 @@ it('envia as questões para análise pela tela', function () {
     $solicitacao = ($this->abrir)(2);
     ($this->completar)($solicitacao);
 
+    // O envio é por disciplina e mantém o professor na tela: ele pode ter
+    // outra parte para entregar.
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->call('enviar')
-        ->assertRedirect(route('solicitacoes.show', $solicitacao));
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id)
+        ->assertDispatched('notificar', tipo: 'sucesso', titulo: 'Enviado para análise');
 
     $solicitacao->refresh();
 
     expect($solicitacao->status)->toBe(StatusSolicitacao::Enviada)
-        ->and($solicitacao->enviada_em)->not->toBeNull()
+        ->and($solicitacao->partes()->first()->enviada_em)->not->toBeNull()
         ->and($solicitacao->questoes()->get()->every(fn (Questao $q) => $q->status === StatusQuestao::Enviada))
         ->toBeTrue();
-
-    expect(session('sucesso'))->toContain('enviadas para análise');
 });
 
 it('grava o que está na tela antes de enviar', function () {
@@ -153,7 +158,7 @@ it('grava o que está na tela antes de enviar', function () {
         ->set("formulario.{$questao->id}.alternativas.3.texto", 'Alternativa D')
         ->call('marcarCorreta', $questao->id, 'C');
 
-    $componente->call('enviar');
+    $componente->call('enviarParte', ($this->parteDe)($solicitacao)->id);
 
     $questao->refresh();
 
@@ -167,11 +172,13 @@ it('não avisa duas vezes ao enviar', function () {
     $solicitacao = ($this->abrir)(1);
     ($this->completar)($solicitacao);
 
-    Livewire::actingAs($this->professor)
+    // Um aviso só: o do envio. O de rascunho é suprimido.
+    $eventos = Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->call('enviar')
-        // O aviso do envio é o flash; o de rascunho é suprimido.
-        ->assertNotDispatched('notificar');
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id)
+        ->effects['dispatches'] ?? [];
+
+    expect(collect($eventos)->where('name', 'notificar'))->toHaveCount(1);
 });
 
 it('recusa o envio com questões incompletas e explica quais', function () {
@@ -179,7 +186,7 @@ it('recusa o envio com questões incompletas e explica quais', function () {
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao])
-        ->call('enviar')
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id)
         ->assertDispatched('notificar', function (string $evento, array $dados) {
             return $dados['tipo'] === 'erro'
                 && str_contains($dados['mensagem'], 'As questões 1, 2, 3');
@@ -195,10 +202,12 @@ it('avisa que o envio foi aceito em atraso', function () {
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->call('enviar');
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id)
+        ->assertDispatched('notificar', function (string $evento, array $dados) {
+            return str_contains($dados['mensagem'], 'em atraso');
+        });
 
-    expect(session('sucesso'))->toContain('em atraso')
-        ->and($solicitacao->refresh()->enviada_em_atraso)->toBeTrue();
+    expect($solicitacao->partes()->first()->enviada_em_atraso)->toBeTrue();
 });
 
 it('mostra o resumo antes de confirmar o envio', function () {
@@ -207,10 +216,11 @@ it('mostra o resumo antes de confirmar o envio', function () {
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->set('confirmandoEnvio', true)
-        ->assertSee('Enviar 2 questão(ões) para análise?')
-        ->assertSee('Soma dos pesos')
-        ->assertSee('ficam bloqueadas para edição até a coordenação');
+        ->call('confirmarEnvio', ($this->parteDe)($solicitacao)->id)
+        ->assertSee('para análise?')
+        ->assertSee('ficam bloqueadas para edição até a coordenação')
+        // A entrega é por disciplina; as outras seguem independentes.
+        ->assertSee('As outras disciplinas desta prova seguem');
 });
 
 it('a solicitação enviada aparece como aguardando análise para a gestão', function () {
@@ -219,7 +229,7 @@ it('a solicitação enviada aparece como aguardando análise para a gestão', fu
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->call('enviar');
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id);
 
     $this->actingAs($this->paeet)
         ->get(route('solicitacoes.show', $solicitacao))
@@ -238,7 +248,7 @@ it('bloqueia a edição depois do envio', function () {
 
     Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao->refresh()])
-        ->call('enviar');
+        ->call('enviarParte', ($this->parteDe)($solicitacao)->id);
 
     $questao = $solicitacao->questoes()->first();
 

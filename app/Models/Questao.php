@@ -28,7 +28,8 @@ class Questao extends Model
      */
     protected $fillable = [
         'solicitacao_id',
-        'solicitacao_item_id',
+        'solicitacao_parte_id',
+        'ordem',
         'disciplina_id',
         'professor_id',
         'enunciado',
@@ -46,6 +47,7 @@ class Questao extends Model
     {
         return [
             'status' => StatusQuestao::class,
+            'ordem' => 'integer',
             'peso' => 'decimal:2',
             'versao' => 'integer',
             'enviada_em' => 'datetime',
@@ -78,10 +80,10 @@ class Questao extends Model
         return $this->belongsTo(SolicitacaoProva::class, 'solicitacao_id');
     }
 
-    /** @return BelongsTo<SolicitacaoItem, $this> */
-    public function item(): BelongsTo
+    /** A parte (disciplina + professor) a que esta questão pertence. */
+    public function parte(): BelongsTo
     {
-        return $this->belongsTo(SolicitacaoItem::class, 'solicitacao_item_id');
+        return $this->belongsTo(SolicitacaoParte::class, 'solicitacao_parte_id');
     }
 
     /** @return BelongsTo<Disciplina, $this> */

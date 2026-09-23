@@ -62,6 +62,13 @@ class ReenviarQuestaoAction
                 ]);
             }
 
+            // A parte volta para análise junto com a questão corrigida.
+            $parte = $questao->loadMissing('parte')->parte;
+
+            if ($parte !== null && $parte->status === StatusSolicitacao::Concluida) {
+                $parte->update(['status' => StatusSolicitacao::EmAnalise]);
+            }
+
             activity('questao')
                 ->performedOn($questao)
                 ->causedBy($autor)

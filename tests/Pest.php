@@ -1,11 +1,18 @@
 <?php
 
 use App\Actions\Academico\PublicarVersaoDeGradeAction;
+use App\Actions\Avaliacao\CriarSolicitacaoAction;
+use App\Actions\Avaliacao\EnviarParteAction;
+use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\PerfilUsuario;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\GradeCurricular;
+use App\Models\Questao;
+use App\Models\SolicitacaoParte;
+use App\Models\SolicitacaoProva;
+use App\Models\Turma;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -115,4 +122,68 @@ function cursoComGrade(Eixo $eixo, array $porPeriodo, ?int $duracaoAnos = null, 
         'grade' => $grade,
         'disciplinas' => $disciplinas,
     ];
+}
+
+/**
+ * Abre uma solicitação com um ou mais pares disciplina + professor.
+ *
+ * @param  array<int, array{disciplina: Disciplina, professor: User, questoes?: int, observacoes?: ?string}>  $partes
+ */
+function solicitacaoCom(
+    User $autor,
+    Turma $turma,
+    array $partes,
+    int $alternativas = 4,
+    ?DateTimeInterface $prazo = null,
+    ?string $titulo = null,
+): SolicitacaoProva {
+    return app(CriarSolicitacaoAction::class)->executar(
+        autor: $autor,
+        turma: $turma,
+        partes: array_map(fn (array $parte) => [
+            'disciplina_id' => $parte['disciplina']->getKey(),
+            'professor_id' => $parte['professor']->getKey(),
+            'quantidade_questoes' => $parte['questoes'] ?? 3,
+            'observacoes' => $parte['observacoes'] ?? null,
+        ], $partes),
+        quantidadeAlternativas: $alternativas,
+        prazo: $prazo ?? now()->addWeek(),
+        titulo: $titulo,
+    );
+}
+
+/** Preenche uma questão de forma válida, para os testes de fluxo. */
+function completarQuestao(
+    Questao $questao,
+    User $professor,
+    ?string $enunciado = null,
+    float $peso = 1,
+): Questao {
+    $quantidade = (int) $questao->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
+
+    $alternativas = collect(range(0, $quantidade - 1))
+        ->map(fn (int $indice) => [
+            'letra' => chr(65 + $indice),
+            'texto' => 'Alternativa '.chr(65 + $indice),
+            'correta' => $indice === 0,
+        ])
+        ->all();
+
+    return app(SalvarQuestaoAction::class)->executar(
+        questao: $questao,
+        autor: $professor,
+        enunciado: $enunciado ?? "Enunciado da questão {$questao->ordem}",
+        alternativas: $alternativas,
+        peso: $peso,
+    );
+}
+
+/** Preenche e envia uma parte inteira. */
+function enviarParte(SolicitacaoParte $parte, User $professor): SolicitacaoParte
+{
+    foreach ($parte->questoes()->get() as $questao) {
+        completarQuestao($questao, $professor);
+    }
+
+    return app(EnviarParteAction::class)->executar($parte->refresh(), $professor);
 }

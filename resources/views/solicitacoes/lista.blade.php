@@ -59,15 +59,13 @@
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                     <thead>
                         <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th class="px-4 py-2 sm:px-6">Disciplina</th>
+                            <th class="px-4 py-2 sm:px-6">Prova</th>
                             <th class="hidden px-4 py-2 sm:table-cell">Turma</th>
                             @if ($ehGestao)
                                 <th class="hidden px-4 py-2 lg:table-cell">Professor</th>
                             @endif
                             <th class="hidden px-4 py-2 md:table-cell">
-                                <button type="button" wire:click="ordenar('quantidade_questoes')" class="font-semibold">
-                                    Questões {{ $this->setaDaColuna('quantidade_questoes') }}
-                                </button>
+                                Questões
                             </th>
                             <th class="px-4 py-2">
                                 <button type="button" wire:click="ordenar('prazo')" class="font-semibold">
@@ -84,10 +82,10 @@
                                 <td class="px-4 py-3 sm:px-6">
                                     <a href="{{ route('solicitacoes.show', $solicitacao) }}" wire:navigate
                                        class="font-medium text-marca-600 hover:underline dark:text-marca-400">
-                                        {{ $solicitacao->disciplina->nome }}
+                                        {{ $solicitacao->identificacao() }}
                                     </a>
-                                    <p class="text-xs text-slate-500 sm:hidden dark:text-slate-400">
-                                        Turma {{ $solicitacao->turma->nome }}
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                                        {{ $solicitacao->partes->pluck('disciplina.nome')->join(', ') }}
                                     </p>
                                 </td>
                                 <td class="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">
@@ -96,11 +94,14 @@
                                 </td>
                                 @if ($ehGestao)
                                     <td class="hidden px-4 py-3 text-slate-600 lg:table-cell dark:text-slate-300">
-                                        {{ $solicitacao->professor->nome }}
+                                        {{ $solicitacao->partes->pluck('professor.nome')->unique()->join(', ') }}
                                     </td>
                                 @endif
                                 <td class="hidden px-4 py-3 tabular-nums text-slate-600 md:table-cell dark:text-slate-300">
-                                    {{ $solicitacao->quantidade_questoes }}
+                                    {{ $solicitacao->questoes_count }}
+                                    <span class="block text-xs text-slate-400">
+                                        {{ $solicitacao->partes_count }} disciplina(s)
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
                                     {{ $solicitacao->prazo->format('d/m/Y') }}

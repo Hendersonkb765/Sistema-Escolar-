@@ -7,9 +7,6 @@
  */
 
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
-use App\Actions\Avaliacao\EnviarSolicitacaoAction;
-use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\StatusQuestao;
 use App\Livewire\Questoes\ResponderSolicitacao;
 use App\Livewire\Solicitacoes\ListaSolicitacoes;
@@ -30,29 +27,14 @@ beforeEach(function () {
         'periodo' => 1, 'nome' => '1 A',
     ]);
 
-    $alternativas = [
-        ['letra' => 'A', 'texto' => 'A', 'correta' => true],
-        ['letra' => 'B', 'texto' => 'B', 'correta' => false],
-        ['letra' => 'C', 'texto' => 'C', 'correta' => false],
-        ['letra' => 'D', 'texto' => 'D', 'correta' => false],
-    ];
+    $abrirEEnviar = function (string $disciplina, int $questoes) use ($montagem, $turma) {
+        $solicitacao = solicitacaoCom($this->paeet, $turma, [[
+            'disciplina' => $montagem['disciplinas'][$disciplina],
+            'professor' => $this->professor,
+            'questoes' => $questoes,
+        ]]);
 
-    $abrirEEnviar = function (string $disciplina, int $questoes) use ($montagem, $turma, $alternativas) {
-        $solicitacao = app(CriarSolicitacaoAction::class)->executar(
-            autor: $this->paeet, turma: $turma,
-            disciplina: $montagem['disciplinas'][$disciplina],
-            professor: $this->professor, quantidadeQuestoes: $questoes,
-            quantidadeAlternativas: 4, prazo: now()->addWeek(),
-        );
-
-        $salvar = app(SalvarQuestaoAction::class);
-
-        foreach ($solicitacao->questoes()->with('item')->get() as $questao) {
-            $salvar->executar($questao, $this->professor,
-                "Enunciado {$questao->item->ordem}", $alternativas, peso: 1);
-        }
-
-        app(EnviarSolicitacaoAction::class)->executar($solicitacao->refresh(), $this->professor);
+        enviarParte($solicitacao->partes()->first(), $this->professor);
 
         return $solicitacao->refresh();
     };
@@ -62,7 +44,7 @@ beforeEach(function () {
     $this->semDevolucao = $abrirEEnviar('Redes', 2);
 
     $this->devolver = function (int $ordem, string $motivo) {
-        $questao = $this->comDevolucao->questoes()->with('item')->get()->firstWhere('item.ordem', $ordem);
+        $questao = $this->comDevolucao->questoes()->where('ordem', $ordem)->first();
 
         return app(AnalisarQuestaoAction::class)->rejeitar($questao, $this->paeet, $motivo);
     };
@@ -195,12 +177,12 @@ it('conta apenas as questões do próprio professor', function () {
         ->assertDontSee('Questões devolvidas');
 });
 
-it('a solicitação sabe quais ordens foram devolvidas', function () {
+it('a solicitação sabe quais disciplinas foram devolvidas', function () {
     ($this->devolver)(2, 'Refaça.');
     ($this->devolver)(3, 'Refaça também.');
 
     expect($this->comDevolucao->refresh()->questoesDevolvidas())->toBe(2)
-        ->and($this->comDevolucao->ordensDevolvidas()->all())->toBe([2, 3]);
+        ->and($this->comDevolucao->disciplinasDevolvidas()->all())->toBe(['Lógica de Programação']);
 });
 
 it('a questão devolvida volta a ser editável', function () {

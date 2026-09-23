@@ -6,9 +6,6 @@
  */
 
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
-use App\Actions\Avaliacao\EnviarSolicitacaoAction;
-use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Livewire\Questoes\ListaQuestoes;
@@ -34,11 +31,9 @@ beforeEach(function () {
         'periodo' => 1, 'nome' => '1 A',
     ]);
 
-    $this->solicitacao = app(CriarSolicitacaoAction::class)->executar(
-        autor: $this->paeet, turma: $turma,
-        disciplina: $montagem['disciplinas']['Lógica de Programação'],
-        professor: $this->professor, quantidadeQuestoes: 3,
-        quantidadeAlternativas: 4, prazo: now()->addWeek(),
+    $this->solicitacao = solicitacaoCom($this->paeet, $turma, [
+        ['disciplina' => $montagem['disciplinas']['Lógica de Programação'], 'professor' => $this->professor, 'questoes' => 3],
+    ], alternativas: 4, prazo: now()->addWeek(),
     );
 
     $alternativas = [
@@ -49,17 +44,9 @@ beforeEach(function () {
     ];
     $this->alternativas = $alternativas;
 
-    $salvar = app(SalvarQuestaoAction::class);
+    enviarParte($this->solicitacao->partes()->first(), $this->professor);
 
-    foreach ($this->solicitacao->questoes()->with('item')->get() as $questao) {
-        $salvar->executar($questao, $this->professor,
-            "Enunciado da questão {$questao->item->ordem}", $alternativas, peso: 1);
-    }
-
-    app(EnviarSolicitacaoAction::class)->executar($this->solicitacao->refresh(), $this->professor);
-
-    $this->questao = fn (int $ordem) => $this->solicitacao->questoes()
-        ->with('item')->get()->firstWhere('item.ordem', $ordem);
+    $this->questao = fn (int $ordem) => $this->solicitacao->questoes()->where('ordem', $ordem)->first();
 });
 
 it('mostra os botões de aprovar e devolver na visão da coordenação', function () {
@@ -68,8 +55,10 @@ it('mostra os botões de aprovar e devolver na visão da coordenação', functio
         ->assertOk()
         ->assertSee('Aprovar')
         ->assertSee('Devolver')
-        ->assertSee('3 aguardando análise')
-        ->assertSee('Aprovar 3 pendente(s)');
+        ->assertSee('Aprovar 3 pendente(s)')
+        // Cada disciplina é um bloco, com o professor responsável.
+        ->assertSee('Lógica de Programação')
+        ->assertSee('Renato Lima');
 });
 
 it('não mostra os botões de análise ao professor', function () {
@@ -162,9 +151,7 @@ it('mostra o histórico da análise na visão da coordenação', function () {
         ->assertOk()
         ->assertSee('Histórico da análise')
         ->assertSee('Reescreva o enunciado.')
-        ->assertSee('Perfeita.')
-        ->assertSee('1 aprovada(s)')
-        ->assertSee('1 devolvida(s)');
+        ->assertSee('Perfeita.');
 });
 
 it('o professor vê o motivo da devolução e o botão de reenviar', function () {
@@ -233,17 +220,13 @@ it('a fila não vaza questões de outro eixo', function () {
         'periodo' => 1, 'nome' => '1 C',
     ]);
 
-    $alheia = app(CriarSolicitacaoAction::class)->executar(
-        autor: $outroPaeet, turma: $turma, disciplina: $montagem['disciplinas']['Contabilidade'],
-        professor: $outroProfessor, quantidadeQuestoes: 2, quantidadeAlternativas: 4,
-        prazo: now()->addWeek(),
-    );
+    $alheia = solicitacaoCom($outroPaeet, $turma, [[
+        'disciplina' => $montagem['disciplinas']['Contabilidade'],
+        'professor' => $outroProfessor,
+        'questoes' => 2,
+    ]]);
 
-    $salvar = app(SalvarQuestaoAction::class);
-    foreach ($alheia->questoes()->get() as $questao) {
-        $salvar->executar($questao, $outroProfessor, 'Enunciado alheio', $this->alternativas, peso: 1);
-    }
-    app(EnviarSolicitacaoAction::class)->executar($alheia->refresh(), $outroProfessor);
+    enviarParte($alheia->partes()->first(), $outroProfessor);
 
     $this->actingAs($this->paeet)
         ->get(route('questoes.index'))
@@ -258,17 +241,13 @@ it('avisa quando a coordenação escreveu a própria questão', function () {
     $paeetQueLeciona = paeet($this->eixo);
     $paeetQueLeciona->update(['nome' => 'Paula Enes']);
 
-    $solicitacao = app(CriarSolicitacaoAction::class)->executar(
-        autor: $this->paeet, turma: $this->solicitacao->turma,
-        disciplina: $this->solicitacao->disciplina, professor: $paeetQueLeciona,
-        quantidadeQuestoes: 2, quantidadeAlternativas: 4, prazo: now()->addWeek(),
-    );
+    $disciplina = $this->solicitacao->partes()->with('disciplina')->first()->disciplina;
 
-    $salvar = app(SalvarQuestaoAction::class);
-    foreach ($solicitacao->questoes()->get() as $questao) {
-        $salvar->executar($questao, $paeetQueLeciona, 'Enunciado próprio', $this->alternativas, peso: 1);
-    }
-    app(EnviarSolicitacaoAction::class)->executar($solicitacao->refresh(), $paeetQueLeciona);
+    $solicitacao = solicitacaoCom($this->paeet, $this->solicitacao->turma, [
+        ['disciplina' => $disciplina, 'professor' => $paeetQueLeciona, 'questoes' => 2],
+    ]);
+
+    enviarParte($solicitacao->partes()->first(), $paeetQueLeciona);
 
     $this->actingAs($paeetQueLeciona)
         ->get(route('solicitacoes.show', $solicitacao))

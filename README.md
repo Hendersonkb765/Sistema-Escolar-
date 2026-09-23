@@ -111,13 +111,31 @@ hoje, não quando a tela ficar pronta.
 
 ## Solicitação de questões
 
-O PAEET abre uma solicitação escolhendo turma, disciplina e professor. As
-disciplinas oferecidas são só as que **aquela turma cursa no período dela**,
-segundo a foto de grade que congelou — não dá para pedir Back-end a uma
-turma do 1º período.
+Uma solicitação é o pedido das questões de **uma prova**, e a prova reúne
+várias disciplinas:
 
-Cada questão pedida vira um item e uma questão em rascunho ligada a ele. O
-professor abre a solicitação e encontra os campos prontos.
+```
+SolicitacaoProva (a prova, com turma e prazo)
+  └── SolicitacaoParte (disciplina + professor + cota de questões)
+        └── Questao (ordem dentro da parte)
+```
+
+O PAEET escolhe a turma e monta a lista de pares **disciplina + professor**,
+cada um com quantas questões deve entregar. As disciplinas oferecidas são só
+as que **aquela turma cursa no período dela**, segundo a foto de grade que
+congelou — não dá para pedir Back-end a uma turma do 1º período. A mesma
+disciplina não se repete na mesma prova, e o mesmo professor pode ficar com
+duas delas.
+
+Cada questão pedida nasce em rascunho, ligada à sua parte. O professor abre
+a solicitação e encontra os campos prontos — só os da parte dele.
+
+### A entrega é por disciplina
+
+O prazo é da prova inteira, mas o envio é de cada parte: o professor de
+Lógica entrega quando termina, sem esperar pelo de Redes. A prova só fica
+"enviada" quando todas as partes chegam, e o atraso de uma não contamina a
+outra.
 
 **O peso é do professor.** É ele quem sabe quanto cada questão vale dentro
 da disciplina, então o peso é definido na tela de resposta, questão a

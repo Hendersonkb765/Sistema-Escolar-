@@ -25,7 +25,7 @@ class SolicitacaoProvaPolicy extends PolicyBase
             return $this->noEscopo($usuario, $registro);
         }
 
-        return (int) $registro->professor_id === (int) $usuario->getKey();
+        return $registro->partes()->where('professor_id', $usuario->getKey())->exists();
     }
 
     /** Professor nunca cria solicitação. */
@@ -46,13 +46,12 @@ class SolicitacaoProvaPolicy extends PolicyBase
     }
 
     /**
-     * Responder a solicitação é exclusivo do professor destinatário.
-     * Prazo vencido não entra nesta conta: vencer o prazo não tira de
-     * ninguém o direito de responder.
+     * O professor abre a solicitação se tem alguma parte nela. O que ele
+     * pode responder é decidido parte a parte, em SolicitacaoPartePolicy.
      */
     public function responder(User $usuario, SolicitacaoProva $solicitacao): bool
     {
-        return (int) $solicitacao->professor_id === (int) $usuario->getKey()
-            && $usuario->ativo;
+        return $usuario->ativo
+            && $solicitacao->partes()->where('professor_id', $usuario->getKey())->exists();
     }
 }

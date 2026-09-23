@@ -39,7 +39,7 @@ class ListaSolicitacoes extends Component
 
     protected function colunasOrdenaveis(): array
     {
-        return ['prazo', 'status', 'created_at', 'quantidade_questoes'];
+        return ['prazo', 'status', 'created_at', 'titulo'];
     }
 
     protected function colunaPadrao(): string
@@ -69,13 +69,14 @@ class ListaSolicitacoes extends Component
         $consulta = SolicitacaoProva::query()
             ->visivelPara($usuario)
             ->with([
-                'turma:id,nome,periodo,curso_id',
+                'turma:id,nome,periodo,periodo_letivo,curso_id',
                 'turma.curso:id,nome,eixo_id',
-                'disciplina:id,nome,curso_id',
-                'professor:id,nome',
+                'partes.disciplina:id,nome,curso_id',
+                'partes.professor:id,nome',
             ])
             ->withCount([
                 'questoes',
+                'partes',
                 // Destaque para o que voltou e espera o professor.
                 'questoes as questoes_devolvidas_count' => fn (Builder $q) => $q
                     ->where('status', StatusQuestao::Rejeitada),
@@ -83,28 +84,26 @@ class ListaSolicitacoes extends Component
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
-                    ->whereHas('disciplina', fn (Builder $d) => $d->where('nome', 'like', $termo))
+                    ->where('titulo', 'like', $termo)
                     ->orWhereHas('turma', fn (Builder $t) => $t->where('nome', 'like', $termo))
-                    ->orWhereHas('professor', fn (Builder $p) => $p->where('nome', 'like', $termo)));
+                    ->orWhereHas('partes.disciplina', fn (Builder $d) => $d->where('nome', 'like', $termo))
+                    ->orWhereHas('partes.professor', fn (Builder $p) => $p->where('nome', 'like', $termo)));
             })
             ->when($this->filtroCurso !== '', fn (Builder $q) => $q->where('curso_id', $this->filtroCurso))
             ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
             // "Atrasada" é estado de prazo, não de fluxo: pendente com
             // prazo vencido, ou enviada depois do combinado.
+            // "Atrasada" é estado de prazo, não de fluxo: alguma parte
+            // pendente com prazo vencido, ou entregue depois do combinado.
             ->when($this->filtroPrazo === 'atrasadas', fn (Builder $q) => $q
-                ->where(fn (Builder $sub) => $sub
-                    ->where('enviada_em_atraso', true)
-                    ->orWhere(fn (Builder $pendente) => $pendente
-                        ->whereNull('enviada_em')
-                        ->where('prazo', '<', now())
-                        ->whereIn('status', [
-                            StatusSolicitacao::Aberta->value,
-                            StatusSolicitacao::Enviada->value,
-                            StatusSolicitacao::EmAnalise->value,
-                        ]))))
+                ->whereHas('partes', fn (Builder $p) => $p
+                    ->where(fn (Builder $sub) => $sub
+                        ->where('enviada_em_atraso', true)
+                        ->orWhere(fn (Builder $pendente) => $pendente
+                            ->whereNull('enviada_em')
+                            ->whereHas('solicitacao', fn (Builder $s) => $s->where('prazo', '<', now()))))))
             ->when($this->filtroPrazo === 'pendentes', fn (Builder $q) => $q
-                ->whereNull('enviada_em')
-                ->where('status', StatusSolicitacao::Aberta))
+                ->whereHas('partes', fn (Builder $p) => $p->whereNull('enviada_em')))
             ->when($this->filtroPrazo === 'devolvidas', fn (Builder $q) => $q
                 ->whereHas('questoes', fn (Builder $sub) => $sub
                     ->where('status', StatusQuestao::Rejeitada)));

@@ -9,7 +9,6 @@
  * Aqui contamos os elementos de formulário.
  */
 
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Livewire\Questoes\ResponderSolicitacao;
@@ -29,12 +28,10 @@ beforeEach(function () {
         'periodo' => 1, 'nome' => '1 A',
     ]);
 
-    $this->solicitacao = app(CriarSolicitacaoAction::class)->executar(
-        autor: $this->paeet, turma: $turma,
-        disciplina: $montagem['disciplinas']['Lógica de Programação'],
-        professor: $this->professor, quantidadeQuestoes: 3,
-        quantidadeAlternativas: 4, prazo: now()->addWeek(),
-    );
+    $this->solicitacao = solicitacaoCom($this->paeet, $turma, [
+        ['disciplina' => $montagem['disciplinas']['Lógica de Programação'],
+            'professor' => $this->professor, 'questoes' => 3],
+    ]);
 
     $this->html = fn () => Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $this->solicitacao->refresh()])
@@ -125,18 +122,18 @@ it('libera o botão de enviar quando todas as questões estão completas', funct
 
     // O botão precisa estar clicável. Um `disabled` renderizado com valor
     // falso desabilita do mesmo jeito, e por isso o envio nunca liberava.
-    expect(preg_match_all('/<button[^>]*confirmandoEnvio/', $html))->toBeGreaterThan(0)
-        ->and(($this->desabilitados)($html, 'button', 'confirmandoEnvio'))->toBe(0);
+    expect(preg_match_all('/<button[^>]*confirmarEnvio\(/', $html))->toBeGreaterThan(0)
+        ->and(($this->desabilitados)($html, 'button', 'confirmarEnvio('))->toBe(0);
 });
 
 it('mantém o botão de enviar bloqueado enquanto faltam questões', function () {
     $html = ($this->html)();
 
-    expect(($this->desabilitados)($html, 'button', 'confirmandoEnvio'))->toBeGreaterThan(0);
+    expect(($this->desabilitados)($html, 'button', 'confirmarEnvio('))->toBeGreaterThan(0);
 });
 
 it('diz o que falta em cada questão, não só quantas faltam', function () {
-    $questao = $this->solicitacao->questoes()->with('item')->get()->firstWhere('item.ordem', 1);
+    $questao = $this->solicitacao->questoes()->where('ordem', 1)->first();
 
     // Tudo preenchido menos a alternativa correta — o caso que mais trava
     // o envio sem o professor entender por quê.

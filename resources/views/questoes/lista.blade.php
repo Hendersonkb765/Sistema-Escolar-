@@ -64,7 +64,7 @@
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <td class="px-4 py-3 sm:px-6">
                                     <p class="font-medium text-slate-900 dark:text-slate-100">
-                                        Questão {{ $questao->item->ordem }}
+                                        Questão {{ $questao->ordem }}
                                         @if ($questao->versao > 1)
                                             <x-badge cor="cinza">v{{ $questao->versao }}</x-badge>
                                         @endif

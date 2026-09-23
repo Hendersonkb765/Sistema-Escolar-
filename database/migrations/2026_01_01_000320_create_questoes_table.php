@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('questoes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('solicitacao_id')->constrained('solicitacoes_prova')->restrictOnDelete();
-            $table->foreignId('solicitacao_item_id')->constrained('solicitacao_itens')->restrictOnDelete();
+            $table->foreignId('solicitacao_parte_id')->constrained('solicitacao_partes')->cascadeOnDelete();
+            $table->unsignedSmallInteger('ordem');
             $table->foreignId('disciplina_id')->constrained('disciplinas')->restrictOnDelete();
             $table->foreignId('professor_id')->constrained('usuarios')->restrictOnDelete();
             $table->text('enunciado')->nullable();
@@ -23,7 +24,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique('solicitacao_item_id');
+            $table->unique(['solicitacao_parte_id', 'ordem']);
             $table->index(['solicitacao_id', 'status']);
             $table->index(['disciplina_id', 'status']);
         });

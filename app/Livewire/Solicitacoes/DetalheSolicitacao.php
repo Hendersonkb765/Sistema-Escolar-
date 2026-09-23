@@ -100,6 +100,9 @@ class DetalheSolicitacao extends Component
 
         $this->authorize('analisar', $questao);
 
+        $disciplina = $questao->parte->disciplina->nome;
+        $ordem = $questao->ordem;
+
         try {
             $action->aprovar(
                 questao: $questao,
@@ -115,7 +118,7 @@ class DetalheSolicitacao extends Component
         unset($this->comentarioDaAprovacao[$questaoId]);
 
         $this->notificarSucesso(
-            "Questão {$questao->item->ordem} aprovada. Ela já pode entrar em uma prova.",
+            "Questão {$ordem} de {$disciplina} aprovada. Ela já pode entrar em uma prova.",
             'Aprovada',
         );
 
@@ -142,6 +145,9 @@ class DetalheSolicitacao extends Component
 
         $this->authorize('analisar', $questao);
 
+        $disciplina = $questao->parte->disciplina->nome;
+        $ordem = $questao->ordem;
+
         try {
             $action->rejeitar(
                 questao: $questao,
@@ -155,7 +161,7 @@ class DetalheSolicitacao extends Component
         }
 
         $this->notificarAtencao(
-            "Questão {$questao->item->ordem} devolvida. O professor vê o seu comentário e pode corrigi-la.",
+            "Questão {$ordem} de {$disciplina} devolvida. O professor vê o seu comentário e pode corrigi-la.",
             'Devolvida para correção',
         );
 
@@ -199,7 +205,7 @@ class DetalheSolicitacao extends Component
     {
         return Questao::query()
             ->where('solicitacao_id', $this->solicitacao->getKey())
-            ->with(['item', 'solicitacao'])
+            ->with(['parte.disciplina', 'solicitacao'])
             ->findOrFail($questaoId);
     }
 
@@ -208,27 +214,28 @@ class DetalheSolicitacao extends Component
     {
         return $this->solicitacao->questoes()
             ->whereIn('status', [StatusQuestao::Enviada->value, StatusQuestao::EmAnalise->value])
-            ->with(['item', 'solicitacao'])
+            ->with(['parte.disciplina', 'solicitacao'])
             ->get();
     }
 
     public function render(): View
     {
-        $this->solicitacao->load([
-            'turma.curso.eixo',
-            'disciplina',
-            'professor',
-            'criadoPor',
-        ]);
+        $this->solicitacao->load(['turma.curso.eixo', 'criadoPor']);
+
+        $partes = $this->solicitacao->partes()
+            ->with(['disciplina', 'professor', 'solicitacao'])
+            ->get();
 
         $questoes = $this->solicitacao->questoes()
-            ->with(['item', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
+            ->with(['parte.disciplina', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
             ->get()
-            ->sortBy(fn (Questao $questao) => $questao->item->ordem)
+            ->sortBy(fn (Questao $questao) => [$questao->parte->ordem, $questao->ordem])
             ->values();
 
         return view('solicitacoes.detalhe', [
-            'questoes' => $questoes,
+            // Agrupadas por parte: a prova é lida disciplina a disciplina.
+            'partes' => $partes,
+            'questoesPorParte' => $questoes->groupBy('solicitacao_parte_id'),
             'completas' => $this->solicitacao->questoesCompletas(),
             'podeResponder' => auth()->user()->can('responder', $this->solicitacao)
                 && $this->solicitacao->aceitaEnvio(),
@@ -239,9 +246,10 @@ class DetalheSolicitacao extends Component
                 'rascunho' => $questoes->filter(fn (Questao $q) => $q->status === StatusQuestao::Rascunho)->count(),
             ],
         ])->layout('components.layouts.app', [
-            'titulo' => $this->solicitacao->disciplina->nome,
+            'titulo' => $this->solicitacao->identificacao(),
             'subtitulo' => 'Turma '.$this->solicitacao->turma->nome
-                .' · '.$this->solicitacao->quantidade_questoes.' questão(ões)'
+                .' · '.$partes->count().' disciplina(s)'
+                .' · '.$this->solicitacao->totalDeQuestoes().' questão(ões)'
                 .' · prazo '.$this->solicitacao->prazo->format('d/m/Y H:i'),
         ]);
     }

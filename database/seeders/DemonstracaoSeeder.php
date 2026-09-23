@@ -94,16 +94,20 @@ class DemonstracaoSeeder extends Seeder
         }
         $professor = $this->usuario('professor@paeet.local', 'Prof. Renato Lima', PerfilUsuario::Professor, $paeetTecnologia);
         $professor->eixos()->syncWithoutDetaching([$tecnologia->id]);
-        $professor->vinculosDocentes()->firstOrCreate(
-            ['disciplina_id' => $disciplinas->firstWhere('codigo', 'LOG')->id, 'turma_id' => null],
-            ['ativo' => true]
-        );
+        foreach (['LOG', 'BKD'] as $codigo) {
+            $professor->vinculosDocentes()->firstOrCreate(
+                ['disciplina_id' => $disciplinas->firstWhere('codigo', $codigo)->id, 'turma_id' => null],
+                ['ativo' => true]
+            );
+        }
 
         // Um PAEET que também leciona: mesma conta, vínculo docente à parte.
-        $paeetTecnologia->vinculosDocentes()->firstOrCreate(
-            ['disciplina_id' => $disciplinas->firstWhere('codigo', 'FRT')->id, 'turma_id' => null],
-            ['ativo' => true]
-        );
+        foreach (['RED', 'FRT'] as $codigo) {
+            $paeetTecnologia->vinculosDocentes()->firstOrCreate(
+                ['disciplina_id' => $disciplinas->firstWhere('codigo', $codigo)->id, 'turma_id' => null],
+                ['ativo' => true]
+            );
+        }
 
         $this->solicitacoes($curso, $admin, $professor, $paeetTecnologia, $disciplinas);
 
@@ -111,9 +115,9 @@ class DemonstracaoSeeder extends Seeder
     }
 
     /**
-     * Duas solicitações em estados diferentes: uma no prazo, ainda por
-     * responder, e outra já vencida — para a tela mostrar "Atrasada" sem
-     * que isso bloqueie o envio.
+     * Uma prova reúne várias disciplinas: cada uma com seu professor e
+     * sua cota de questões. Duas solicitações, uma no prazo e outra já
+     * vencida, para a tela mostrar "Atrasada" sem bloquear o envio.
      *
      * @param  Collection<int, Disciplina>  $disciplinas
      */
@@ -133,35 +137,48 @@ class DemonstracaoSeeder extends Seeder
 
         $criar = app(CriarSolicitacaoAction::class);
 
+        // Prova do 1º período: Lógica com um professor, Redes com outro.
         $criar->executar(
             autor: $admin,
             turma: $turmaDoPrimeiro,
-            disciplina: $disciplinas->firstWhere('codigo', 'LOG'),
-            professor: $professor,
-            quantidadeQuestoes: 5,
+            partes: [
+                [
+                    'disciplina_id' => $disciplinas->firstWhere('codigo', 'LOG')->id,
+                    'professor_id' => $professor->id,
+                    'quantidade_questoes' => 5,
+                    'observacoes' => 'Foque em estruturas de repetição.',
+                ],
+                [
+                    'disciplina_id' => $disciplinas->firstWhere('codigo', 'RED')->id,
+                    'professor_id' => $paeetQueLeciona->id,
+                    'quantidade_questoes' => 3,
+                ],
+            ],
             quantidadeAlternativas: 4,
             prazo: now()->addWeek(),
+            titulo: 'Avaliação do 2º bimestre',
             observacoes: 'Priorize conteúdo do segundo bimestre.',
         );
 
-        $criar->executar(
-            autor: $admin,
-            turma: $turmaDoPrimeiro,
-            disciplina: $disciplinas->firstWhere('codigo', 'RED'),
-            professor: $professor,
-            quantidadeQuestoes: 3,
-            quantidadeAlternativas: 5,
-            prazo: now()->subDays(3),
-        );
-
+        // Prova do 2º período, com prazo já vencido.
         $criar->executar(
             autor: $admin,
             turma: $turmaDoSegundo,
-            disciplina: $disciplinas->firstWhere('codigo', 'FRT'),
-            professor: $paeetQueLeciona,
-            quantidadeQuestoes: 2,
-            quantidadeAlternativas: 4,
-            prazo: now()->addDays(3),
+            partes: [
+                [
+                    'disciplina_id' => $disciplinas->firstWhere('codigo', 'FRT')->id,
+                    'professor_id' => $paeetQueLeciona->id,
+                    'quantidade_questoes' => 2,
+                ],
+                [
+                    'disciplina_id' => $disciplinas->firstWhere('codigo', 'BKD')->id,
+                    'professor_id' => $professor->id,
+                    'quantidade_questoes' => 2,
+                ],
+            ],
+            quantidadeAlternativas: 5,
+            prazo: now()->subDays(3),
+            titulo: 'Recuperação',
         );
     }
 

@@ -5,7 +5,6 @@
  * usam — Python, JavaScript, HTML, React, Kotlin, Swift e as demais.
  */
 
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Enums\LinguagemCodigo;
@@ -34,11 +33,9 @@ beforeEach(function () {
         'periodo' => 1, 'nome' => '1 A',
     ]);
 
-    $this->solicitacao = app(CriarSolicitacaoAction::class)->executar(
-        autor: $this->paeet, turma: $turma,
-        disciplina: $montagem['disciplinas']['Lógica de Programação'],
-        professor: $this->professor, quantidadeQuestoes: 2,
-        quantidadeAlternativas: 4, prazo: now()->addWeek(),
+    $this->solicitacao = solicitacaoCom($this->paeet, $turma, [
+        ['disciplina' => $montagem['disciplinas']['Lógica de Programação'], 'professor' => $this->professor, 'questoes' => 2],
+    ], alternativas: 4, prazo: now()->addWeek(),
     );
 
     $this->questao = $this->solicitacao->questoes()->first();

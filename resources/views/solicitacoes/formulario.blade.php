@@ -1,94 +1,150 @@
-<div class="mx-auto max-w-3xl">
+<div class="mx-auto max-w-4xl">
     <form wire:submit="salvar" class="space-y-4">
-        <x-cartao titulo="Para quem e sobre o quê">
+        <x-cartao titulo="A prova">
             <div class="space-y-4">
-                <x-campo rotulo="Turma" para="turma_id" obrigatorio :erro="$errors->first('turma_id')">
-                    <x-select id="turma_id" wire:model.live="turma_id" required>
-                        <option value="">Selecione…</option>
-                        @foreach ($turmas as $turma)
-                            <option value="{{ $turma->id }}">
-                                {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo }}º período
-                            </option>
-                        @endforeach
-                    </x-select>
-                </x-campo>
-
-                <x-campo rotulo="Disciplina" para="disciplina_id" obrigatorio
-                         :erro="$errors->first('disciplina_id')"
-                         ajuda="Apenas as disciplinas que esta turma cursa no período dela.">
-                    @if ($turmaSelecionada === null)
-                        <x-alerta tipo="info">Escolha a turma primeiro.</x-alerta>
-                    @elseif ($disciplinas->isEmpty())
-                        <x-alerta tipo="atencao">
-                            A grade congelada nesta turma não tem disciplinas no {{ $turmaSelecionada->periodo }}º período.
-                        </x-alerta>
-                    @else
-                        <x-select id="disciplina_id" wire:model.live="disciplina_id" required>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <x-campo rotulo="Turma" para="turma_id" obrigatorio :erro="$errors->first('turma_id')">
+                        <x-select id="turma_id" wire:model.live="turma_id" required>
                             <option value="">Selecione…</option>
-                            @foreach ($disciplinas as $disciplina)
-                                <option value="{{ $disciplina->id }}">{{ $disciplina->nome }}</option>
+                            @foreach ($turmas as $turma)
+                                <option value="{{ $turma->id }}">
+                                    {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo }}º período
+                                </option>
                             @endforeach
                         </x-select>
-                    @endif
-                </x-campo>
+                    </x-campo>
 
-                <x-campo rotulo="Professor" para="professor_id" obrigatorio :erro="$errors->first('professor_id')"
-                         ajuda="Designar alguém já cria o vínculo docente com a disciplina.">
-                    <x-select id="professor_id" wire:model="professor_id" required>
-                        <option value="">Selecione…</option>
-                        @if ($sugeridos->isNotEmpty())
-                            <optgroup label="Já leciona esta disciplina">
-                                @foreach ($sugeridos as $usuario)
-                                    <option value="{{ $usuario->id }}">{{ $usuario->nome }}</option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                        @if ($outros->isNotEmpty())
-                            <optgroup label="Outras contas do seu escopo">
-                                @foreach ($outros as $usuario)
-                                    <option value="{{ $usuario->id }}">{{ $usuario->nome }} ({{ $usuario->perfil->rotulo() }})</option>
-                                @endforeach
-                            </optgroup>
-                        @endif
-                    </x-select>
+                    <x-campo rotulo="Título da prova (opcional)" para="titulo" :erro="$errors->first('titulo')"
+                             ajuda="Ex.: Avaliação do 2º bimestre.">
+                        <x-input id="titulo" wire:model="titulo" placeholder="Avaliação do 2º bimestre"/>
+                    </x-campo>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <x-campo rotulo="Prazo de entrega" para="prazo" obrigatorio :erro="$errors->first('prazo')"
+                             ajuda="Vale para todos os professores. Vencer o prazo não bloqueia o envio.">
+                        <x-input tipo="datetime-local" id="prazo" wire:model="prazo" required/>
+                    </x-campo>
+
+                    <x-campo rotulo="Alternativas por questão" para="quantidade_alternativas" obrigatorio
+                             :erro="$errors->first('quantidade_alternativas')"
+                             ajuda="Vale para a prova inteira.">
+                        <x-select id="quantidade_alternativas" wire:model="quantidade_alternativas" required>
+                            @for ($n = 2; $n <= 6; $n++)
+                                <option value="{{ $n }}">{{ $n }} alternativas</option>
+                            @endfor
+                        </x-select>
+                    </x-campo>
+                </div>
+
+                <x-campo rotulo="Observações gerais" para="observacoes" :erro="$errors->first('observacoes')"
+                         ajuda="Todos os professores veem este texto.">
+                    <x-area-texto id="observacoes" wire:model="observacoes" :linhas="2"
+                                  placeholder="Ex.: priorize conteúdo do segundo bimestre"/>
                 </x-campo>
             </div>
         </x-cartao>
 
-        <x-cartao titulo="Prazo e formato">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <x-campo rotulo="Prazo" para="prazo" obrigatorio :erro="$errors->first('prazo')"
-                         ajuda="Vencer o prazo não bloqueia o envio.">
-                    <x-input tipo="datetime-local" id="prazo" wire:model="prazo" required/>
-                </x-campo>
+        <x-cartao titulo="Disciplinas e professores"
+                  :descricao="'A prova reúne as disciplinas abaixo — '.$totalDeQuestoes.' questão(ões) no total.'">
+            <x-slot:acoes>
+                <x-botao variante="secundario" type="button" wire:click="adicionarParte"
+                         :desabilitado="$turmaSelecionada === null">
+                    + Adicionar disciplina
+                </x-botao>
+            </x-slot:acoes>
 
-                <x-campo rotulo="Questões" para="quantidade_questoes" obrigatorio
-                         :erro="$errors->first('quantidade_questoes')">
-                    <x-input tipo="number" id="quantidade_questoes" wire:model.live.debounce.500ms="quantidade_questoes"
-                             min="1" max="60" required/>
-                </x-campo>
+            @error('partes')
+                <x-alerta tipo="erro" class="mb-3">{{ $message }}</x-alerta>
+            @enderror
 
-                <x-campo rotulo="Alternativas por questão" para="quantidade_alternativas" obrigatorio
-                         :erro="$errors->first('quantidade_alternativas')">
-                    <x-select id="quantidade_alternativas" wire:model="quantidade_alternativas" required>
-                        @for ($n = 2; $n <= 6; $n++)
-                            <option value="{{ $n }}">{{ $n }} alternativas</option>
-                        @endfor
-                    </x-select>
-                </x-campo>
-            </div>
+            @if ($turmaSelecionada === null)
+                <x-alerta tipo="info">Escolha a turma primeiro: as disciplinas oferecidas são as que ela cursa.</x-alerta>
+            @elseif ($disciplinas->isEmpty())
+                <x-alerta tipo="atencao">
+                    A grade congelada nesta turma não tem disciplinas no {{ $turmaSelecionada->periodo }}º período.
+                </x-alerta>
+            @else
+                <div class="space-y-3">
+                    @foreach ($partes as $indice => $parte)
+                        @php
+                            $disciplinaEscolhida = (int) ($parte['disciplina_id'] ?: 0);
+                            $sugeridos = $sugeridosPorDisciplina[$disciplinaEscolhida] ?? collect();
+                            $idsSugeridos = $sugeridos->pluck('id')->all();
+                        @endphp
 
-            <x-campo rotulo="Observações ao professor" para="observacoes" class="mt-4"
-                     :erro="$errors->first('observacoes')">
-                <x-area-texto id="observacoes" wire:model="observacoes" :linhas="2"
-                              placeholder="Ex.: priorize conteúdo do segundo bimestre"/>
-            </x-campo>
+                        <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+                             wire:key="parte-{{ $indice }}">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                    {{ $indice + 1 }}
+                                </span>
+
+                                @if (count($partes) > 1)
+                                    <x-botao variante="discreto" type="button"
+                                             wire:click="removerParte({{ $indice }})"
+                                             class="text-rose-600 dark:text-rose-400">
+                                        Remover
+                                    </x-botao>
+                                @endif
+                            </div>
+
+                            <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-12">
+                                <x-campo rotulo="Disciplina" obrigatorio class="sm:col-span-5"
+                                         :erro="$errors->first('partes.'.$indice.'.disciplina_id')">
+                                    <x-select wire:model.live="partes.{{ $indice }}.disciplina_id" required>
+                                        <option value="">Selecione…</option>
+                                        @foreach ($disciplinas as $disciplina)
+                                            <option value="{{ $disciplina->id }}">{{ $disciplina->nome }}</option>
+                                        @endforeach
+                                    </x-select>
+                                </x-campo>
+
+                                <x-campo rotulo="Professor responsável" obrigatorio class="sm:col-span-5"
+                                         :erro="$errors->first('partes.'.$indice.'.professor_id')">
+                                    <x-select wire:model="partes.{{ $indice }}.professor_id" required>
+                                        <option value="">Selecione…</option>
+                                        @if ($sugeridos->isNotEmpty())
+                                            <optgroup label="Já leciona esta disciplina">
+                                                @foreach ($sugeridos as $usuario)
+                                                    <option value="{{ $usuario->id }}">{{ $usuario->nome }}</option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endif
+                                        <optgroup label="Outras contas do seu escopo">
+                                            @foreach ($outros as $usuario)
+                                                @unless (in_array($usuario->id, $idsSugeridos, true))
+                                                    <option value="{{ $usuario->id }}">
+                                                        {{ $usuario->nome }} ({{ $usuario->perfil->rotulo() }})
+                                                    </option>
+                                                @endunless
+                                            @endforeach
+                                        </optgroup>
+                                    </x-select>
+                                </x-campo>
+
+                                <x-campo rotulo="Questões" obrigatorio class="sm:col-span-2"
+                                         :erro="$errors->first('partes.'.$indice.'.quantidade_questoes')">
+                                    <x-input tipo="number" min="1" max="60"
+                                             wire:model.live.debounce.500ms="partes.{{ $indice }}.quantidade_questoes"/>
+                                </x-campo>
+                            </div>
+
+                            <x-campo rotulo="Orientação para este professor (opcional)" class="mt-2"
+                                     :erro="$errors->first('partes.'.$indice.'.observacoes')">
+                                <x-input wire:model="partes.{{ $indice }}.observacoes"
+                                         placeholder="Ex.: foque em estruturas de repetição"/>
+                            </x-campo>
+                        </div>
+                    @endforeach
+                </div>
+
+                <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    Cada professor recebe apenas a parte dele e entrega quando terminar, sem esperar
+                    pelos outros. O peso de cada questão é definido por quem a escreve.
+                </p>
+            @endif
         </x-cartao>
-
-        <x-alerta tipo="info">
-            O <strong>peso</strong> de cada questão é definido pelo professor ao escrevê-la — é ele
-            quem sabe quanto cada uma vale dentro da disciplina.
-        </x-alerta>
 
         <div class="flex items-center justify-end gap-2">
             <x-botao variante="secundario" href="{{ route('solicitacoes.index') }}" wire:navigate>Cancelar</x-botao>

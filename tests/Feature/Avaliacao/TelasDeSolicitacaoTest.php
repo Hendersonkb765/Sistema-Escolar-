@@ -5,7 +5,6 @@
  * que ativa a proteção contra lazy loading do framework.
  */
 
-use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Enums\StatusSolicitacao;
 use App\Livewire\Painel;
 use App\Livewire\Questoes\ResponderSolicitacao;
@@ -46,20 +45,14 @@ beforeEach(function () {
         'periodo' => 2, 'nome' => '2 A', 'periodo_letivo' => '2026',
     ]);
 
-    $criar = app(CriarSolicitacaoAction::class);
-
     // Duas solicitações, uma no prazo e outra vencida.
-    $this->noPrazo = $criar->executar(
-        autor: $this->paeet, turma: $this->turma, disciplina: $this->logica,
-        professor: $this->professor, quantidadeQuestoes: 3, quantidadeAlternativas: 4,
-        prazo: now()->addWeek(), observacoes: 'Foco no segundo bimestre',
-    );
+    $this->noPrazo = solicitacaoCom($this->paeet, $this->turma, [[
+        'disciplina' => $this->logica, 'professor' => $this->professor, 'questoes' => 3,
+    ]], titulo: 'Avaliação do 2º bimestre');
 
-    $this->vencida = $criar->executar(
-        autor: $this->paeet, turma: $this->turma, disciplina: $this->redes,
-        professor: $this->outroProfessor, quantidadeQuestoes: 2, quantidadeAlternativas: 4,
-        prazo: now()->subDays(2),
-    );
+    $this->vencida = solicitacaoCom($this->paeet, $this->turma, [[
+        'disciplina' => $this->redes, 'professor' => $this->outroProfessor, 'questoes' => 2,
+    ]], prazo: now()->subDays(2), titulo: 'Recuperação');
 });
 
 it('lista as solicitações para a gestão com mais de um registro', function () {
@@ -97,8 +90,8 @@ it('abre o detalhe com as questões pedidas', function () {
         ->get(route('solicitacoes.show', $this->noPrazo))
         ->assertOk()
         ->assertSee('Lógica de Programação')
-        ->assertSee('Foco no segundo bimestre')
-        ->assertSee('0 de 3 preenchida(s)');
+        ->assertSee('Avaliação do 2º bimestre')
+        ->assertSee('3 questão(ões) pedida(s)');
 });
 
 it('abre a tela de resposta do professor com um bloco por questão', function () {
@@ -138,12 +131,12 @@ it('preenche e envia as questões pela tela', function () {
             ->call('marcarCorreta', $questao->id, 'B');
     }
 
-    $componente->call('enviar');
+    $componente->call('enviarParte', $this->noPrazo->partes()->first()->id);
 
     $this->noPrazo->refresh();
 
     expect($this->noPrazo->status)->toBe(StatusSolicitacao::Enviada)
-        ->and($this->noPrazo->enviada_em_atraso)->toBeFalse()
+        ->and($this->noPrazo->partes()->first()->enviada_em_atraso)->toBeFalse()
         ->and($this->noPrazo->questoes()->whereNotNull('enunciado')->count())->toBe(3);
 
     $primeira = $this->noPrazo->questoes()->with('alternativas')->first();
@@ -189,34 +182,61 @@ it('o formulário oferece só as disciplinas do período da turma', function () 
         ->assertDontSee('Back-end');
 });
 
+it('o formulário monta vários pares de disciplina e professor', function () {
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(FormularioSolicitacao::class)
+        ->set('turma_id', $this->turma->id)
+        ->call('adicionarParte');
+
+    expect($componente->get('partes'))->toHaveCount(2);
+
+    $componente->call('removerParte', 1);
+
+    expect($componente->get('partes'))->toHaveCount(1);
+
+    // A prova precisa de ao menos uma disciplina.
+    $componente->call('removerParte', 0)
+        ->assertDispatched('notificar', tipo: 'info');
+
+    expect($componente->get('partes'))->toHaveCount(1);
+});
+
 it('o formulário do PAEET não pede peso', function () {
     $html = Livewire::actingAs($this->paeet)
         ->test(FormularioSolicitacao::class)
+        ->set('turma_id', $this->turma->id)
         ->html();
 
-    expect($html)->toContain('definido pelo professor ao escrevê-la')
+    expect($html)->toContain('O peso de cada questão é definido por quem a escreve')
         ->and($html)->not->toContain('wire:model.live.debounce.500ms="pesos');
 });
 
-it('abre uma solicitação pelo formulário', function () {
+it('abre uma prova com duas disciplinas pelo formulário', function () {
     Livewire::actingAs($this->paeet)
         ->test(FormularioSolicitacao::class)
         ->set('turma_id', $this->turma->id)
-        ->set('disciplina_id', $this->logica->id)
-        ->set('professor_id', $this->professor->id)
-        ->set('quantidade_questoes', 2)
+        ->set('titulo', 'Prova bimestral')
         ->set('quantidade_alternativas', 5)
         ->set('prazo', now()->addDays(10)->format('Y-m-d\TH:i'))
+        ->set('partes.0.disciplina_id', (string) $this->logica->id)
+        ->set('partes.0.professor_id', (string) $this->professor->id)
+        ->set('partes.0.quantidade_questoes', '2')
+        ->call('adicionarParte')
+        ->set('partes.1.disciplina_id', (string) $this->redes->id)
+        ->set('partes.1.professor_id', (string) $this->outroProfessor->id)
+        ->set('partes.1.quantidade_questoes', '3')
         ->call('salvar')
         ->assertHasNoErrors();
 
     $nova = SolicitacaoProva::query()->latest('id')->first();
 
-    expect($nova->quantidade_questoes)->toBe(2)
+    expect($nova->titulo)->toBe('Prova bimestral')
         ->and($nova->quantidade_alternativas)->toBe(5)
-        ->and($nova->questoes()->count())->toBe(2)
+        ->and($nova->partes()->count())->toBe(2)
+        ->and($nova->totalDeQuestoes())->toBe(5)
+        ->and($nova->questoes()->count())->toBe(5)
         // Peso 1 de partida, para o professor ajustar.
-        ->and((float) $nova->somaDosPesos())->toBe(2.0);
+        ->and((float) $nova->somaDosPesos())->toBe(5.0);
 });
 
 it('recusa disciplina fora do período da turma no formulário', function () {
@@ -225,11 +245,11 @@ it('recusa disciplina fora do período da turma no formulário', function () {
     Livewire::actingAs($this->paeet)
         ->test(FormularioSolicitacao::class)
         ->set('turma_id', $this->turma->id)
-        ->set('disciplina_id', $backend->id)
-        ->set('professor_id', $this->professor->id)
+        ->set('partes.0.disciplina_id', (string) $backend->id)
+        ->set('partes.0.professor_id', (string) $this->professor->id)
         ->set('prazo', now()->addWeek()->format('Y-m-d\TH:i'))
         ->call('salvar')
-        ->assertHasErrors('disciplina_id');
+        ->assertHasErrors('partes.0.disciplina_id');
 });
 
 it('mostra ao professor os indicadores de prazo no painel', function () {

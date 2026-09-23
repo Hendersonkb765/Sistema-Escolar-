@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Questoes;
 
-use App\Actions\Avaliacao\EnviarSolicitacaoAction;
+use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\ReenviarQuestaoAction;
 use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
@@ -12,6 +12,7 @@ use App\Enums\TipoBlocoQuestao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
 use App\Models\Questao;
+use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -22,6 +23,10 @@ use Livewire\WithFileUploads;
 
 /**
  * Área do professor: escrever e enviar as questões pedidas.
+ *
+ * A prova reúne várias disciplinas, mas o professor vê e responde apenas
+ * as partes dele. O envio é por parte: ele entrega a sua quando termina,
+ * sem esperar pelos outros.
  *
  * O enunciado é montado em blocos — parágrafos, trechos de código com a
  * linguagem declarada e imagens — e o peso de cada questão é escolhido
@@ -46,7 +51,8 @@ class ResponderSolicitacao extends Component
     /** Upload em andamento, por questão. @var array<int, mixed> */
     public array $imagens = [];
 
-    public bool $confirmandoEnvio = false;
+    /** Parte cujo envio está sendo confirmado. */
+    public ?int $confirmandoEnvio = null;
 
     public function mount(SolicitacaoProva $solicitacao, SalvarQuestaoAction $action): void
     {
@@ -54,28 +60,49 @@ class ResponderSolicitacao extends Component
 
         $this->solicitacaoId = $solicitacao->getKey();
 
-        foreach ($solicitacao->questoes()->with('alternativas')->get() as $questao) {
+        foreach ($this->questoes() as $questao) {
             $action->prepararAlternativas($questao);
         }
 
         $this->carregarFormulario();
     }
 
+    /**
+     * As partes desta solicitação que pertencem a quem está respondendo —
+     * normalmente uma, mas um professor pode ter duas disciplinas.
+     *
+     * @return Collection<int, SolicitacaoParte>
+     */
+    protected function minhasPartes(): Collection
+    {
+        return SolicitacaoParte::query()
+            ->where('solicitacao_id', $this->solicitacaoId)
+            ->where('professor_id', auth()->id())
+            ->with(['disciplina', 'solicitacao'])
+            ->orderBy('ordem')
+            ->get();
+    }
+
     protected function solicitacao(): SolicitacaoProva
     {
         return SolicitacaoProva::query()
-            ->with(['disciplina', 'turma.curso.eixo', 'criadoPor'])
+            ->with(['turma.curso.eixo', 'criadoPor'])
             ->findOrFail($this->solicitacaoId);
     }
 
-    /** @return Collection<int, Questao> */
+    /**
+     * Só as questões das partes deste professor.
+     *
+     * @return Collection<int, Questao>
+     */
     protected function questoes(): Collection
     {
         return Questao::query()
             ->where('solicitacao_id', $this->solicitacaoId)
-            ->with(['item', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
+            ->where('professor_id', auth()->id())
+            ->with(['parte.disciplina', 'alternativas', 'blocos', 'feedbacks.analisadoPor'])
             ->get()
-            ->sortBy(fn (Questao $questao) => $questao->item->ordem)
+            ->sortBy(fn (Questao $questao) => [$questao->parte->ordem, $questao->ordem])
             ->values();
     }
 
@@ -201,11 +228,16 @@ class ResponderSolicitacao extends Component
 
     public function salvarQuestao(int $questaoId, SalvarQuestaoAction $action): void
     {
-        // `item` entra no eager load porque a mensagem cita o número da
-        // questão.
-        $questao = Questao::query()->with('item')->findOrFail($questaoId);
+        // `parte` entra no eager load porque a mensagem cita a disciplina
+        // e o número da questão.
+        $questao = Questao::query()->with('parte.disciplina')->findOrFail($questaoId);
 
         $this->authorize('update', $questao);
+
+        // O nome é guardado antes: o `refresh()` dentro da action descarta
+        // as relações aninhadas que já estavam carregadas.
+        $disciplina = $questao->parte->disciplina->nome;
+        $ordem = $questao->ordem;
 
         $rascunho = $this->formulario[$questaoId] ?? null;
 
@@ -234,7 +266,7 @@ class ResponderSolicitacao extends Component
         }
 
         $this->notificarSucesso(
-            "Questão {$questao->item->ordem} salva como rascunho. Nada foi enviado ainda.",
+            "Questão {$ordem} de {$disciplina} salva como rascunho. Nada foi enviado ainda.",
             'Rascunho salvo',
         );
     }
@@ -288,9 +320,12 @@ class ResponderSolicitacao extends Component
      */
     public function reenviarQuestao(int $questaoId, SalvarQuestaoAction $salvar, ReenviarQuestaoAction $reenviar): void
     {
-        $questao = Questao::query()->with('item')->findOrFail($questaoId);
+        $questao = Questao::query()->with('parte.disciplina')->findOrFail($questaoId);
 
         $this->authorize('update', $questao);
+
+        $disciplina = $questao->parte->disciplina->nome;
+        $ordem = $questao->ordem;
 
         $rascunho = $this->formulario[$questaoId] ?? null;
 
@@ -319,58 +354,79 @@ class ResponderSolicitacao extends Component
         }
 
         $this->notificarSucesso(
-            "Questão {$questao->item->ordem} reenviada como versão {$reenviada->versao}. A coordenação vai analisar de novo.",
+            "Questão {$ordem} de {$disciplina} reenviada como versão {$reenviada->versao}. A coordenação vai analisar de novo.",
             'Correção enviada',
         );
 
         $this->carregarFormulario();
     }
 
-    public function enviar(SalvarQuestaoAction $salvar, EnviarSolicitacaoAction $enviar): void
+    public function confirmarEnvio(int $parteId): void
     {
-        $solicitacao = $this->solicitacao();
+        $this->confirmandoEnvio = $parteId;
+    }
 
-        $this->authorize('responder', $solicitacao);
+    public function cancelarEnvio(): void
+    {
+        $this->confirmandoEnvio = null;
+    }
+
+    /** Envia uma parte — a cota de uma disciplina. */
+    public function enviarParte(int $parteId, SalvarQuestaoAction $salvar, EnviarParteAction $enviar): void
+    {
+        $parte = SolicitacaoParte::query()
+            ->with(['disciplina', 'solicitacao'])
+            ->findOrFail($parteId);
+
+        $this->authorize('responder', $parte);
 
         // Grava o que estiver na tela antes de enviar, sem avisar duas
         // vezes: quem manda a mensagem é o envio.
         $this->salvarTudo($salvar, avisar: false);
 
+        $disciplina = $parte->disciplina->nome;
+
         try {
-            $enviada = $enviar->executar($solicitacao->refresh(), auth()->user());
+            $enviada = $enviar->executar($parte->refresh(), auth()->user());
         } catch (RegraDeNegocioException $excecao) {
             $this->notificarErro($excecao->getMessage());
-            $this->confirmandoEnvio = false;
+            $this->confirmandoEnvio = null;
 
             return;
         }
 
-        $this->flashSucesso($enviada->enviada_em_atraso
-            ? 'Questões enviadas para análise. O envio ficou registrado como em atraso, mas foi aceito normalmente.'
-            : 'Questões enviadas para análise dentro do prazo.');
+        $this->confirmandoEnvio = null;
+        $this->carregarFormulario();
 
-        $this->redirectRoute('solicitacoes.show', $enviada, navigate: true);
+        $this->notificarSucesso($enviada->enviada_em_atraso
+            ? "Questões de {$disciplina} enviadas. O envio ficou registrado como em atraso, mas foi aceito normalmente."
+            : "Questões de {$disciplina} enviadas para análise dentro do prazo.",
+            'Enviado para análise');
     }
 
-    public function render(EnviarSolicitacaoAction $enviar): View
+    public function render(EnviarParteAction $enviar): View
     {
         $solicitacao = $this->solicitacao();
+        $partes = $this->minhasPartes();
         $questoes = $this->questoes();
 
         return view('questoes.responder', [
             'solicitacao' => $solicitacao,
-            'questoes' => $questoes,
-            'incompletas' => $enviar->questoesIncompletas($solicitacao),
-            'pendencias' => $enviar->pendenciasPorQuestao($solicitacao),
+            'partes' => $partes,
+            'questoesPorParte' => $questoes->groupBy('solicitacao_parte_id'),
+            // Pendências e bloqueio são por parte: cada disciplina entrega
+            // quando estiver pronta.
+            'pendenciasPorParte' => $partes->mapWithKeys(
+                fn (SolicitacaoParte $parte) => [$parte->getKey() => $enviar->pendenciasPorQuestao($parte)]
+            ),
             'podeEditar' => $solicitacao->aceitaEnvio(),
             'linguagens' => LinguagemCodigo::opcoes(),
             // O que a coordenação devolveu, para o topo da tela avisar.
             'devolvidas' => $questoes
                 ->filter(fn (Questao $questao) => $questao->status === StatusQuestao::Rejeitada)
                 ->values(),
-            'somaDosPesos' => collect($this->formulario)->sum(fn (array $q) => (float) ($q['peso'] ?? 0)),
         ])->layout('components.layouts.app', [
-            'titulo' => 'Responder: '.$solicitacao->disciplina->nome,
+            'titulo' => 'Responder: '.$partes->map(fn (SolicitacaoParte $p) => $p->disciplina->nome)->join(', '),
             'subtitulo' => 'Turma '.$solicitacao->turma->nome
                 .' · prazo '.$solicitacao->prazo->format('d/m/Y H:i')
                 .($solicitacao->estaAtrasada() ? ' · atrasada' : ''),

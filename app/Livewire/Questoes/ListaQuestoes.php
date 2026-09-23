@@ -64,10 +64,10 @@ class ListaQuestoes extends Component
         $consulta = Questao::query()
             ->visivelPara($usuario)
             ->with([
-                'item',
+                'parte:id,disciplina_id,ordem',
                 'disciplina:id,nome,curso_id',
                 'professor:id,nome',
-                'solicitacao:id,turma_id,curso_id,prazo,quantidade_alternativas',
+                'solicitacao:id,turma_id,curso_id,prazo,quantidade_alternativas,titulo',
                 'solicitacao.turma:id,nome,curso_id',
                 'solicitacao.curso:id,nome,eixo_id',
             ])

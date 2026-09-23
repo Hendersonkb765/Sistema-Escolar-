@@ -36,9 +36,10 @@ class EncerrarSolicitacaoAction
 
         return DB::transaction(function () use ($solicitacao, $autor, $motivo) {
             $solicitacao->update([
-                'status' => $solicitacao->enviada_em !== null
-                    ? StatusSolicitacao::Enviada
-                    : StatusSolicitacao::Aberta,
+                // Volta ao estado que as partes indicam.
+                'status' => $solicitacao->partes()->whereNull('enviada_em')->exists()
+                    ? StatusSolicitacao::Aberta
+                    : StatusSolicitacao::Enviada,
                 'encerrada_em' => null,
                 'cancelada_em' => null,
             ]);
@@ -83,7 +84,7 @@ class EncerrarSolicitacaoAction
                 ->withProperties([
                     'motivo' => $motivo,
                     'questoes_recebidas' => $solicitacao->questoesCompletas(),
-                    'questoes_pedidas' => $solicitacao->quantidade_questoes,
+                    'questoes_pedidas' => $solicitacao->totalDeQuestoes(),
                 ])
                 ->log($cancelando ? 'Solicitação cancelada' : 'Solicitação encerrada');
 
