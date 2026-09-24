@@ -90,7 +90,8 @@
     .disciplina {
         break-inside: avoid; page-break-inside: avoid;
         margin: 0 0 6px 0; padding: 3px 6px;
-        background: #eee; border-left: 3px solid #111;
+        background: #eee;
+        border-left: 3px solid #111; border-right: 3px solid #111;
         font-weight: bold; font-size: {{ $tamanho }}pt; text-align: left;
     }
 

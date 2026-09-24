@@ -278,10 +278,16 @@ exatamente o que imprime.
 
 Cada motor pede a sua sintaxe para a mesma coisa:
 
-- tela: `column-count` no CSS;
-- PDF: a tag `<columns column-count="2">`, do mPDF;
-- Word: seção com `breakType: continuous` e `colsNum`, depois do
-  cabeçalho — que fica em uma coluna só.
+| | colunas | faixa da disciplina | linha de preencher |
+|---|---|---|---|
+| tela | `column-count` | `border-left/right` + fundo | `border-bottom` |
+| PDF | tag `<columns>` do mPDF | idem | idem |
+| Word | seção `continuous` com `colsNum` | tabela de uma célula | borda de célula |
+
+No Word a seção das colunas vem depois do cabeçalho, que fica em uma
+coluna só. E a faixa da disciplina precisa ser tabela porque o parágrafo
+do Word aceita sombreado mas **não aceita borda** — sem ela, não haveria
+as barras pretas dos lados.
 
 O PDF é gerado pelo **mPDF**, e não pelo dompdf que o projeto usava
 antes: o dompdf ignora `column-count` sem reclamar, e a folha saía

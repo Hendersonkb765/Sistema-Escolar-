@@ -294,6 +294,34 @@ it('trata o trecho de código como citação longa: 10 pt e espaçamento simples
         ->toContain('line-height: 1');
 });
 
+it('fecha a faixa da disciplina com barra nos dois lados', function () {
+    $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)());
+
+    $faixa = substr($html, strpos($html, '.disciplina {'), 300);
+
+    expect($faixa)->toContain('border-left: 3px solid #111')
+        ->toContain('border-right: 3px solid #111');
+});
+
+it('fecha a faixa da disciplina no Word do mesmo jeito', function () {
+    // O parágrafo do Word aceita sombreado, mas não borda: a faixa é
+    // uma tabela de uma célula.
+    $docx = app(GerarDocxDaProvaAction::class)->conteudo(($this->montar)(), $this->paeet);
+
+    $arquivo = tempnam(sys_get_temp_dir(), 'prova').'.docx';
+    file_put_contents($arquivo, $docx);
+
+    $zip = new ZipArchive;
+    $zip->open($arquivo);
+    $xml = (string) $zip->getFromName('word/document.xml');
+    $zip->close();
+    @unlink($arquivo);
+
+    expect($xml)->toContain('w:fill="EEEEEE"')
+        ->toContain('<w:left w:val="single" w:sz="18" w:color="111111"/>')
+        ->toContain('<w:right w:val="single" w:sz="18" w:color="111111"/>');
+});
+
 it('numera as páginas no alto à direita', function () {
     $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)());
 

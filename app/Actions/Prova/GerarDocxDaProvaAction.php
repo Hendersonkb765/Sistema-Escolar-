@@ -316,17 +316,44 @@ class GerarDocxDaProvaAction
             'colsSpace' => $this->twips(0.8),
         ]);
 
+        $largura = $this->twips(
+            (21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10
+                - 0.8 * ($prova->colunas() - 1)) / $prova->colunas()
+        );
+
         foreach ($prova->questoesPorDisciplina() as $disciplina => $questoes) {
-            $secao->addText(
+            $this->faixaDaDisciplina(
+                $secao,
                 "{$disciplina} — questões {$questoes->min('numero')} a {$questoes->max('numero')}",
-                'disciplina',
-                ['spaceBefore' => 120, 'spaceAfter' => 60],
+                $largura,
             );
 
             foreach ($questoes as $questao) {
                 $this->questao($secao, $questao, $prova, $comGabarito);
             }
         }
+    }
+
+    /**
+     * A faixa que abre cada disciplina: fundo cinza e barra preta nos
+     * dois lados, como na folha em HTML. É uma tabela de uma célula
+     * porque o parágrafo do Word aceita sombreado, mas não borda.
+     */
+    protected function faixaDaDisciplina(Section $secao, string $texto, int $largura): void
+    {
+        $tabela = $secao->addTable([
+            'borderLeftSize' => 18, 'borderLeftColor' => '111111',
+            'borderRightSize' => 18, 'borderRightColor' => '111111',
+            'cellMargin' => 60,
+        ]);
+
+        $tabela->addRow();
+        // À esquerda, e não no justificado herdado do corpo: uma faixa
+        // de uma linha justificada estica as palavras de ponta a ponta.
+        $tabela->addCell($largura, ['bgColor' => 'EEEEEE'])
+            ->addText($texto, 'disciplina', ['spaceAfter' => 0, 'alignment' => Jc::START]);
+
+        $secao->addTextBreak(1);
     }
 
     protected function questao(Section $secao, ProvaQuestao $questao, Prova $prova, bool $comGabarito): void
