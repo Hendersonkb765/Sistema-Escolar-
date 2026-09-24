@@ -1,4 +1,6 @@
 {{-- Uma questão da folha: número, enunciado, blocos e alternativas. --}}
+@use('App\Support\TrechoDeCodigo')
+
 <div class="questao">
     <div class="enunciado">
         <span class="numero">{{ $questao->numero }}.</span>
@@ -10,10 +12,20 @@
 
     @foreach ($questao->blocos() as $bloco)
         @if ($bloco['tipo'] === 'codigo')
-            <div class="bloco-codigo"><span class="linguagem">{{ $bloco['linguagem'] ?? 'código' }}</span>{{ trim((string) $bloco['conteudo']) }}</div>
+            {{--
+                Uma linha por elemento: o mPDF não honra `white-space:
+                pre-wrap` e juntaria tudo numa linha só.
+            --}}
+            <div class="bloco-codigo">
+                <div class="linguagem">{{ $bloco['linguagem'] ?? 'código' }}</div>
+                @foreach (TrechoDeCodigo::linhas((string) $bloco['conteudo']) as $linha)
+                    <div class="linha">{!! $linha !!}</div>
+                @endforeach
+            </div>
         @elseif ($bloco['tipo'] === 'imagem' && ! empty($bloco['caminho']))
             <div class="bloco-imagem">
-                <img src="{{ $origemDaImagem($bloco['caminho']) }}" alt="{{ $bloco['legenda'] ?: 'Imagem' }}">
+                <img src="{{ $origemDaImagem($bloco['caminho']) }}" alt="{{ $bloco['legenda'] ?: 'Imagem' }}"
+                     style="max-width: 100%;">
                 @if (! empty($bloco['legenda']))
                     <div class="legenda">{{ $bloco['legenda'] }}</div>
                 @endif
@@ -23,11 +35,12 @@
         @endif
     @endforeach
 
-    <ul class="alternativas">
+    <table class="alternativas">
         @foreach ($questao->alternativas_snapshot as $alternativa)
-            <li @class(['correta' => $comGabarito && $alternativa['correta']])>
-                <span class="letra">{{ $alternativa['letra'] }})</span> {{ $alternativa['texto'] }}
-            </li>
+            <tr @class(['correta' => $comGabarito && $alternativa['correta']])>
+                <td class="letra">{{ $alternativa['letra'] }})</td>
+                <td>{{ $alternativa['texto'] }}</td>
+            </tr>
         @endforeach
-    </ul>
+    </table>
 </div>

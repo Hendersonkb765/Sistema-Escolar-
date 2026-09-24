@@ -13,7 +13,7 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 | Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
 | Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
 | Auth | Laravel Fortify **sem registro público** |
-| PDF | `barryvdh/laravel-dompdf` |
+| PDF | `mpdf/mpdf` |
 | Planilhas | `maatwebsite/excel` |
 | Auditoria | `spatie/laravel-activitylog` v5 |
 | Testes | Pest 3 |
@@ -276,15 +276,61 @@ A pré-visualização dentro do sistema, o PDF e o Word saem da **mesma**
 view (`resources/views/provas/folha/`). O que o PAEET confere na tela é
 exatamente o que imprime.
 
-- tela e PDF: `column-count` no CSS, com `break-inside: avoid` para não
-  partir uma questão entre colunas;
+Cada motor pede a sua sintaxe para a mesma coisa:
+
+- tela: `column-count` no CSS;
+- PDF: a tag `<columns column-count="2">`, do mPDF;
 - Word: seção com `breakType: continuous` e `colsNum`, depois do
-  cabeçalho — que fica em uma coluna só;
-- a única diferença entre tela e PDF é a origem das imagens: o navegador
-  usa URL, o dompdf lê o arquivo no disco.
+  cabeçalho — que fica em uma coluna só.
+
+O PDF é gerado pelo **mPDF**, e não pelo dompdf que o projeto usava
+antes: o dompdf ignora `column-count` sem reclamar, e a folha saía
+inteira em coluna única. A troca está coberta por teste
+(`FormatacaoDaFolhaTest`), inclusive contra a regressão em que a regra
+`@page` fazia o mPDF entrar em laço e devolver milhares de páginas.
+
+Sobra uma limitação do modo de colunas do mPDF: uma questão comprida
+pode ser partida entre o pé de uma coluna e o topo da outra. No
+navegador o `break-inside: avoid` evita isso; no PDF, não.
+
+A outra diferença entre tela e PDF é a origem das imagens: o navegador
+usa URL, o mPDF lê o arquivo no disco.
 
 O download é gerado **na hora**, a partir do snapshot, para nunca
 entregar uma versão velha guardada em disco.
+
+### Duas logos e as normas da ABNT
+
+O cabeçalho leva **uma logo em cada extremo** — a da escola de um lado, a
+da rede ou do estado do outro — com a identificação ao centro. Cada uma é
+opcional, e as células dos extremos continuam existindo mesmo vazias: é o
+que mantém o texto centrado quando só uma delas foi enviada.
+
+A formatação padrão é a **ABNT (NBR 14724)**. A norma trata de trabalho
+acadêmico, não de prova; o que se aproveita dela é a parte tipográfica,
+que é justamente a que a escola costuma exigir:
+
+| | |
+|---|---|
+| Papel | A4 |
+| Margens | 3 cm em cima e à esquerda, 2 cm embaixo e à direita |
+| Fonte | Arial ou Times New Roman |
+| Corpo | 12 pt |
+| Entrelinhas | 1,5 |
+| Alinhamento | justificado |
+| Trecho de código e legenda | 10 pt, espaçamento simples (o tratamento da citação longa) |
+| Numeração | canto superior direito |
+
+Enquanto a norma está marcada, o formulário do modelo **trava** corpo,
+entrelinhas e margens e diz por quê — os valores são dela, não do
+modelo. Quem precisar fugir da norma escolhe **Livre** e ajusta tudo.
+
+O recuo de 4 cm da citação longa só é aplicado em **coluna única**: numa
+coluna de ~7,5 cm ele não deixaria texto nenhum.
+
+Os valores resolvidos ficam num lugar só, `App\Support\LayoutDaFolha`,
+que o HTML e o Word consultam — é o que impede o .docx de divergir do
+PDF.
 
 ### Gabarito
 

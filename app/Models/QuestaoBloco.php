@@ -61,7 +61,7 @@ class QuestaoBloco extends Model
         return $this->caminho === null ? null : Storage::disk('public')->url($this->caminho);
     }
 
-    /** Caminho absoluto, que o dompdf precisa para embutir a imagem. */
+    /** Caminho absoluto, que o mPDF precisa para embutir a imagem. */
     public function caminhoAbsolutoDaImagem(): ?string
     {
         if ($this->caminho === null || ! Storage::disk('public')->exists($this->caminho)) {

@@ -2,16 +2,20 @@
 
 namespace App\Actions\Prova;
 
+use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\User;
+use App\Support\LayoutDaFolha;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpWord\Element\Cell;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\Shared\Converter;
 use PhpOffice\PhpWord\SimpleType\Jc;
+use PhpOffice\PhpWord\Style\Language;
 
 /**
  * Gera a prova em Word (.docx), com o mesmo layout de duas colunas.
@@ -20,6 +24,9 @@ use PhpOffice\PhpWord\SimpleType\Jc;
  * bloco. O cabeçalho e a identificação ficam numa seção de coluna única,
  * e as questões numa seção contínua com o número de colunas escolhido —
  * é assim que o Word faz texto em colunas.
+ *
+ * A formatação (papel, margens, fonte, espaçamento) sai do mesmo
+ * `LayoutDaFolha` que o HTML usa, para o .docx não divergir do PDF.
  */
 class GerarDocxDaProvaAction
 {
@@ -67,81 +74,133 @@ class GerarDocxDaProvaAction
     protected function montar(Prova $prova, bool $comGabarito): PhpWord
     {
         $modelo = $prova->modelo;
-        $tamanho = (int) ($modelo->layout['tamanho'] ?? 11);
-        $fonte = ($modelo->layout['fonte'] ?? 'sans') === 'serif' ? 'Georgia' : 'Arial';
+        $layout = $modelo->layoutDaFolha();
+        $tamanho = $layout->tamanho;
+        $secundario = $layout->tamanhoSecundario();
 
         $documento = new PhpWord;
-        $documento->setDefaultFontName($fonte);
+        $documento->setDefaultFontName($layout->nomeDaFonte());
         $documento->setDefaultFontSize($tamanho);
+        $documento->getSettings()->setThemeFontLang(new Language(Language::PT_BR));
+
+        // `lineHeight` do PhpWord é o multiplicador: 1,5 é o da norma.
+        $documento->setDefaultParagraphStyle([
+            'alignment' => Jc::BOTH,
+            'lineHeight' => $layout->espacamento,
+        ]);
 
         $documento->addTitleStyle(1, ['bold' => true, 'size' => $tamanho + 2]);
-        $documento->addParagraphStyle('justificado', ['alignment' => Jc::BOTH, 'spaceAfter' => 60]);
-        $documento->addFontStyle('codigo', ['name' => 'Courier New', 'size' => max(8, $tamanho - 2)]);
+        $documento->addParagraphStyle('justificado', [
+            'alignment' => Jc::BOTH,
+            'lineHeight' => $layout->espacamento,
+            'spaceAfter' => 60,
+        ]);
+        $documento->addParagraphStyle('compacto', [
+            'alignment' => Jc::START,
+            'lineHeight' => $layout->espacamentoSecundario(),
+            'spaceAfter' => 0,
+            'spaceBefore' => 0,
+        ]);
+        $documento->addFontStyle('codigo', ['name' => 'Courier New', 'size' => $secundario]);
         $documento->addFontStyle('disciplina', ['bold' => true, 'size' => $tamanho]);
-        $documento->addFontStyle('discreto', ['size' => max(8, $tamanho - 2), 'color' => '555555']);
+        $documento->addFontStyle('discreto', ['size' => $secundario, 'color' => '555555']);
 
-        $this->cabecalho($documento, $prova, $modelo, $tamanho);
-        $this->corpoEmColunas($documento, $prova, $comGabarito);
+        $this->cabecalho($documento, $prova, $modelo, $layout);
+        $this->corpoEmColunas($documento, $prova, $layout, $comGabarito);
 
         if ($comGabarito) {
-            $this->gabarito($documento, $prova);
+            $this->gabarito($documento, $prova, $layout);
         }
 
         return $documento;
     }
 
-    protected function cabecalho(PhpWord $documento, Prova $prova, $modelo, int $tamanho): void
+    /**
+     * Papel e margens da seção. A4 e 3/2/2/3 cm quando a norma manda.
+     *
+     * @return array<string, mixed>
+     */
+    protected function pagina(LayoutDaFolha $layout): array
     {
-        $secao = $documento->addSection([
-            'marginTop' => Converter::cmToTwip(1.8),
-            'marginBottom' => Converter::cmToTwip(1.6),
-            'marginLeft' => Converter::cmToTwip(1.4),
-            'marginRight' => Converter::cmToTwip(1.4),
-        ]);
+        return [
+            'pageSizeW' => $this->twips(21),
+            'pageSizeH' => $this->twips(29.7),
+            'marginTop' => $this->twips($layout->margens['superior'] / 10),
+            'marginBottom' => $this->twips($layout->margens['inferior'] / 10),
+            'marginLeft' => $this->twips($layout->margens['esquerda'] / 10),
+            'marginRight' => $this->twips($layout->margens['direita'] / 10),
+        ];
+    }
 
-        $secao->addText($modelo->instituicao ?: config('app.name'), ['bold' => true, 'size' => $tamanho + 2]);
-        $secao->addText(
-            ($modelo->nome_avaliacao ?: 'Avaliação').' — '.$prova->titulo,
-            ['size' => $tamanho + 1],
+    /**
+     * Centímetros em twips inteiros.
+     *
+     * `Converter::cmToTwip()` devolve float, e o OOXML espera inteiro —
+     * uma margem gravada como `w:top="1700.787"` é medida inválida, que o
+     * Word arredonda por conta própria ou simplesmente ignora.
+     */
+    protected function twips(float $centimetros): int
+    {
+        return (int) round(Converter::cmToTwip($centimetros));
+    }
+
+    protected function cabecalho(PhpWord $documento, Prova $prova, ModeloProva $modelo, LayoutDaFolha $layout): void
+    {
+        $secao = $documento->addSection($this->pagina($layout));
+
+        // Numeração no alto à direita, como pede a NBR 14724.
+        $secao->addHeader()->addPreserveText(
+            '{PAGE}',
+            ['size' => $layout->tamanhoSecundario()],
+            ['alignment' => Jc::END],
         );
 
+        $this->marca($secao, $prova, $modelo, $layout);
+
         $turma = $prova->turma;
+
+        $centrado = ['alignment' => Jc::CENTER, 'spaceAfter' => 0];
 
         $secao->addText(
             "{$turma->curso->nome} · Turma {$turma->nome} · {$turma->periodo}º período"
             .($prova->data_aplicacao ? ' · '.$prova->data_aplicacao->format('d/m/Y') : ''),
             'discreto',
+            $centrado,
         );
 
         if ($modelo->cabecalho) {
-            $secao->addText($modelo->cabecalho, 'discreto');
+            $secao->addText($modelo->cabecalho, 'discreto', $centrado);
         }
 
         $secao->addTextBreak(1);
 
         $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data'];
+        $largura = $this->twips(
+            21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10
+        );
+
         $tabela = $secao->addTable(['borderSize' => 6, 'borderColor' => '111111', 'cellMargin' => 60]);
 
-        if (in_array('aluno', $campos, true)) {
+        // Mesmos campos e mesma ordem da folha em HTML.
+        $linhas = array_filter([
+            in_array('aluno', $campos, true) ? 'Aluno(a): '.str_repeat('_', 60) : null,
+            $this->juntar([
+                in_array('matricula', $campos, true) ? 'Matrícula: '.str_repeat('_', 18) : null,
+                in_array('turma', $campos, true) ? 'Turma: '.$turma->nome : null,
+                in_array('curso', $campos, true) ? 'Curso: '.$turma->curso->nome : null,
+                in_array('data', $campos, true) ? 'Data: ___/___/______' : null,
+            ]),
+            $this->juntar([
+                in_array('nota', $campos, true) ? 'Nota: '.str_repeat('_', 12) : null,
+                in_array('assinatura', $campos, true)
+                    ? 'Assinatura do professor: '.str_repeat('_', 30)
+                    : null,
+            ]),
+        ]);
+
+        foreach ($linhas as $texto) {
             $tabela->addRow();
-            $tabela->addCell(Converter::cmToTwip(18))->addText('Aluno(a): '.str_repeat('_', 60));
-        }
-
-        $linha = [];
-
-        if (in_array('matricula', $campos, true)) {
-            $linha[] = 'Matrícula: '.str_repeat('_', 18);
-        }
-        if (in_array('turma', $campos, true)) {
-            $linha[] = 'Turma: '.$turma->nome;
-        }
-        if (in_array('data', $campos, true)) {
-            $linha[] = 'Data: ___/___/______';
-        }
-
-        if ($linha !== []) {
-            $tabela->addRow();
-            $tabela->addCell(Converter::cmToTwip(18))->addText(implode('     ', $linha));
+            $tabela->addCell($largura)->addText($texto, null, 'compacto');
         }
 
         if ($prova->instrucoes) {
@@ -150,15 +209,68 @@ class GerarDocxDaProvaAction
         }
     }
 
+    /** @param  array<int, ?string>  $partes */
+    protected function juntar(array $partes): ?string
+    {
+        $presentes = array_filter($partes);
+
+        return $presentes === [] ? null : implode('     ', $presentes);
+    }
+
+    /**
+     * Logo à esquerda, identificação ao centro, logo à direita — numa
+     * tabela sem bordas, que é como o Word põe três blocos lado a lado.
+     */
+    protected function marca(Section $secao, Prova $prova, ModeloProva $modelo, LayoutDaFolha $layout): void
+    {
+        $util = 21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10;
+        $ladoDaLogo = 2.6;
+
+        $tabela = $secao->addTable(['borderSize' => 0, 'cellMargin' => 0]);
+        $tabela->addRow();
+
+        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo_esquerda_path, Jc::START);
+
+        $centro = $tabela->addCell($this->twips($util - 2 * $ladoDaLogo));
+
+        $centro->addText(
+            $modelo->instituicao ?: config('app.name'),
+            ['bold' => true, 'size' => $layout->tamanho + 1, 'allCaps' => true],
+            ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
+        );
+
+        $centro->addText(
+            ($modelo->nome_avaliacao ?: 'Avaliação').' — '.$prova->titulo,
+            ['size' => $layout->tamanho],
+            ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
+        );
+
+        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo_direita_path, Jc::END);
+    }
+
+    /** A célula existe mesmo sem imagem: é ela que mantém o centro no lugar. */
+    protected function logo(Cell $celula, ?string $caminho, string $alinhamento): void
+    {
+        if ($caminho === null || ! Storage::disk('public')->exists($caminho)) {
+            $celula->addTextBreak(1);
+
+            return;
+        }
+
+        $celula->addImage(
+            Storage::disk('public')->path($caminho),
+            ['height' => 62, 'alignment' => $alinhamento],
+        );
+    }
+
     /** As questões entram numa seção contínua com o número de colunas. */
-    protected function corpoEmColunas(PhpWord $documento, Prova $prova, bool $comGabarito): void
+    protected function corpoEmColunas(PhpWord $documento, Prova $prova, LayoutDaFolha $layout, bool $comGabarito): void
     {
         $secao = $documento->addSection([
+            ...$this->pagina($layout),
             'breakType' => 'continuous',
             'colsNum' => $prova->colunas(),
-            'colsSpace' => Converter::cmToTwip(0.8),
-            'marginLeft' => Converter::cmToTwip(1.4),
-            'marginRight' => Converter::cmToTwip(1.4),
+            'colsSpace' => $this->twips(0.8),
         ]);
 
         foreach ($prova->questoesPorDisciplina() as $disciplina => $questoes) {
@@ -189,7 +301,7 @@ class GerarDocxDaProvaAction
                 $secao->addText(
                     strtoupper((string) ($bloco['linguagem'] ?? 'código')),
                     'discreto',
-                    ['spaceAfter' => 0],
+                    'compacto',
                 );
 
                 foreach (preg_split('/\R/', trim((string) $bloco['conteudo'])) as $linha) {
@@ -198,7 +310,7 @@ class GerarDocxDaProvaAction
                     $secao->addText(
                         htmlspecialchars($linha === '' ? ' ' : $linha, ENT_QUOTES),
                         'codigo',
-                        ['spaceAfter' => 0, 'spaceBefore' => 0],
+                        'compacto',
                     );
                 }
             } elseif ($bloco['tipo'] === 'imagem' && ! empty($bloco['caminho'])) {
@@ -228,9 +340,13 @@ class GerarDocxDaProvaAction
         $secao->addTextBreak(1);
     }
 
-    protected function gabarito(PhpWord $documento, Prova $prova): void
+    protected function gabarito(PhpWord $documento, Prova $prova, LayoutDaFolha $layout): void
     {
-        $secao = $documento->addSection(['breakType' => 'continuous', 'colsNum' => 1]);
+        $secao = $documento->addSection([
+            ...$this->pagina($layout),
+            'breakType' => 'continuous',
+            'colsNum' => 1,
+        ]);
 
         $secao->addText('Gabarito', ['bold' => true, 'size' => 12], ['spaceBefore' => 200]);
 
@@ -239,12 +355,12 @@ class GerarDocxDaProvaAction
 
         $tabela->addRow();
         foreach ($gabarito as $numero => $letra) {
-            $tabela->addCell(Converter::cmToTwip(1))->addText((string) $numero, null, ['alignment' => Jc::CENTER]);
+            $tabela->addCell($this->twips(1))->addText((string) $numero, null, ['alignment' => Jc::CENTER]);
         }
 
         $tabela->addRow();
         foreach ($gabarito as $letra) {
-            $tabela->addCell(Converter::cmToTwip(1))->addText($letra, ['bold' => true], ['alignment' => Jc::CENTER]);
+            $tabela->addCell($this->twips(1))->addText($letra, ['bold' => true], ['alignment' => Jc::CENTER]);
         }
     }
 }

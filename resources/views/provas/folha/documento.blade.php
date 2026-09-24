@@ -9,18 +9,34 @@
     <title>{{ $prova->titulo }}</title>
     @include('provas.folha.estilo', [
         'colunas' => $prova->colunas(),
-        'fonte' => $modelo->layout['fonte'] ?? 'sans',
-        'tamanho' => (int) ($modelo->layout['tamanho'] ?? 11),
+        'layout' => $layout,
+        'paraImpressao' => $paraImpressao,
     ])
 </head>
 <body>
+    @unless ($paraImpressao)
+        {{-- Numeração da tela. No PDF quem a desenha é o cabeçalho do mPDF. --}}
+        <div class="paginacao"></div>
+    @endunless
+
     <div class="cabecalho">
-        <table>
+        {{--
+            Uma logo em cada extremo, com o texto ao centro. As células
+            dos extremos existem mesmo sem imagem: é o que mantém a
+            identificação centrada quando só uma das logos foi enviada.
+
+            A altura da logo vai no `style` do próprio `img`: o mPDF não
+            aplica `max-height` de folha de estilo e desenharia a imagem
+            no tamanho original.
+        --}}
+        <table class="marca">
             <tr>
-                @if ($logo)
-                    <td class="logo"><img src="{{ $logo }}" alt=""></td>
-                @endif
-                <td>
+                <td class="logo esquerda">
+                    @if ($logos['esquerda'])
+                        <img src="{{ $logos['esquerda'] }}" alt="" style="height: 18mm;">
+                    @endif
+                </td>
+                <td class="titulo">
                     <div class="instituicao">{{ $modelo->instituicao ?: config('app.name') }}</div>
                     <div class="avaliacao">{{ $modelo->nome_avaliacao ?: 'Avaliação' }} — {{ $prova->titulo }}</div>
                     <div class="meta">
@@ -30,51 +46,87 @@
                             · {{ $prova->data_aplicacao->format('d/m/Y') }}
                         @endif
                     </div>
+                    @if ($modelo->cabecalho)
+                        <div class="meta">{{ $modelo->cabecalho }}</div>
+                    @endif
+                </td>
+                <td class="logo direita">
+                    @if ($logos['direita'])
+                        <img src="{{ $logos['direita'] }}" alt="" style="height: 18mm;">
+                    @endif
                 </td>
             </tr>
         </table>
-
-        @if ($modelo->cabecalho)
-            <div class="meta">{{ $modelo->cabecalho }}</div>
-        @endif
     </div>
 
     @php $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data']; @endphp
 
     @if ($campos !== [])
-        <div class="identificacao">
+        {{--
+            Quadro de identificação em tabela: a linha para preencher é a
+            borda inferior de uma célula. Um `span` com `display:
+            inline-block` funcionaria no navegador e sumiria no PDF.
+        --}}
+        <table class="identificacao">
             @if (in_array('aluno', $campos, true))
-                <div class="linha"><span class="rotulo">Aluno(a):</span> <span class="preencher">&nbsp;</span></div>
+                <tr>
+                    <td class="rotulo">Aluno(a):</td>
+                    <td class="risco" colspan="3">&nbsp;</td>
+                </tr>
             @endif
-            <div class="linha">
-                @if (in_array('matricula', $campos, true))
-                    <span class="rotulo">Matrícula:</span> <span class="preencher" style="min-width: 25%">&nbsp;</span>
-                @endif
-                @if (in_array('turma', $campos, true))
-                    <span class="rotulo">Turma:</span> {{ $prova->turma->nome }}
-                @endif
-                @if (in_array('curso', $campos, true))
-                    <span class="rotulo">Curso:</span> {{ $prova->turma->curso->nome }}
-                @endif
-                @if (in_array('data', $campos, true))
-                    <span class="rotulo">Data:</span> ___/___/______
-                @endif
-            </div>
+
+            @if (in_array('matricula', $campos, true) || in_array('turma', $campos, true))
+                <tr>
+                    @if (in_array('matricula', $campos, true))
+                        <td class="rotulo">Matrícula:</td>
+                        <td class="risco">&nbsp;</td>
+                    @endif
+                    @if (in_array('turma', $campos, true))
+                        <td class="rotulo">Turma:</td>
+                        <td class="valor">{{ $prova->turma->nome }}</td>
+                    @endif
+                </tr>
+            @endif
+
+            @if (in_array('curso', $campos, true) || in_array('data', $campos, true))
+                <tr>
+                    @if (in_array('curso', $campos, true))
+                        <td class="rotulo">Curso:</td>
+                        <td class="valor">{{ $prova->turma->curso->nome }}</td>
+                    @endif
+                    @if (in_array('data', $campos, true))
+                        <td class="rotulo">Data:</td>
+                        <td class="valor">___/___/______</td>
+                    @endif
+                </tr>
+            @endif
+
             @if (in_array('nota', $campos, true) || in_array('assinatura', $campos, true))
-                <div class="linha">
+                <tr>
                     @if (in_array('nota', $campos, true))
-                        <span class="rotulo">Nota:</span> <span class="preencher" style="min-width: 20%">&nbsp;</span>
+                        <td class="rotulo">Nota:</td>
+                        <td class="risco">&nbsp;</td>
                     @endif
                     @if (in_array('assinatura', $campos, true))
-                        <span class="rotulo">Assinatura do professor:</span> <span class="preencher">&nbsp;</span>
+                        <td class="rotulo">Assinatura:</td>
+                        <td class="risco">&nbsp;</td>
                     @endif
-                </div>
+                </tr>
             @endif
-        </div>
+        </table>
     @endif
 
     @if ($prova->instrucoes)
         <div class="instrucoes">{{ $prova->instrucoes }}</div>
+    @endif
+
+    {{--
+        O `column-count` do CSS resolve na tela. O mPDF não o entende:
+        para ele o fluxo em colunas se abre com a tag `<columns>` e se
+        fecha voltando para uma coluna só.
+    --}}
+    @if ($paraImpressao && $prova->colunas() > 1)
+        <columns column-count="{{ $prova->colunas() }}" column-gap="10"/>
     @endif
 
     <div class="corpo">
@@ -91,6 +143,10 @@
             @endforeach
         @endforeach
     </div>
+
+    @if ($paraImpressao && $prova->colunas() > 1)
+        <columns column-count="1"/>
+    @endif
 
     @if ($comGabarito)
         <div class="gabarito">

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\NormaDaFolha;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Support\LayoutDaFolha;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,7 +29,8 @@ class ModeloProva extends Model
         'instituicao',
         'cabecalho',
         'instrucoes',
-        'logo_path',
+        'logo_esquerda_path',
+        'logo_direita_path',
         'campos_identificacao',
         'layout',
         'rodape',
@@ -56,11 +59,27 @@ class ModeloProva extends Model
         return LogOptions::defaults()->logFillable()->logOnlyDirty()->useLogName('modelo_prova');
     }
 
+    public function layoutDaFolha(): LayoutDaFolha
+    {
+        return LayoutDaFolha::doModelo($this);
+    }
+
+    public function norma(): NormaDaFolha
+    {
+        return $this->layoutDaFolha()->norma;
+    }
+
     /** @return BelongsTo<Eixo, $this> */
     public function eixo(): BelongsTo
     {
         return $this->belongsTo(Eixo::class);
     }
+
+    /** As duas logos do cabeçalho: uma em cada extremo. */
+    public const LADOS_DA_LOGO = [
+        'esquerda' => 'Logo à esquerda',
+        'direita' => 'Logo à direita',
+    ];
 
     /** Campos que a folha imprime no quadro de identificação do aluno. */
     public const CAMPOS_DE_IDENTIFICACAO = [

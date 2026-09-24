@@ -86,7 +86,7 @@ class SalvarBlocosDaQuestaoAction
     /**
      * Guarda a imagem enviada e devolve o caminho relativo.
      *
-     * Aceita apenas formatos que o navegador e o dompdf desenham; SVG
+     * Aceita apenas formatos que o navegador e o mPDF desenham; SVG
      * fica de fora porque carrega script.
      */
     public function guardarImagem(UploadedFile $arquivo, Questao $questao): string

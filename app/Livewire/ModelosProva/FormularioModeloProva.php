@@ -3,8 +3,10 @@
 namespace App\Livewire\ModelosProva;
 
 use App\Actions\Prova\RenderizarProvaAction;
+use App\Enums\NormaDaFolha;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
+use App\Support\LayoutDaFolha;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\Rule;
@@ -46,9 +48,33 @@ class FormularioModeloProva extends Component
 
     public bool $ativo = true;
 
-    public ?TemporaryUploadedFile $logo = null;
+    // --- Formatação da folha ---------------------------------------------
 
-    public bool $removerLogo = false;
+    public string $norma = 'abnt';
+
+    public string $fonte = 'sans';
+
+    public int $tamanho = 12;
+
+    public float $espacamento = 1.5;
+
+    public float $margem_superior = 30;
+
+    public float $margem_inferior = 20;
+
+    public float $margem_esquerda = 30;
+
+    public float $margem_direita = 20;
+
+    // --- Logos ------------------------------------------------------------
+
+    public ?TemporaryUploadedFile $logoEsquerda = null;
+
+    public ?TemporaryUploadedFile $logoDireita = null;
+
+    public bool $removerLogoEsquerda = false;
+
+    public bool $removerLogoDireita = false;
 
     public function mount(?ModeloProva $modelo = null): void
     {
@@ -66,6 +92,8 @@ class FormularioModeloProva extends Component
             $this->campos_identificacao = $modelo->campos_identificacao ?? [];
             $this->ativo = $modelo->ativo;
 
+            $this->carregarLayout($modelo->layoutDaFolha());
+
             return;
         }
 
@@ -73,6 +101,50 @@ class FormularioModeloProva extends Component
 
         $this->eixo_id = auth()->user()->eixoIds()[0] ?? null;
         $this->instituicao = (string) config('app.name');
+
+        $this->carregarLayout(LayoutDaFolha::de([]));
+    }
+
+    protected function carregarLayout(LayoutDaFolha $layout): void
+    {
+        $this->norma = $layout->norma->value;
+        $this->fonte = $layout->fonte;
+        $this->tamanho = $layout->tamanho;
+        $this->espacamento = $layout->espacamento;
+        $this->margem_superior = $layout->margens['superior'];
+        $this->margem_inferior = $layout->margens['inferior'];
+        $this->margem_esquerda = $layout->margens['esquerda'];
+        $this->margem_direita = $layout->margens['direita'];
+    }
+
+    /**
+     * Trocar para ABNT devolve os campos aos valores da norma — senão a
+     * tela mostraria 11 pt travado enquanto a folha imprime 12.
+     */
+    public function updatedNorma(): void
+    {
+        $this->carregarLayout($this->layoutEscolhido());
+    }
+
+    public function normaEscolhida(): NormaDaFolha
+    {
+        return NormaDaFolha::tryFrom($this->norma) ?? NormaDaFolha::Abnt;
+    }
+
+    protected function layoutEscolhido(): LayoutDaFolha
+    {
+        return LayoutDaFolha::de([
+            'norma' => $this->norma,
+            'fonte' => $this->fonte,
+            'tamanho' => $this->tamanho,
+            'espacamento' => $this->espacamento,
+            'margens' => [
+                'superior' => $this->margem_superior,
+                'inferior' => $this->margem_inferior,
+                'esquerda' => $this->margem_esquerda,
+                'direita' => $this->margem_direita,
+            ],
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -89,7 +161,16 @@ class FormularioModeloProva extends Component
             'campos_identificacao' => ['array'],
             'campos_identificacao.*' => [Rule::in(array_keys(ModeloProva::CAMPOS_DE_IDENTIFICACAO))],
             'ativo' => ['boolean'],
-            'logo' => ['nullable', 'image', 'max:2048'],
+            'norma' => ['required', Rule::in(NormaDaFolha::valores())],
+            'fonte' => ['required', Rule::in(array_keys(LayoutDaFolha::FONTES))],
+            'tamanho' => ['required', 'integer', 'min:8', 'max:16'],
+            'espacamento' => ['required', 'numeric', 'min:1', 'max:2'],
+            'margem_superior' => ['required', 'numeric', 'min:5', 'max:50'],
+            'margem_inferior' => ['required', 'numeric', 'min:5', 'max:50'],
+            'margem_esquerda' => ['required', 'numeric', 'min:5', 'max:50'],
+            'margem_direita' => ['required', 'numeric', 'min:5', 'max:50'],
+            'logoEsquerda' => ['nullable', 'image', 'max:2048'],
+            'logoDireita' => ['nullable', 'image', 'max:2048'],
         ];
     }
 
@@ -103,6 +184,15 @@ class FormularioModeloProva extends Component
             'instrucoes' => 'instruções',
             'rodape' => 'rodapé',
             'campos_identificacao' => 'campos de identificação',
+            'norma' => 'norma de formatação',
+            'tamanho' => 'tamanho da fonte',
+            'espacamento' => 'espaçamento entre linhas',
+            'margem_superior' => 'margem superior',
+            'margem_inferior' => 'margem inferior',
+            'margem_esquerda' => 'margem esquerda',
+            'margem_direita' => 'margem direita',
+            'logoEsquerda' => 'logo da esquerda',
+            'logoDireita' => 'logo da direita',
         ];
     }
 
@@ -112,16 +202,24 @@ class FormularioModeloProva extends Component
             ? $this->authorize('update', $this->modelo)
             : $this->authorize('create', ModeloProva::class);
 
-        $dados = $this->validate();
-        unset($dados['logo']);
+        $this->validate();
 
-        $dados['campos_identificacao'] = array_values($this->campos_identificacao);
+        $dados = [
+            'eixo_id' => $this->eixo_id,
+            'nome' => $this->nome,
+            'instituicao' => $this->instituicao,
+            'nome_avaliacao' => $this->nome_avaliacao,
+            'cabecalho' => $this->cabecalho,
+            'instrucoes' => $this->instrucoes,
+            'rodape' => $this->rodape,
+            'campos_identificacao' => array_values($this->campos_identificacao),
+            'ativo' => $this->ativo,
+            // Sob a ABNT, o que vai para o banco são os valores da norma,
+            // não os que estavam no formulário antes de ela ser marcada.
+            'layout' => $this->layoutEscolhido()->paraJson(),
+        ];
 
-        if ($this->logo !== null) {
-            $dados['logo_path'] = $this->logo->store('modelos-prova', 'public');
-        } elseif ($this->removerLogo) {
-            $dados['logo_path'] = null;
-        }
+        $dados += $this->caminhoDasLogos();
 
         if ($this->modelo === null) {
             $dados['criado_por'] = auth()->id();
@@ -136,11 +234,33 @@ class FormularioModeloProva extends Component
         $this->redirectRoute('modelos-prova.index', navigate: true);
     }
 
+    /** @return array<string, ?string> */
+    protected function caminhoDasLogos(): array
+    {
+        $caminhos = [];
+
+        foreach ([
+            'logo_esquerda_path' => ['logoEsquerda', 'removerLogoEsquerda'],
+            'logo_direita_path' => ['logoDireita', 'removerLogoDireita'],
+        ] as $coluna => [$arquivo, $remover]) {
+            if ($this->{$arquivo} !== null) {
+                $caminhos[$coluna] = $this->{$arquivo}->store('modelos-prova', 'public');
+            } elseif ($this->{$remover}) {
+                $caminhos[$coluna] = null;
+            }
+        }
+
+        return $caminhos;
+    }
+
     public function render(RenderizarProvaAction $renderizar): View
     {
         return view('modelos-prova.formulario', [
             'eixos' => Eixo::query()->whereIn('id', auth()->user()->eixoIds())->orderBy('nome')->get(),
             'camposDisponiveis' => ModeloProva::CAMPOS_DE_IDENTIFICACAO,
+            'fontesDisponiveis' => LayoutDaFolha::FONTES,
+            'normas' => NormaDaFolha::opcoes(),
+            'normaEscolhida' => $this->normaEscolhida(),
             'folha' => $renderizar->amostraDoModelo($this->paraAmostra()),
         ])->layout('components.layouts.app', [
             'titulo' => $this->modelo === null ? 'Novo modelo de prova' : 'Editar modelo de prova',
@@ -161,7 +281,18 @@ class FormularioModeloProva extends Component
             'instrucoes' => $this->instrucoes,
             'rodape' => $this->rodape,
             'campos_identificacao' => array_values($this->campos_identificacao),
+            'layout' => $this->layoutEscolhido()->paraJson(),
         ]);
+
+        // A amostra mostra a logo que já está guardada; a recém-enviada
+        // ainda é um arquivo temporário, fora do disco público.
+        if ($this->removerLogoEsquerda) {
+            $amostra->logo_esquerda_path = null;
+        }
+
+        if ($this->removerLogoDireita) {
+            $amostra->logo_direita_path = null;
+        }
 
         return $amostra;
     }

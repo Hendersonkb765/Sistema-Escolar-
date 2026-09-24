@@ -15,9 +15,12 @@ use Illuminate\Support\Facades\View;
  * Monta o HTML da folha de prova.
  *
  * A mesma view serve à pré-visualização na tela e ao PDF — o que o
- * professor confere é exatamente o que sai impresso. A única diferença é
- * de onde vêm as imagens: o navegador usa URL, o dompdf precisa do
- * caminho no disco.
+ * professor confere é exatamente o que sai impresso. Duas diferenças,
+ * ambas de motor e não de conteúdo:
+ *
+ * - imagens: o navegador busca pela URL, o mPDF lê o arquivo no disco;
+ * - colunas: o navegador entende `column-count`, o mPDF quer a própria
+ *   tag `<columns>`.
  */
 class RenderizarProvaAction
 {
@@ -59,7 +62,9 @@ class RenderizarProvaAction
                 ]),
             ]),
             'comGabarito' => false,
-            'logo' => $this->logo($modelo->logo_path, paraImpressao: false),
+            'paraImpressao' => false,
+            'layout' => $modelo->layoutDaFolha(),
+            'logos' => $this->logos($modelo, paraImpressao: false),
             'origemDaImagem' => fn (string $caminho) => $this->imagem($caminho, paraImpressao: false),
         ])->render();
     }
@@ -94,9 +99,25 @@ class RenderizarProvaAction
             'modelo' => $modelo,
             'questoesPorDisciplina' => $prova->questoesPorDisciplina(),
             'comGabarito' => $comGabarito,
-            'logo' => $this->logo($modelo->logo_path, $paraImpressao),
+            'paraImpressao' => $paraImpressao,
+            'layout' => $modelo->layoutDaFolha(),
+            'logos' => $this->logos($modelo, $paraImpressao),
             'origemDaImagem' => fn (string $caminho) => $this->imagem($caminho, $paraImpressao),
         ])->render();
+    }
+
+    /**
+     * As duas logos do cabeçalho — uma em cada extremo. Cada uma pode
+     * faltar, e a folha se vira com as que houver.
+     *
+     * @return array{esquerda: ?string, direita: ?string}
+     */
+    protected function logos(ModeloProva $modelo, bool $paraImpressao): array
+    {
+        return [
+            'esquerda' => $this->logo($modelo->logo_esquerda_path, $paraImpressao),
+            'direita' => $this->logo($modelo->logo_direita_path, $paraImpressao),
+        ];
     }
 
     protected function logo(?string $caminho, bool $paraImpressao): ?string
@@ -109,7 +130,7 @@ class RenderizarProvaAction
     }
 
     /**
-     * O dompdf não busca a imagem por HTTP: ele lê o arquivo. Na tela, o
+     * O mPDF não busca a imagem por HTTP: ele lê o arquivo. Na tela, o
      * navegador precisa da URL.
      */
     protected function imagem(string $caminho, bool $paraImpressao): string

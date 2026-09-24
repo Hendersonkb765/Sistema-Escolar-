@@ -140,7 +140,8 @@ class DemonstracaoSeeder extends Seeder
                     .'Não é permitido consulta.',
                 'rodape' => 'Boa prova!',
                 'campos_identificacao' => ['aluno', 'matricula', 'turma', 'data'],
-                'layout' => ['fonte' => 'sans', 'tamanho' => 11],
+                // Sob a ABNT o resto da tipografia é da norma, não do modelo.
+                'layout' => ['norma' => 'abnt', 'fonte' => 'sans'],
                 'ativo' => true,
                 'criado_por' => $autor->id,
             ]

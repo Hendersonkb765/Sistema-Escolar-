@@ -40,6 +40,7 @@
                                 </button>
                             </th>
                             <th class="hidden px-4 py-2 sm:table-cell">Eixo</th>
+                            <th class="hidden px-4 py-2 lg:table-cell">Formatação</th>
                             <th class="hidden px-4 py-2 md:table-cell">Provas</th>
                             <th class="px-4 py-2">Situação</th>
                             <th class="px-4 py-2 text-right sm:px-6">Ações</th>
@@ -56,6 +57,9 @@
                                 </td>
                                 <td class="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">
                                     {{ $modelo->eixo->nome }}
+                                </td>
+                                <td class="hidden px-4 py-3 lg:table-cell">
+                                    <x-badge :cor="$modelo->norma()->cor()" :rotulo="$modelo->norma()->rotulo()"/>
                                 </td>
                                 <td class="hidden px-4 py-3 tabular-nums text-slate-600 md:table-cell dark:text-slate-300">
                                     {{ $modelo->provas_count }}

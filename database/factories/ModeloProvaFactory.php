@@ -23,7 +23,7 @@ class ModeloProvaFactory extends Factory
             'cabecalho' => null,
             'instrucoes' => 'Leia com atenção. Marque apenas uma alternativa por questão.',
             'campos_identificacao' => ['aluno', 'matricula', 'turma', 'curso', 'data'],
-            'layout' => ['colunas' => 2, 'fonte' => 'sans', 'tamanho' => 11],
+            'layout' => ['norma' => 'abnt', 'fonte' => 'sans'],
             'rodape' => 'Boa prova!',
             'versao' => 1,
             'ativo' => true,
