@@ -9,15 +9,24 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 
 | Camada | Escolha |
 |---|---|
-| Runtime | PHP 8.4 · Laravel 12 |
+| Runtime | PHP 8.4 · Laravel 13.17.0 |
 | Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
 | Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
 | Auth | Laravel Fortify **sem registro público** |
 | PDF | `mpdf/mpdf` |
 | Planilhas | `maatwebsite/excel` |
 | Auditoria | `spatie/laravel-activitylog` v5 |
-| Testes | Pest 3 |
+| Testes | Pest 4 · PHPUnit 12 |
 | Filas | driver `database` |
+
+### Sobre as versões
+
+`laravel/framework` está preso na **13.17.0 exata**, e não em `^13`: a
+atualização foi pedida nessa versão. Subir dentro do 13.x é editar essa
+linha do `composer.json` e rodar `composer update laravel/framework`.
+
+O `spatie/laravel-activitylog` 5.x exige **PHP ^8.4** — é ele, e não o
+Laravel, que define o piso de PHP do projeto. O Laravel 13 aceita ^8.3.
 
 ## Regra de ouro
 
