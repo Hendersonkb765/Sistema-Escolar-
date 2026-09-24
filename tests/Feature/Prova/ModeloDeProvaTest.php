@@ -8,10 +8,12 @@
 
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\NormaDaFolha;
+use App\Enums\OrigemDaLogo;
 use App\Livewire\ModelosProva\FormularioModeloProva;
 use App\Livewire\ModelosProva\ListaModelosProva;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
+use App\Support\LogoDaFolha;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -66,88 +68,109 @@ it('cria um modelo com os campos de identificação escolhidos', function () {
         ->and($criado->criado_por)->toBe($this->paeet->id);
 });
 
-it('guarda as duas logos do cabeçalho', function () {
+it('nasce usando as duas logos que acompanham o sistema', function () {
     Livewire::actingAs($this->paeet)
         ->test(FormularioModeloProva::class)
-        ->set('nome', 'Com duas logos')
+        ->assertSet('origem_logo_esquerda', OrigemDaLogo::Padrao->value)
+        ->assertSet('origem_logo_direita', OrigemDaLogo::Padrao->value)
+        ->set('nome', 'Sem enviar nada')
         ->set('eixo_id', $this->eixo->id)
-        ->set('logoEsquerda', UploadedFile::fake()->image('brasao-escola.png'))
-        ->set('logoDireita', UploadedFile::fake()->image('brasao-estado.png'))
         ->call('salvar')
         ->assertHasNoErrors();
 
-    $criado = ModeloProva::query()->where('nome', 'Com duas logos')->sole();
+    $criado = ModeloProva::query()->where('nome', 'Sem enviar nada')->sole();
 
-    expect($criado->logo_esquerda_path)->not->toBeNull()
-        ->and($criado->logo_direita_path)->not->toBeNull()
-        ->and($criado->logo_direita_path)->not->toBe($criado->logo_esquerda_path);
+    expect($criado->origem_logo_esquerda)->toBe(OrigemDaLogo::Padrao)
+        ->and($criado->logo_esquerda_path)->toBeNull()
+        ->and($criado->logo('esquerda')->url())->toBe('/'.LogoDaFolha::PADRAO['esquerda'])
+        ->and($criado->logo('direita')->url())->toBe('/'.LogoDaFolha::PADRAO['direita']);
+});
 
-    Storage::disk('public')->assertExists($criado->logo_esquerda_path);
+it('troca um dos lados por uma imagem enviada, sem mexer no outro', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(FormularioModeloProva::class)
+        ->set('nome', 'Com logo própria')
+        ->set('eixo_id', $this->eixo->id)
+        ->set('origem_logo_direita', OrigemDaLogo::Enviada->value)
+        ->set('logoDireita', UploadedFile::fake()->image('brasao-escola.png'))
+        ->call('salvar')
+        ->assertHasNoErrors();
+
+    $criado = ModeloProva::query()->where('nome', 'Com logo própria')->sole();
+
+    expect($criado->origem_logo_esquerda)->toBe(OrigemDaLogo::Padrao)
+        ->and($criado->origem_logo_direita)->toBe(OrigemDaLogo::Enviada)
+        ->and($criado->logo_direita_path)->not->toBeNull();
+
     Storage::disk('public')->assertExists($criado->logo_direita_path);
 });
 
-it('aceita uma logo só, sem exigir a outra', function () {
+it('cobra a imagem de quem escolheu enviar uma e não enviou', function () {
     Livewire::actingAs($this->paeet)
         ->test(FormularioModeloProva::class)
-        ->set('nome', 'Com uma logo')
+        ->set('nome', 'Prometeu e não entregou')
         ->set('eixo_id', $this->eixo->id)
-        ->set('logoDireita', UploadedFile::fake()->image('brasao.png'))
+        ->set('origem_logo_esquerda', OrigemDaLogo::Enviada->value)
         ->call('salvar')
-        ->assertHasNoErrors();
+        ->assertHasErrors('logoEsquerda');
 
-    $criado = ModeloProva::query()->where('nome', 'Com uma logo')->sole();
-
-    expect($criado->logo_esquerda_path)->toBeNull()
-        ->and($criado->logo_direita_path)->not->toBeNull();
+    expect(ModeloProva::query()->where('nome', 'Prometeu e não entregou')->exists())->toBeFalse();
 });
 
-it('remove uma das logos sem mexer na outra', function () {
+it('não cobra imagem nova de quem já tem uma guardada', function () {
     $this->modelo->update([
-        'logo_esquerda_path' => 'modelos-prova/esquerda.png',
-        'logo_direita_path' => 'modelos-prova/direita.png',
+        'origem_logo_esquerda' => OrigemDaLogo::Enviada,
+        'logo_esquerda_path' => UploadedFile::fake()->image('antiga.png')->store('modelos-prova', 'public'),
     ]);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioModeloProva::class, ['modelo' => $this->modelo])
-        ->set('removerLogoEsquerda', true)
+        ->set('instituicao', 'Outro nome')
         ->call('salvar')
         ->assertHasNoErrors();
 
-    expect($this->modelo->refresh()->logo_esquerda_path)->toBeNull()
-        ->and($this->modelo->logo_direita_path)->toBe('modelos-prova/direita.png');
+    expect($this->modelo->refresh()->logo_esquerda_path)->not->toBeNull();
 });
 
-it('mostra a amostra da folha com a moldura que está sendo editada', function () {
+it('volta para a logo padrão e apaga o arquivo que ninguém mais alcança', function () {
+    $caminho = UploadedFile::fake()->image('antiga.png')->store('modelos-prova', 'public');
+
+    $this->modelo->update([
+        'origem_logo_direita' => OrigemDaLogo::Enviada,
+        'logo_direita_path' => $caminho,
+    ]);
+
     Livewire::actingAs($this->paeet)
         ->test(FormularioModeloProva::class, ['modelo' => $this->modelo])
-        ->set('instituicao', 'Instituto Federal do Exemplo')
-        ->set('rodape', 'Assinado pela coordenação')
-        ->assertSee('Instituto Federal do Exemplo')
-        ->assertSee('Assinado pela coordenação')
-        ->assertSee('column-count: 2', escape: false);
+        ->set('origem_logo_direita', OrigemDaLogo::Padrao->value)
+        ->call('salvar')
+        ->assertHasNoErrors();
+
+    expect($this->modelo->refresh()->logo_direita_path)->toBeNull()
+        ->and($this->modelo->origem_logo_direita)->toBe(OrigemDaLogo::Padrao);
+
+    Storage::disk('public')->assertMissing($caminho);
 });
 
-it('desativa o modelo sem apagá-lo', function () {
+it('deixa um lado sem logo nenhuma quando isso é o pedido', function () {
     Livewire::actingAs($this->paeet)
-        ->test(ListaModelosProva::class)
-        ->call('alternarAtivo', $this->modelo->id)
-        ->assertDispatched('notificar');
+        ->test(FormularioModeloProva::class, ['modelo' => $this->modelo])
+        ->set('origem_logo_esquerda', OrigemDaLogo::Nenhuma->value)
+        ->call('salvar')
+        ->assertHasNoErrors();
 
-    expect($this->modelo->refresh()->ativo)->toBeFalse()
-        ->and(ModeloProva::query()->whereKey($this->modelo->id)->exists())->toBeTrue();
-
-    Livewire::actingAs($this->paeet)
-        ->test(ListaModelosProva::class)
-        ->assertDontSee('Padrão institucional')
-        ->set('mostrarInativos', true)
-        ->assertSee('Padrão institucional');
+    expect($this->modelo->refresh()->logo('esquerda')->url())->toBeNull()
+        ->and($this->modelo->logo('direita')->url())->toBe('/'.LogoDaFolha::PADRAO['direita']);
 });
 
-it('mantém o modelo desativado disponível para as provas que o usaram', function () {
-    $this->modelo->update(['ativo' => false]);
+it('mostra a prévia do lado escolhido no formulário', function () {
+    $componente = Livewire::actingAs($this->paeet)->test(FormularioModeloProva::class);
 
-    expect($this->modelo->refresh()->ativo)->toBeFalse()
-        ->and($this->modelo->trashed())->toBeFalse();
+    $componente->assertSee('/'.LogoDaFolha::PADRAO['esquerda'], escape: false)
+        ->assertSee('Já vem com o sistema');
+
+    $componente->set('origem_logo_esquerda', OrigemDaLogo::Nenhuma->value)
+        ->assertDontSee('/'.LogoDaFolha::PADRAO['esquerda'], escape: false);
 });
 
 /*

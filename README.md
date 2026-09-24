@@ -301,10 +301,30 @@ entregar uma versão velha guardada em disco.
 
 ### Duas logos e as normas da ABNT
 
-O cabeçalho leva **uma logo em cada extremo** — a da escola de um lado, a
-da rede ou do estado do outro — com a identificação ao centro. Cada uma é
-opcional, e as células dos extremos continuam existindo mesmo vazias: é o
-que mantém o texto centrado quando só uma delas foi enviada.
+O cabeçalho leva **uma logo em cada extremo**, com a identificação ao
+centro. O sistema já acompanha as duas — o brasão do estado à esquerda e
+a da escola à direita, em `public/marca/` —, então um modelo novo sai
+pronto sem enviar imagem nenhuma.
+
+Cada lado escolhe entre três origens (`OrigemDaLogo`):
+
+| | |
+|---|---|
+| **Padrão** | a que vem com o sistema; nada a enviar |
+| **Enviada** | uma imagem própria daquele modelo, guardada no disco público |
+| **Nenhuma** | aquele extremo fica sem logo |
+
+Sair de "enviada" apaga o arquivo, que ninguém mais alcançaria pela
+tela. E uma origem "enviada" cujo arquivo sumiu do disco cai de volta
+para a padrão: moldura sem logo por causa de arquivo apagado à mão é
+pior do que a logo do sistema.
+
+As células dos extremos continuam existindo mesmo vazias — é o que
+mantém o texto centrado quando um dos lados não tem logo.
+
+Trocar as logos que acompanham o sistema é substituir os dois arquivos
+em `public/marca/`; vale para todos os modelos que estejam no padrão. Os
+formatos são PNG, JPG ou GIF: **o mPDF não desenha WEBP**.
 
 A formatação padrão é a **ABNT (NBR 14724)**. A norma trata de trabalho
 acadêmico, não de prova; o que se aproveita dela é a parte tipográfica,
@@ -338,6 +358,21 @@ O gabarito completo é da coordenação (`ProvaPolicy::verGabarito`). O
 professor abre a prova porque tem questões nela, mas não recebe as
 respostas das outras disciplinas — nem pela tela, nem por `?gabarito=1`
 na URL do download.
+
+### Arquivos públicos saem por `/storage`, sem host fixo
+
+O disco público é configurado com uma URL **relativa à raiz**
+(`config/filesystems.php`), e não montada a partir do `APP_URL`.
+
+Com a URL absoluta, o `APP_URL=http://localhost` do ambiente de
+desenvolvimento gerava `<img src="http://localhost/storage/...">`
+enquanto o `artisan serve` atendia em `127.0.0.1:8000`: a imagem do
+enunciado não carregava e nada na tela dizia por quê. Relativo, o
+arquivo é sempre servido por quem serviu a página — qualquer host, porta
+ou proxy.
+
+Quem for servir os arquivos de outro domínio define
+`FILESYSTEM_PUBLIC_URL`.
 
 ## Estrutura acadêmica
 

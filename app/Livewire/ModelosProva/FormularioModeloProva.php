@@ -4,11 +4,14 @@ namespace App\Livewire\ModelosProva;
 
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\NormaDaFolha;
+use App\Enums\OrigemDaLogo;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
 use App\Support\LayoutDaFolha;
+use App\Support\LogoDaFolha;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -68,13 +71,17 @@ class FormularioModeloProva extends Component
 
     // --- Logos ------------------------------------------------------------
 
+    /**
+     * O sistema já traz uma logo para cada lado, então o padrão de um
+     * modelo novo não exige envio nenhum.
+     */
+    public string $origem_logo_esquerda = 'padrao';
+
+    public string $origem_logo_direita = 'padrao';
+
     public ?TemporaryUploadedFile $logoEsquerda = null;
 
     public ?TemporaryUploadedFile $logoDireita = null;
-
-    public bool $removerLogoEsquerda = false;
-
-    public bool $removerLogoDireita = false;
 
     public function mount(?ModeloProva $modelo = null): void
     {
@@ -91,6 +98,8 @@ class FormularioModeloProva extends Component
             $this->rodape = (string) $modelo->rodape;
             $this->campos_identificacao = $modelo->campos_identificacao ?? [];
             $this->ativo = $modelo->ativo;
+            $this->origem_logo_esquerda = $modelo->origem_logo_esquerda->value;
+            $this->origem_logo_direita = $modelo->origem_logo_direita->value;
 
             $this->carregarLayout($modelo->layoutDaFolha());
 
@@ -169,8 +178,12 @@ class FormularioModeloProva extends Component
             'margem_inferior' => ['required', 'numeric', 'min:5', 'max:50'],
             'margem_esquerda' => ['required', 'numeric', 'min:5', 'max:50'],
             'margem_direita' => ['required', 'numeric', 'min:5', 'max:50'],
-            'logoEsquerda' => ['nullable', 'image', 'max:2048'],
-            'logoDireita' => ['nullable', 'image', 'max:2048'],
+            'origem_logo_esquerda' => ['required', Rule::in(OrigemDaLogo::valores())],
+            'origem_logo_direita' => ['required', Rule::in(OrigemDaLogo::valores())],
+            // Exigida só quando o lado ficou em "enviar uma imagem" e
+            // ainda não há arquivo guardado — trocar a imagem é opcional.
+            'logoEsquerda' => [Rule::requiredIf($this->faltaArquivo('esquerda')), 'nullable', 'image', 'max:2048'],
+            'logoDireita' => [Rule::requiredIf($this->faltaArquivo('direita')), 'nullable', 'image', 'max:2048'],
         ];
     }
 
@@ -191,8 +204,10 @@ class FormularioModeloProva extends Component
             'margem_inferior' => 'margem inferior',
             'margem_esquerda' => 'margem esquerda',
             'margem_direita' => 'margem direita',
-            'logoEsquerda' => 'logo da esquerda',
-            'logoDireita' => 'logo da direita',
+            'origem_logo_esquerda' => 'logo da esquerda',
+            'origem_logo_direita' => 'logo da direita',
+            'logoEsquerda' => 'imagem da logo da esquerda',
+            'logoDireita' => 'imagem da logo da direita',
         ];
     }
 
@@ -219,7 +234,7 @@ class FormularioModeloProva extends Component
             'layout' => $this->layoutEscolhido()->paraJson(),
         ];
 
-        $dados += $this->caminhoDasLogos();
+        $dados += $this->dadosDasLogos();
 
         if ($this->modelo === null) {
             $dados['criado_por'] = auth()->id();
@@ -234,23 +249,55 @@ class FormularioModeloProva extends Component
         $this->redirectRoute('modelos-prova.index', navigate: true);
     }
 
-    /** @return array<string, ?string> */
-    protected function caminhoDasLogos(): array
+    /**
+     * O que vai para o banco em cada lado: a origem escolhida e, quando
+     * a imagem é enviada, o caminho dela. Sair de "enviada" apaga o
+     * arquivo — ninguém mais o alcança pela tela.
+     *
+     * @return array<string, mixed>
+     */
+    protected function dadosDasLogos(): array
     {
-        $caminhos = [];
+        $dados = [];
 
-        foreach ([
-            'logo_esquerda_path' => ['logoEsquerda', 'removerLogoEsquerda'],
-            'logo_direita_path' => ['logoDireita', 'removerLogoDireita'],
-        ] as $coluna => [$arquivo, $remover]) {
-            if ($this->{$arquivo} !== null) {
-                $caminhos[$coluna] = $this->{$arquivo}->store('modelos-prova', 'public');
-            } elseif ($this->{$remover}) {
-                $caminhos[$coluna] = null;
+        foreach (LogoDaFolha::LADOS as $lado) {
+            $origem = OrigemDaLogo::from($this->{"origem_logo_{$lado}"});
+            $enviada = $this->{'logo'.ucfirst($lado)};
+            $guardado = $this->modelo?->{"logo_{$lado}_path"};
+
+            $dados["origem_logo_{$lado}"] = $origem->value;
+
+            if ($origem->exigeArquivo() && $enviada !== null) {
+                $this->descartar($guardado);
+
+                $dados["logo_{$lado}_path"] = $enviada->store('modelos-prova', 'public');
+
+                continue;
+            }
+
+            if (! $origem->exigeArquivo()) {
+                $this->descartar($guardado);
+
+                $dados["logo_{$lado}_path"] = null;
             }
         }
 
-        return $caminhos;
+        return $dados;
+    }
+
+    protected function descartar(?string $caminho): void
+    {
+        if ($caminho !== null && Storage::disk('public')->exists($caminho)) {
+            Storage::disk('public')->delete($caminho);
+        }
+    }
+
+    /** Escolheu "enviar uma imagem" e não há arquivo — nem novo, nem guardado. */
+    protected function faltaArquivo(string $lado): bool
+    {
+        return $this->{"origem_logo_{$lado}"} === OrigemDaLogo::Enviada->value
+            && $this->{'logo'.ucfirst($lado)} === null
+            && $this->modelo?->{"logo_{$lado}_path"} === null;
     }
 
     public function render(RenderizarProvaAction $renderizar): View
@@ -259,6 +306,8 @@ class FormularioModeloProva extends Component
             'eixos' => Eixo::query()->whereIn('id', auth()->user()->eixoIds())->orderBy('nome')->get(),
             'camposDisponiveis' => ModeloProva::CAMPOS_DE_IDENTIFICACAO,
             'fontesDisponiveis' => LayoutDaFolha::FONTES,
+            'origensDaLogo' => OrigemDaLogo::opcoes(),
+            'lados' => ModeloProva::LADOS_DA_LOGO,
             'normas' => NormaDaFolha::opcoes(),
             'normaEscolhida' => $this->normaEscolhida(),
             'folha' => $renderizar->amostraDoModelo($this->paraAmostra()),
@@ -284,15 +333,11 @@ class FormularioModeloProva extends Component
             'layout' => $this->layoutEscolhido()->paraJson(),
         ]);
 
-        // A amostra mostra a logo que já está guardada; a recém-enviada
-        // ainda é um arquivo temporário, fora do disco público.
-        if ($this->removerLogoEsquerda) {
-            $amostra->logo_esquerda_path = null;
-        }
-
-        if ($this->removerLogoDireita) {
-            $amostra->logo_direita_path = null;
-        }
+        // A amostra reflete a origem escolhida agora; a imagem
+        // recém-enviada ainda é um arquivo temporário, fora do disco
+        // público, então ela só aparece depois de salvar.
+        $amostra->origem_logo_esquerda = OrigemDaLogo::from($this->origem_logo_esquerda);
+        $amostra->origem_logo_direita = OrigemDaLogo::from($this->origem_logo_direita);
 
         return $amostra;
     }

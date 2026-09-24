@@ -44,30 +44,56 @@
         <x-cartao titulo="Logos do cabeçalho"
                   descricao="Uma em cada extremo, com a identificação da escola ao centro.">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                @foreach ([
-                    ['lado' => 'esquerda', 'rotulo' => 'Logo à esquerda', 'campo' => 'logoEsquerda',
-                     'remover' => 'removerLogoEsquerda', 'atual' => $modelo?->logo_esquerda_path],
-                    ['lado' => 'direita', 'rotulo' => 'Logo à direita', 'campo' => 'logoDireita',
-                     'remover' => 'removerLogoDireita', 'atual' => $modelo?->logo_direita_path],
-                ] as $logo)
-                    <x-campo :rotulo="$logo['rotulo']" :para="$logo['campo']"
-                             :erro="$errors->first($logo['campo'])"
-                             ajuda="PNG ou JPG de até 2 MB.">
-                        @if ($logo['atual'] && ! $this->{$logo['remover']})
-                            <img src="{{ Storage::disk('public')->url($logo['atual']) }}" alt=""
-                                 class="mb-2 h-16 w-auto rounded border border-slate-200 bg-white p-1 dark:border-slate-700">
-                        @endif
+                @foreach ($lados as $lado => $rotulo)
+                    @php
+                        $campoOrigem = "origem_logo_{$lado}";
+                        $campoArquivo = 'logo'.ucfirst($lado);
+                        $guardada = $modelo?->{"logo_{$lado}_path"};
+                        $escolhida = $this->{$campoOrigem};
+                    @endphp
 
-                        <input type="file" id="{{ $logo['campo'] }}" wire:model="{{ $logo['campo'] }}"
-                               accept="image/*"
-                               class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200">
+                    <x-campo :rotulo="$rotulo" :erro="$errors->first($campoOrigem)">
+                        <div class="space-y-2">
+                            @foreach ($origensDaLogo as $valor => $texto)
+                                <label class="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                    {{-- Radio de verdade: a escolha é uma entre três. --}}
+                                    <input type="radio" value="{{ $valor }}"
+                                           wire:model.live="{{ $campoOrigem }}"
+                                           class="mt-0.5 border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
+                                    <span>
+                                        {{ $texto }}
+                                        @if ($valor === 'padrao')
+                                            <span class="block text-xs text-slate-500 dark:text-slate-400">
+                                                Já vem com o sistema — não precisa enviar nada.
+                                            </span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
 
-                        @if ($logo['atual'])
-                            <label class="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                                <input type="checkbox" wire:model.live="{{ $logo['remover'] }}"
-                                       class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
-                                Remover esta logo
-                            </label>
+                        @if ($escolhida === 'padrao')
+                            <img src="/{{ App\Support\LogoDaFolha::PADRAO[$lado] }}" alt=""
+                                 class="mt-3 h-16 w-auto rounded border border-slate-200 bg-white p-1 dark:border-slate-700">
+                        @elseif ($escolhida === 'enviada')
+                            @if ($guardada)
+                                <img src="{{ Storage::disk('public')->url($guardada) }}" alt=""
+                                     class="mt-3 h-16 w-auto rounded border border-slate-200 bg-white p-1 dark:border-slate-700">
+                            @endif
+
+                            <div class="mt-3 space-y-1.5">
+                                <input type="file" id="{{ $campoArquivo }}" wire:model="{{ $campoArquivo }}"
+                                       accept="image/png,image/jpeg,image/gif"
+                                       class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200">
+
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    PNG, JPG ou GIF de até 2 MB. {{ $guardada ? 'Envie outra para substituir.' : '' }}
+                                </p>
+
+                                @error($campoArquivo)
+                                    <p class="text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                                @enderror
+                            </div>
                         @endif
                     </x-campo>
                 @endforeach

@@ -17,11 +17,13 @@ use App\Actions\Prova\GerarPdfDaProvaAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\NormaDaFolha;
+use App\Enums\OrigemDaLogo;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
 use App\Models\QuestaoBloco;
 use App\Models\Turma;
 use App\Support\LayoutDaFolha;
+use App\Support\LogoDaFolha;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -52,6 +54,8 @@ beforeEach(function () {
         'instituicao' => 'Escola Técnica Estadual',
         'logo_esquerda_path' => $this->logoEsquerda,
         'logo_direita_path' => $this->logoDireita,
+        'origem_logo_esquerda' => OrigemDaLogo::Enviada,
+        'origem_logo_direita' => OrigemDaLogo::Enviada,
         'layout' => ['norma' => 'abnt', 'fonte' => 'sans'],
         'criado_por' => $this->paeet->id,
     ]);
@@ -114,15 +118,61 @@ it('põe uma logo em cada extremo do cabeçalho', function () {
     expect($posicoes)->toBe(collect($posicoes)->sort()->values()->all());
 });
 
-it('mantém as duas células do cabeçalho mesmo sem logo nenhuma', function () {
+it('usa as logos que acompanham o sistema quando nada foi enviado', function () {
+    // É o padrão de qualquer modelo novo: ninguém precisa enviar as
+    // mesmas duas imagens a cada modelo que cria.
+    $modelo = ModeloProva::factory()->create(['eixo_id' => $this->eixo->id]);
+
+    expect($modelo->origem_logo_esquerda)->toBe(OrigemDaLogo::Padrao)
+        ->and($modelo->origem_logo_direita)->toBe(OrigemDaLogo::Padrao);
+
+    $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)($modelo));
+
+    expect($html)->toContain('/'.LogoDaFolha::PADRAO['esquerda'])
+        ->toContain('/'.LogoDaFolha::PADRAO['direita']);
+});
+
+it('entrega o arquivo da logo padrão para o PDF, e não a URL', function () {
+    $modelo = ModeloProva::factory()->create(['eixo_id' => $this->eixo->id]);
+
+    $html = app(RenderizarProvaAction::class)->paraPdf(($this->montar)($modelo));
+
+    expect($html)->toContain(public_path(LogoDaFolha::PADRAO['esquerda']))
+        ->toContain(public_path(LogoDaFolha::PADRAO['direita']));
+});
+
+it('os dois arquivos padrão existem no projeto', function () {
+    foreach (LogoDaFolha::PADRAO as $lado => $relativo) {
+        expect(is_file(public_path($relativo)))->toBeTrue("falta a logo padrão da {$lado}");
+
+        // O mPDF não desenha WEBP.
+        expect(image_type_to_mime_type(getimagesize(public_path($relativo))[2]))
+            ->toBeIn(['image/png', 'image/jpeg', 'image/gif']);
+    }
+});
+
+it('mantém as duas células do cabeçalho quando os dois lados dispensam a logo', function () {
     // Sem as células vazias o texto do centro escorrega para a esquerda.
-    $this->modelo->update(['logo_esquerda_path' => null, 'logo_direita_path' => null]);
+    $this->modelo->update([
+        'origem_logo_esquerda' => OrigemDaLogo::Nenhuma,
+        'origem_logo_direita' => OrigemDaLogo::Nenhuma,
+    ]);
 
     $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)());
 
     expect($html)->toContain('class="logo esquerda"')
         ->toContain('class="logo direita"')
-        ->not->toContain('modelos-prova/');
+        ->not->toContain('<img src="/storage/modelos-prova/')
+        ->not->toContain('/'.LogoDaFolha::PADRAO['esquerda']);
+});
+
+it('cai para a logo padrão quando o arquivo enviado sumiu do disco', function () {
+    // Um arquivo apagado à mão não pode deixar a folha sem moldura.
+    $this->modelo->update(['logo_esquerda_path' => 'modelos-prova/que-nao-existe.png']);
+
+    $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)());
+
+    expect($html)->toContain('/'.LogoDaFolha::PADRAO['esquerda']);
 });
 
 it('lê as logos do disco quando o destino é o PDF', function () {

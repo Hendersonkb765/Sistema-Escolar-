@@ -8,6 +8,7 @@ use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\Turma;
+use App\Support\LogoDaFolha;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\View;
 
@@ -107,26 +108,23 @@ class RenderizarProvaAction
     }
 
     /**
-     * As duas logos do cabeçalho — uma em cada extremo. Cada uma pode
-     * faltar, e a folha se vira com as que houver.
+     * As duas logos do cabeçalho — uma em cada extremo. Cada lado
+     * resolve sozinho se usa a logo que acompanha o sistema, uma imagem
+     * enviada, ou nenhuma.
      *
      * @return array{esquerda: ?string, direita: ?string}
      */
     protected function logos(ModeloProva $modelo, bool $paraImpressao): array
     {
-        return [
-            'esquerda' => $this->logo($modelo->logo_esquerda_path, $paraImpressao),
-            'direita' => $this->logo($modelo->logo_direita_path, $paraImpressao),
-        ];
-    }
+        $enderecos = [];
 
-    protected function logo(?string $caminho, bool $paraImpressao): ?string
-    {
-        if ($caminho === null || ! Storage::disk('public')->exists($caminho)) {
-            return null;
+        foreach (LogoDaFolha::LADOS as $lado) {
+            $logo = $modelo->logo($lado);
+
+            $enderecos[$lado] = $paraImpressao ? $logo->arquivo() : $logo->url();
         }
 
-        return $this->imagem($caminho, $paraImpressao);
+        return $enderecos;
     }
 
     /**

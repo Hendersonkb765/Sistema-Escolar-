@@ -41,7 +41,20 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            /*
+             * Caminho relativo à raiz, de propósito.
+             *
+             * Com a URL montada a partir do `APP_URL`, um `<img>` desta
+             * aplicação aponta para `http://localhost/...` enquanto o
+             * `artisan serve` atende em `127.0.0.1:8000` — a imagem não
+             * carrega e nada na tela diz por quê. Relativo, o arquivo é
+             * sempre servido por quem serviu a página, em qualquer host,
+             * porta ou proxy.
+             *
+             * Quem for servir os arquivos de outro domínio (CDN) define
+             * `FILESYSTEM_PUBLIC_URL`.
+             */
+            'url' => rtrim(env('FILESYSTEM_PUBLIC_URL', '/storage'), '/'),
             'visibility' => 'public',
             'throw' => false,
             'report' => false,

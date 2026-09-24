@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Enums\NormaDaFolha;
+use App\Enums\OrigemDaLogo;
 use App\Models\Concerns\AplicaEscopoDeEixo;
 use App\Support\LayoutDaFolha;
+use App\Support\LogoDaFolha;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -31,6 +33,8 @@ class ModeloProva extends Model
         'instrucoes',
         'logo_esquerda_path',
         'logo_direita_path',
+        'origem_logo_esquerda',
+        'origem_logo_direita',
         'campos_identificacao',
         'layout',
         'rodape',
@@ -43,6 +47,8 @@ class ModeloProva extends Model
     {
         return [
             'campos_identificacao' => 'array',
+            'origem_logo_esquerda' => OrigemDaLogo::class,
+            'origem_logo_direita' => OrigemDaLogo::class,
             'layout' => 'array',
             'ativo' => 'boolean',
             'versao' => 'integer',
@@ -69,6 +75,11 @@ class ModeloProva extends Model
         return $this->layoutDaFolha()->norma;
     }
 
+    public function logo(string $lado): LogoDaFolha
+    {
+        return LogoDaFolha::de($this, $lado);
+    }
+
     /** @return BelongsTo<Eixo, $this> */
     public function eixo(): BelongsTo
     {
@@ -79,6 +90,11 @@ class ModeloProva extends Model
     public const LADOS_DA_LOGO = [
         'esquerda' => 'Logo à esquerda',
         'direita' => 'Logo à direita',
+    ];
+
+    protected $attributes = [
+        'origem_logo_esquerda' => 'padrao',
+        'origem_logo_direita' => 'padrao',
     ];
 
     /** Campos que a folha imprime no quadro de identificação do aluno. */
