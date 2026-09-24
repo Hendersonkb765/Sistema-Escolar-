@@ -177,6 +177,61 @@ it('o DOCX traz o conteúdo da prova e as duas colunas', function () {
         ->not->toContain(str_repeat('_', 12));
 });
 
+it('gera o DOCX sem deixar vazar aviso nenhum', function () {
+    // O PhpWord 1.4 chama `Style::getStyle(null)` ao escrever cada
+    // parágrafo, e no PHP 8.5 isso virou depreciação. Sem o silêncio
+    // estreito da action, cada download escreveria várias linhas de
+    // ruído no log.
+    $avisos = [];
+
+    set_error_handler(function (int $tipo, string $mensagem) use (&$avisos) {
+        $avisos[] = $mensagem;
+
+        return true;
+    });
+
+    try {
+        $conteudo = app(GerarDocxDaProvaAction::class)->conteudo($this->provaMontada, $this->paeet);
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($avisos)->toBe([])
+        ->and(substr($conteudo, 0, 2))->toBe('PK');
+});
+
+it('não cala aviso que não venha do PhpWord', function () {
+    // O silêncio precisa ser estreito: uma depreciação nossa, um dia,
+    // tem de continuar aparecendo.
+    $acao = new class extends GerarDocxDaProvaAction
+    {
+        public function provocar(): bool
+        {
+            return $this->semRuidoDoPhpWord(function () {
+                trigger_error('depreciação de teste', E_USER_DEPRECATED);
+
+                return true;
+            });
+        }
+    };
+
+    $vistos = [];
+
+    set_error_handler(function (int $tipo, string $mensagem) use (&$vistos) {
+        $vistos[] = $mensagem;
+
+        return true;
+    });
+
+    try {
+        $acao->provocar();
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($vistos)->toBe(['depreciação de teste']);
+});
+
 it('guarda o DOCX e registra o caminho na prova', function () {
     $caminho = app(GerarDocxDaProvaAction::class)->guardar($this->provaMontada, $this->paeet);
 

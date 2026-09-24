@@ -9,7 +9,7 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 
 | Camada | Escolha |
 |---|---|
-| Runtime | PHP 8.4 · Laravel 13.17.0 |
+| Runtime | PHP 8.5 · Laravel 13.17.0 |
 | Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
 | Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
 | Auth | Laravel Fortify **sem registro público** |
@@ -25,8 +25,18 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 atualização foi pedida nessa versão. Subir dentro do 13.x é editar essa
 linha do `composer.json` e rodar `composer update laravel/framework`.
 
-O `spatie/laravel-activitylog` 5.x exige **PHP ^8.4** — é ele, e não o
-Laravel, que define o piso de PHP do projeto. O Laravel 13 aceita ^8.3.
+O piso de PHP é `^8.5`. Quem o empurrava para cima antes era o
+`spatie/laravel-activitylog` 5.x, que exige `^8.4` — o Laravel 13
+sozinho aceita `^8.3`.
+
+No PHP 8.5 o `phpoffice/phpword` 1.4 emite uma depreciação ao escrever
+cada parágrafo (`Style::getStyle(null)` → *using null as an array
+offset*). O `.docx` sai correto; o que vazava era ruído no log a cada
+download. `GerarDocxDaProvaAction::semRuidoDoPhpWord()` cala **apenas**
+`E_DEPRECATED` vindo de dentro do PhpWord — qualquer outro aviso,
+inclusive uma depreciação nossa, continua passando, e há teste para as
+duas coisas. A 1.4.0 é a última publicada; quando sair a correção, o
+método some.
 
 ## Regra de ouro
 

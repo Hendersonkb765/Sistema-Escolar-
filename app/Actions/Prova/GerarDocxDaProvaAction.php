@@ -41,13 +41,61 @@ class GerarDocxDaProvaAction
 
         $temporario = tempnam(sys_get_temp_dir(), 'prova').'.docx';
 
-        IOFactory::createWriter($documento, 'Word2007')->save($temporario);
+        $this->semRuidoDoPhpWord(
+            fn () => IOFactory::createWriter($documento, 'Word2007')->save($temporario)
+        );
 
         $conteudo = (string) file_get_contents($temporario);
 
         @unlink($temporario);
 
         return $conteudo;
+    }
+
+    /**
+     * Cala uma depreciação do próprio PhpWord no PHP 8.5.
+     *
+     * Ao escrever cada parágrafo, o PhpWord 1.4 chama
+     * `Style::getStyle(null)` quando não há estilo de numeração — e
+     * `$styles[null]` virou "Using null as an array offset is
+     * deprecated". O .docx sai correto; o que vaza é ruído, algumas
+     * linhas de log a cada download.
+     *
+     * O silêncio é estreito de propósito: só `E_DEPRECATED`, e só se vier
+     * de dentro do PhpWord. Qualquer outro aviso, inclusive uma
+     * depreciação nossa, continua passando. A 1.4.0 é a última publicada
+     * e ainda não traz a correção; quando trouxer, este método sai e o
+     * teste de regressão cobra a saída.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $escrever
+     * @return T
+     */
+    protected function semRuidoDoPhpWord(callable $escrever): mixed
+    {
+        $anterior = set_error_handler(
+            function (int $tipo, string $mensagem, string $arquivo = '', int $linha = 0) use (&$anterior) {
+                $doPhpWord = str_contains(
+                    str_replace('\\', '/', $arquivo),
+                    'vendor/phpoffice/phpword/'
+                );
+
+                if ($tipo === E_DEPRECATED && $doPhpWord) {
+                    return true;
+                }
+
+                return $anterior === null
+                    ? false
+                    : ($anterior)($tipo, $mensagem, $arquivo, $linha);
+            }
+        );
+
+        try {
+            return $escrever();
+        } finally {
+            restore_error_handler();
+        }
     }
 
     public function guardar(Prova $prova, User $autor, bool $comGabarito = false): string
