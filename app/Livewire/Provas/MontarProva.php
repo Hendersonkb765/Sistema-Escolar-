@@ -36,8 +36,6 @@ class MontarProva extends Component
 
     public bool $mostrar_pesos = false;
 
-    public bool $gerar_gabarito = true;
-
     public string $instrucoes = '';
 
     /** Questões marcadas para entrar. @var array<int, int> */
@@ -161,7 +159,6 @@ class MontarProva extends Component
                 questoesEscolhidas: $this->escolhidas(),
                 configuracao: [
                     'colunas' => $dados['colunas'],
-                    'gabarito' => $this->gerar_gabarito,
                     'mostrar_pesos' => $this->mostrar_pesos,
                 ],
                 instrucoes: $dados['instrucoes'] ?: null,

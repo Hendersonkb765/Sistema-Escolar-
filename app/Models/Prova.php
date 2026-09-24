@@ -127,11 +127,6 @@ class Prova extends Model
         return (int) ($this->configuracao['colunas'] ?? 2);
     }
 
-    public function mostrarGabarito(): bool
-    {
-        return (bool) ($this->configuracao['gabarito'] ?? false);
-    }
-
     public function mostrarPesos(): bool
     {
         return (bool) ($this->configuracao['mostrar_pesos'] ?? false);

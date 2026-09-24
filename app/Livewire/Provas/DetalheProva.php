@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Provas;
 
+use App\Actions\Prova\GerarGabaritoCsvAction;
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\StatusProva;
 use App\Livewire\Concerns\Notifica;
@@ -21,21 +22,11 @@ class DetalheProva extends Component
 
     public Prova $prova;
 
-    /** Mostrar as respostas na pré-visualização. */
-    public bool $comGabarito = false;
-
     public function mount(Prova $prova): void
     {
         $this->authorize('view', $prova);
 
         $this->prova = $prova;
-    }
-
-    public function alternarGabarito(): void
-    {
-        $this->authorize('verGabarito', $this->prova);
-
-        $this->comGabarito = ! $this->comGabarito;
     }
 
     public function marcarComoAplicada(): void
@@ -60,13 +51,18 @@ class DetalheProva extends Component
         $this->notificarSucesso('Prova marcada como aplicada. Agora ela aceita a importação de resultados.');
     }
 
-    public function render(RenderizarProvaAction $renderizar): View
+    public function render(RenderizarProvaAction $renderizar, GerarGabaritoCsvAction $gabarito): View
     {
         $this->prova->load(['turma.curso.eixo', 'modelo', 'geradaPor']);
 
+        $podeVerOGabarito = auth()->user()->can('verGabarito', $this->prova);
+
         return view('provas.detalhe', [
-            'folha' => $renderizar->paraTela($this->prova, $this->comGabarito),
+            'folha' => $renderizar->paraTela($this->prova),
             'porDisciplina' => $this->prova->questoesPorDisciplina(),
+            'podeVerOGabarito' => $podeVerOGabarito,
+            // Os avisos são do gabarito, e só quem pode baixá-lo os lê.
+            'avisosDoGabarito' => $podeVerOGabarito ? $gabarito->avisos($this->prova) : [],
         ])->layout('components.layouts.app', [
             'titulo' => $this->prova->titulo,
             'subtitulo' => 'Turma '.$this->prova->turma->nome

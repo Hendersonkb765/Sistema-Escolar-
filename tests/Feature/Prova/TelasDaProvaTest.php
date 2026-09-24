@@ -244,26 +244,60 @@ it('mostra a composição por disciplina com a faixa de números', function () {
         ->assertSeeInOrder(['Lógica', '1 a 3', 'Redes', '4 a 5']);
 });
 
-it('alterna o gabarito para a gestão', function () {
+it('oferece o gabarito à gestão e esconde do professor', function () {
     $prova = ($this->montarProva)();
 
     Livewire::actingAs($this->paeet)
         ->test(DetalheProva::class, ['prova' => $prova])
-        ->assertSee('Ver com gabarito')
-        ->call('alternarGabarito')
-        ->assertSet('comGabarito', true)
-        ->assertSee('Gabarito');
-});
-
-it('não oferece o gabarito ao professor', function () {
-    $prova = ($this->montarProva)();
+        ->assertSee('Gerar gabarito')
+        ->assertDontSee('Ver com gabarito');
 
     Livewire::actingAs($this->profLogica)
         ->test(DetalheProva::class, ['prova' => $prova])
         ->assertOk()
-        ->assertDontSee('Ver com gabarito')
-        ->call('alternarGabarito')
-        ->assertForbidden();
+        ->assertDontSee('Gerar gabarito');
+});
+
+it('explica na tela o que conferir antes de importar o gabarito', function () {
+    $prova = ($this->montarProva)();
+
+    // Uma letra fora do A–D da folha de referência.
+    $prova->questoes()->where('numero', 1)->sole()->update([
+        'alternativas_snapshot' => [['letra' => 'E', 'texto' => 'Quinta', 'correta' => true]],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(DetalheProva::class, ['prova' => $prova])
+        ->assertSee('Confira antes de importar o gabarito')
+        ->assertSee('A, B, C, D');
+
+    // O professor não vê o gabarito, e portanto não vê os avisos dele.
+    Livewire::actingAs($this->profLogica)
+        ->test(DetalheProva::class, ['prova' => $prova])
+        ->assertDontSee('Confira antes de importar o gabarito');
+});
+
+it('não mostra aviso nenhum quando não há o que conferir', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(DetalheProva::class, ['prova' => ($this->montarProva)()])
+        ->assertDontSee('Confira antes de importar o gabarito');
+});
+
+it('baixa o gabarito em CSV', function () {
+    $prova = ($this->montarProva)();
+
+    $resposta = $this->actingAs($this->paeet)->get(route('provas.gabarito', $prova));
+
+    $resposta->assertOk();
+
+    expect($resposta->headers->get('content-type'))->toContain('text/csv')
+        ->and($resposta->headers->get('content-disposition'))->toContain('.csv');
+});
+
+it('nega o gabarito ao professor, mesmo pela URL', function () {
+    $prova = ($this->montarProva)();
+
+    $this->actingAs($this->profLogica)->get(route('provas.gabarito', $prova))->assertForbidden();
 });
 
 it('baixa o PDF e o Word pela rota', function () {

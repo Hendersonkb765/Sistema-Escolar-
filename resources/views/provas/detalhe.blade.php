@@ -1,19 +1,18 @@
 <div class="space-y-4">
     <x-cartao>
         <x-slot:acoes>
-            @can('verGabarito', $prova)
-                <x-botao variante="secundario" wire:click="alternarGabarito">
-                    {{ $comGabarito ? 'Ocultar gabarito' : 'Ver com gabarito' }}
+            @if ($podeVerOGabarito)
+                <x-botao variante="secundario" href="{{ route('provas.gabarito', $prova) }}"
+                         title="Baixa o CSV de chaves de respostas para importar no leitor de folhas.">
+                    Gerar gabarito
                 </x-botao>
-            @endcan
+            @endif
 
-            <x-botao variante="secundario"
-                     href="{{ route('provas.pdf', ['prova' => $prova, 'gabarito' => $comGabarito ? 1 : 0]) }}">
+            <x-botao variante="secundario" href="{{ route('provas.pdf', $prova) }}">
                 Baixar PDF
             </x-botao>
 
-            <x-botao variante="secundario"
-                     href="{{ route('provas.docx', ['prova' => $prova, 'gabarito' => $comGabarito ? 1 : 0]) }}">
+            <x-botao variante="secundario" href="{{ route('provas.docx', $prova) }}">
                 Baixar Word
             </x-botao>
 
@@ -66,6 +65,16 @@
             </div>
         </dl>
 
+        @if ($avisosDoGabarito !== [])
+            <x-alerta tipo="atencao" class="mt-4" titulo="Confira antes de importar o gabarito">
+                <ul class="list-disc space-y-1 pl-4">
+                    @foreach ($avisosDoGabarito as $aviso)
+                        <li>{{ $aviso }}</li>
+                    @endforeach
+                </ul>
+            </x-alerta>
+        @endif
+
         <x-alerta tipo="info" class="mt-4" titulo="Esta prova é um registro congelado">
             Enunciados, alternativas e pesos foram copiados na montagem
             ({{ $prova->gerada_em?->format('d/m/Y H:i') }}, por {{ $prova->geradaPor?->nome }}).
@@ -107,7 +116,7 @@
     </x-cartao>
 
     <x-cartao titulo="Pré-visualização"
-              :descricao="'É exatamente o que sai no PDF e no Word'.($comGabarito ? ' — mostrando o gabarito' : '')">
+              descricao="É exatamente o que sai no PDF e no Word.">
         {{-- A folha vai num iframe: o CSS dela é de impressão e não pode
              vazar para o resto do sistema. --}}
         <iframe srcdoc="{{ $folha }}"

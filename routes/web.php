@@ -90,6 +90,7 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/provas/{prova}', DetalheProva::class)->name('provas.show');
     Route::get('/provas/{prova}/pdf', [ProvaArquivoController::class, 'pdf'])->name('provas.pdf');
     Route::get('/provas/{prova}/word', [ProvaArquivoController::class, 'docx'])->name('provas.docx');
+    Route::get('/provas/{prova}/gabarito', [ProvaArquivoController::class, 'gabarito'])->name('provas.gabarito');
 
     Route::get('/modelos-prova', ListaModelosProva::class)->name('modelos-prova.index');
     Route::get('/modelos-prova/criar', FormularioModeloProva::class)->name('modelos-prova.criar');

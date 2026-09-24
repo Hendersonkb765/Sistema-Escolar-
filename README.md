@@ -372,6 +372,38 @@ professor abre a prova porque tem questões nela, mas não recebe as
 respostas das outras disciplinas — nem pela tela, nem por `?gabarito=1`
 na URL do download.
 
+**Gerar gabarito** baixa o CSV de chaves de respostas que os leitores de
+folha importam:
+
+```
+Key Letter,Question Number,Response/Mapping,Point Value,Tags
+,1,A,1.50,
+,2,C,1.00,
+```
+
+| coluna | o que vai |
+|---|---|
+| Key Letter | em branco — a chave primária, a única versão que a prova tem |
+| Question Number | a numeração contínua da prova, a mesma que o aluno vê |
+| Response/Mapping | a letra correta congelada no snapshot |
+| Point Value | o peso que **o professor** definiu, com ponto decimal |
+| Tags | vazia, porque é opcional |
+
+Uma linha por resposta aceita — o formato prevê registros extras para
+respostas alternativas da mesma questão —, e cada trio (versão, questão,
+resposta) aparece uma única vez. Nada é recalculado: tudo sai do
+snapshot, então o gabarito segue valendo mesmo que a questão original
+mude depois.
+
+As aspas entram só quando o campo precisa delas. O `fputcsv` do PHP põe
+aspas em qualquer campo com espaço e sairia `"Key Letter"` num cabeçalho
+que o arquivo de referência traz limpo, então a escrita é explícita.
+
+O tamanho da folha de respostas é de quem imprime, não do sistema: se a
+prova passar de 20 questões, se uma resposta sair do A–D ou se faltar
+alternativa correta, a tela **avisa** em vez de bloquear
+(`GerarGabaritoCsvAction::avisos()`).
+
 ### Arquivos públicos saem por `/storage`, sem host fixo
 
 O disco público é configurado com uma URL **relativa à raiz**

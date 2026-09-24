@@ -236,11 +236,10 @@ it('guarda o layout escolhido na montagem', function () {
     $prova = $this->montar->executar(
         autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
         titulo: 'Avaliação bimestral',
-        configuracao: ['colunas' => 2, 'gabarito' => true, 'mostrar_pesos' => true],
+        configuracao: ['colunas' => 2, 'mostrar_pesos' => true],
     );
 
     expect($prova->colunas())->toBe(2)
-        ->and($prova->mostrarGabarito())->toBeTrue()
         ->and($prova->mostrarPesos())->toBeTrue()
         ->and($prova->status)->toBe(StatusProva::Gerada)
         ->and($prova->foiGerada())->toBeTrue()

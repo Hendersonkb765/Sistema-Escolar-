@@ -54,7 +54,7 @@
         </x-cartao>
 
         <x-cartao titulo="Layout da folha">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <x-campo rotulo="Colunas de texto" para="colunas" obrigatorio :erro="$errors->first('colunas')"
                          ajuda="Duas colunas é o padrão de prova impressa.">
                     <x-select id="colunas" wire:model.live="colunas" required>
@@ -69,11 +69,6 @@
                     Mostrar o peso de cada questão na folha
                 </label>
 
-                <label class="flex items-start gap-2 pt-6 text-sm text-slate-700 dark:text-slate-300">
-                    <input type="checkbox" wire:model="gerar_gabarito"
-                           class="mt-0.5 rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
-                    Disponibilizar a versão com gabarito
-                </label>
             </div>
         </x-cartao>
 

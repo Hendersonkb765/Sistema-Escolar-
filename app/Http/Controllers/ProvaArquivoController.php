@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Prova\GerarDocxDaProvaAction;
+use App\Actions\Prova\GerarGabaritoCsvAction;
 use App\Actions\Prova\GerarPdfDaProvaAction;
 use App\Models\Prova;
 use Illuminate\Http\Request;
@@ -41,6 +42,21 @@ class ProvaArquivoController extends Controller
                 'Content-Disposition',
                 'attachment; filename="'
                 .app(GerarPdfDaProvaAction::class)->nomeDoArquivo($prova, $comGabarito, 'docx').'"'
+            );
+    }
+
+    /**
+     * Gabarito em CSV, no formato que os leitores de folha de respostas
+     * importam. A autorização é a mesma da folha com as respostas
+     * marcadas: `verGabarito`, que a própria action aplica.
+     */
+    public function gabarito(Request $request, Prova $prova, GerarGabaritoCsvAction $action): Response
+    {
+        return response($action->conteudo($prova, $request->user()))
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header(
+                'Content-Disposition',
+                'attachment; filename="'.$action->nomeDoArquivo($prova).'"'
             );
     }
 
