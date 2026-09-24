@@ -165,7 +165,16 @@ it('o DOCX traz o conteúdo da prova e as duas colunas', function () {
         // Seção contínua com duas colunas.
         ->toContain('w:num="2"')
         ->toContain('def soma')
-        ->toContain('Lógica');
+        ->toContain('Lógica')
+        // Quadro de identificação, com os mesmos campos da folha.
+        ->toContain('Aluno(a):')
+        ->toContain('Matrícula:')
+        ->toContain('Turma:')
+        // Linha para preencher é borda de célula, e não fileira de `_`,
+        // que quebraria no fim da célula. (A máscara da data segue com
+        // os seus poucos sublinhados.)
+        ->toContain('w:tcBorders')
+        ->not->toContain(str_repeat('_', 12));
 });
 
 it('guarda o DOCX e registra o caminho na prova', function () {

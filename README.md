@@ -326,6 +326,13 @@ Trocar as logos que acompanham o sistema é substituir os dois arquivos
 em `public/marca/`; vale para todos os modelos que estejam no padrão. Os
 formatos são PNG, JPG ou GIF: **o mPDF não desenha WEBP**.
 
+Quem resolve de onde sai cada logo é `App\Support\LogoDaFolha`, e os três
+destinos a consultam — a tela, o PDF e o **Word**. A diferença importa:
+a logo padrão vem de `public/`, versionada com o código, e a enviada vem
+do disco público, que é dado. Ler a coluna do caminho direto, como o
+gerador do .docx fazia, deixava sem cabeçalho justamente quem não tinha
+enviado imagem nenhuma.
+
 A formatação padrão é a **ABNT (NBR 14724)**. A norma trata de trabalho
 acadêmico, não de prova; o que se aproveita dela é a parte tipográfica,
 que é justamente a que a escola costuma exigir:

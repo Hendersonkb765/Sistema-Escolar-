@@ -86,6 +86,25 @@ beforeEach(function () {
         $analisar->aprovar($questao, $this->paeet);
     }
 
+    /** Quantas imagens o .docx carrega dentro de si. */
+    $this->imagensDoDocx = function (string $docx): int {
+        $arquivo = tempnam(sys_get_temp_dir(), 'prova').'.docx';
+        file_put_contents($arquivo, $docx);
+
+        $zip = new ZipArchive;
+        $zip->open($arquivo);
+
+        $imagens = collect(range(0, $zip->numFiles - 1))
+            ->map(fn (int $i) => $zip->getNameIndex($i))
+            ->filter(fn (string $nome) => str_starts_with($nome, 'word/media/'))
+            ->count();
+
+        $zip->close();
+        @unlink($arquivo);
+
+        return $imagens;
+    };
+
     $this->montar = fn (?ModeloProva $modelo = null) => app(MontarProvaAction::class)->executar(
         autor: $this->paeet,
         turma: $this->turma,
@@ -185,23 +204,31 @@ it('lê as logos do disco quando o destino é o PDF', function () {
         ->toContain(Storage::disk('public')->path($this->logoDireita));
 });
 
-it('leva as duas logos para o Word', function () {
+it('leva as duas logos enviadas para o Word', function () {
     $docx = app(GerarDocxDaProvaAction::class)->conteudo(($this->montar)(), $this->paeet);
 
-    $arquivo = tempnam(sys_get_temp_dir(), 'prova').'.docx';
-    file_put_contents($arquivo, $docx);
+    expect(($this->imagensDoDocx)($docx))->toBe(2);
+});
 
-    $zip = new ZipArchive;
-    $zip->open($arquivo);
+it('leva também as logos padrão para o Word', function () {
+    // O .docx lia o caminho do disco direto, e a logo padrão não mora
+    // lá: quem não enviava imagem nenhuma baixava o Word sem cabeçalho.
+    $modelo = ModeloProva::factory()->create(['eixo_id' => $this->eixo->id]);
 
-    $imagens = collect(range(0, $zip->numFiles - 1))
-        ->map(fn (int $i) => $zip->getNameIndex($i))
-        ->filter(fn (string $nome) => str_starts_with($nome, 'word/media/'));
+    $docx = app(GerarDocxDaProvaAction::class)->conteudo(($this->montar)($modelo), $this->paeet);
 
-    $zip->close();
-    @unlink($arquivo);
+    expect(($this->imagensDoDocx)($docx))->toBe(2);
+});
 
-    expect($imagens)->toHaveCount(2);
+it('não põe imagem nenhuma no Word quando os dois lados dispensam a logo', function () {
+    $this->modelo->update([
+        'origem_logo_esquerda' => OrigemDaLogo::Nenhuma,
+        'origem_logo_direita' => OrigemDaLogo::Nenhuma,
+    ]);
+
+    $docx = app(GerarDocxDaProvaAction::class)->conteudo(($this->montar)(), $this->paeet);
+
+    expect(($this->imagensDoDocx)($docx))->toBe(0);
 });
 
 /*

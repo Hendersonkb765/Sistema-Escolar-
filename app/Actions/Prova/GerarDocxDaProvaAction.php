@@ -7,6 +7,7 @@ use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\User;
 use App\Support\LayoutDaFolha;
+use App\Support\LogoDaFolha;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\Element\Cell;
@@ -174,34 +175,7 @@ class GerarDocxDaProvaAction
 
         $secao->addTextBreak(1);
 
-        $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data'];
-        $largura = $this->twips(
-            21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10
-        );
-
-        $tabela = $secao->addTable(['borderSize' => 6, 'borderColor' => '111111', 'cellMargin' => 60]);
-
-        // Mesmos campos e mesma ordem da folha em HTML.
-        $linhas = array_filter([
-            in_array('aluno', $campos, true) ? 'Aluno(a): '.str_repeat('_', 60) : null,
-            $this->juntar([
-                in_array('matricula', $campos, true) ? 'Matrícula: '.str_repeat('_', 18) : null,
-                in_array('turma', $campos, true) ? 'Turma: '.$turma->nome : null,
-                in_array('curso', $campos, true) ? 'Curso: '.$turma->curso->nome : null,
-                in_array('data', $campos, true) ? 'Data: ___/___/______' : null,
-            ]),
-            $this->juntar([
-                in_array('nota', $campos, true) ? 'Nota: '.str_repeat('_', 12) : null,
-                in_array('assinatura', $campos, true)
-                    ? 'Assinatura do professor: '.str_repeat('_', 30)
-                    : null,
-            ]),
-        ]);
-
-        foreach ($linhas as $texto) {
-            $tabela->addRow();
-            $tabela->addCell($largura)->addText($texto, null, 'compacto');
-        }
+        $this->identificacao($secao, $prova, $modelo, $layout);
 
         if ($prova->instrucoes) {
             $secao->addTextBreak(1);
@@ -209,12 +183,72 @@ class GerarDocxDaProvaAction
         }
     }
 
-    /** @param  array<int, ?string>  $partes */
-    protected function juntar(array $partes): ?string
+    /**
+     * Quadro de identificação: rótulo numa célula, linha para preencher
+     * na de baixo bordada ao lado — os mesmos campos e a mesma ordem da
+     * folha em HTML.
+     *
+     * A linha não é feita de sublinhados: uma fileira de `_` quebra no
+     * fim da célula e desce para a linha seguinte.
+     */
+    protected function identificacao(Section $secao, Prova $prova, ModeloProva $modelo, LayoutDaFolha $layout): void
     {
-        $presentes = array_filter($partes);
+        $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data'];
+        $turma = $prova->turma;
 
-        return $presentes === [] ? null : implode('     ', $presentes);
+        $util = 21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10;
+        $rotulo = 2.6;
+
+        $linhas = array_values(array_filter([
+            in_array('aluno', $campos, true) ? [['Aluno(a):', null]] : null,
+            array_values(array_filter([
+                in_array('matricula', $campos, true) ? ['Matrícula:', null] : null,
+                in_array('turma', $campos, true) ? ['Turma:', $turma->nome] : null,
+            ])) ?: null,
+            array_values(array_filter([
+                in_array('curso', $campos, true) ? ['Curso:', $turma->curso->nome] : null,
+                in_array('data', $campos, true) ? ['Data:', '___/___/______'] : null,
+            ])) ?: null,
+            array_values(array_filter([
+                in_array('nota', $campos, true) ? ['Nota:', null] : null,
+                in_array('assinatura', $campos, true) ? ['Assinatura:', null] : null,
+            ])) ?: null,
+        ]));
+
+        if ($linhas === []) {
+            return;
+        }
+
+        // Só a moldura de fora: `borderSize` desenharia também o
+        // gradeado interno, e as únicas linhas internas que este quadro
+        // tem são as de preencher, que são borda de célula.
+        $tabela = $secao->addTable([
+            'borderTopSize' => 6, 'borderBottomSize' => 6,
+            'borderLeftSize' => 6, 'borderRightSize' => 6,
+            'borderColor' => '111111',
+            'cellMargin' => 60,
+            'width' => 100 * 50,
+            'unit' => 'pct',
+        ]);
+
+        foreach ($linhas as $linha) {
+            $tabela->addRow();
+
+            // O espaço que sobra é dividido entre os campos da linha.
+            $preenchimento = ($util - count($linha) * $rotulo) / count($linha);
+
+            foreach ($linha as [$texto, $valor]) {
+                $tabela->addCell($this->twips($rotulo))
+                    ->addText($texto, ['bold' => true], 'compacto');
+
+                $celula = $tabela->addCell(
+                    $this->twips($preenchimento),
+                    $valor === null ? ['borderBottomSize' => 6, 'borderBottomColor' => '555555'] : [],
+                );
+
+                $celula->addText($valor ?? ' ', null, 'compacto');
+            }
+        }
     }
 
     /**
@@ -226,10 +260,12 @@ class GerarDocxDaProvaAction
         $util = 21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10;
         $ladoDaLogo = 2.6;
 
-        $tabela = $secao->addTable(['borderSize' => 0, 'cellMargin' => 0]);
+        // Sem `borderSize`: declarar `0` emite `<w:tblBorders>` com
+        // espessura zero, que alguns leitores desenham como fio de cabelo.
+        $tabela = $secao->addTable(['cellMargin' => 0]);
         $tabela->addRow();
 
-        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo_esquerda_path, Jc::START);
+        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo('esquerda'), Jc::START);
 
         $centro = $tabela->addCell($this->twips($util - 2 * $ladoDaLogo));
 
@@ -245,22 +281,29 @@ class GerarDocxDaProvaAction
             ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
         );
 
-        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo_direita_path, Jc::END);
+        $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $modelo->logo('direita'), Jc::END);
     }
 
-    /** A célula existe mesmo sem imagem: é ela que mantém o centro no lugar. */
-    protected function logo(Cell $celula, ?string $caminho, string $alinhamento): void
+    /**
+     * A célula existe mesmo sem imagem: é ela que mantém o centro no
+     * lugar.
+     *
+     * Quem decide de onde sai o arquivo é a `LogoDaFolha`, a mesma que o
+     * HTML consulta — ler `logo_esquerda_path` direto daqui deixava o
+     * .docx sem cabeçalho para quem usa a logo padrão, que não mora no
+     * disco público, e fazia o "sem logo deste lado" ser ignorado.
+     */
+    protected function logo(Cell $celula, LogoDaFolha $logo, string $alinhamento): void
     {
-        if ($caminho === null || ! Storage::disk('public')->exists($caminho)) {
+        $arquivo = $logo->arquivo();
+
+        if ($arquivo === null || ! is_file($arquivo)) {
             $celula->addTextBreak(1);
 
             return;
         }
 
-        $celula->addImage(
-            Storage::disk('public')->path($caminho),
-            ['height' => 62, 'alignment' => $alinhamento],
-        );
+        $celula->addImage($arquivo, ['height' => 62, 'alignment' => $alinhamento]);
     }
 
     /** As questões entram numa seção contínua com o número de colunas. */
