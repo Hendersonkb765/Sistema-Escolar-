@@ -73,6 +73,53 @@ it('quebra o texto em trechos com o estilo de cada um', function () {
 
 /*
 |--------------------------------------------------------------------------
+| Ligar e desligar as marcas
+|--------------------------------------------------------------------------
+*/
+
+it('soma negrito e itálico na mesma palavra', function () {
+    // Era o defeito: alternar cada marca por conta própria fazia o
+    // segundo clique desfazer o primeiro, porque `**palavra**` começa e
+    // termina com `*`.
+    $estado = ['antes' => 'Leia a ', 'selecao' => 'palavra', 'depois' => ' agora'];
+    $texto = fn (array $e) => $e['antes'].$e['selecao'].$e['depois'];
+
+    $estado = TextoDoEnunciado::alternar(...[...$estado, 'marca' => TextoDoEnunciado::MARCA_NEGRITO]);
+    expect($texto($estado))->toBe('Leia a **palavra** agora');
+
+    $estado = TextoDoEnunciado::alternar(...[...$estado, 'marca' => TextoDoEnunciado::MARCA_ITALICO]);
+    expect($texto($estado))->toBe('Leia a ***palavra*** agora')
+        ->and((string) TextoDoEnunciado::paraHtml($texto($estado)))
+        ->toBe('Leia a <strong><em>palavra</em></strong> agora');
+});
+
+it('desliga uma marca sem levar a outra junto', function () {
+    $texto = fn (array $e) => $e['antes'].$e['selecao'].$e['depois'];
+
+    $estado = TextoDoEnunciado::alternar('', '***palavra***', '', TextoDoEnunciado::MARCA_NEGRITO);
+    expect($texto($estado))->toBe('*palavra*');
+
+    $estado = TextoDoEnunciado::alternar('', '***palavra***', '', TextoDoEnunciado::MARCA_ITALICO);
+    expect($texto($estado))->toBe('**palavra**');
+});
+
+it('reconhece as marcas encostadas na seleção', function () {
+    // Quem marcou a palavra e depois selecionou só a palavra espera
+    // desmarcar, não marcar de novo.
+    $estado = TextoDoEnunciado::alternar('Leia a **', 'palavra', '** agora', TextoDoEnunciado::MARCA_NEGRITO);
+
+    expect($estado['antes'].$estado['selecao'].$estado['depois'])->toBe('Leia a palavra agora');
+});
+
+it('marca o ponto do cursor quando não há seleção', function () {
+    $estado = TextoDoEnunciado::alternar('Leia ', '', 'agora', TextoDoEnunciado::MARCA_ITALICO);
+
+    expect($estado['selecao'])->toBe('**')
+        ->and($estado['antes'].$estado['selecao'].$estado['depois'])->toBe('Leia **agora');
+});
+
+/*
+|--------------------------------------------------------------------------
 | A tela do professor
 |--------------------------------------------------------------------------
 */
@@ -122,6 +169,38 @@ describe('na tela do professor', function () {
             ->set("formulario.{$this->questao->id}.enunciado", 'Leia o **comando**')
             ->assertSee('Prévia')
             ->assertSee('<strong>comando</strong>', escape: false);
+    });
+
+    it('aplica a marca pelo servidor e devolve o cursor ao lugar', function () {
+        ($this->tela)()
+            ->set("formulario.{$this->questao->id}.enunciado", 'Leia a palavra agora')
+            ->call('alternarMarca', "formulario.{$this->questao->id}.enunciado",
+                'Leia a ', 'palavra', ' agora', TextoDoEnunciado::MARCA_NEGRITO)
+            ->assertSet("formulario.{$this->questao->id}.enunciado", 'Leia a **palavra** agora')
+            ->assertDispatched('marca-aplicada', campo: "formulario.{$this->questao->id}.enunciado",
+                inicio: 7, fim: 18);
+    });
+
+    it('ignora caminho que não seja campo de texto da questão', function () {
+        // O caminho vem do navegador: nada além dos campos previstos.
+        $componente = ($this->tela)();
+        $antes = $componente->get('formulario');
+
+        foreach (['formulario.'.$this->questao->id.'.peso', 'solicitacao.titulo', 'formulario'] as $caminho) {
+            $componente->call('alternarMarca', $caminho, 'a', 'b', 'c', TextoDoEnunciado::MARCA_NEGRITO);
+        }
+
+        expect($componente->get('formulario'))->toBe($antes);
+    });
+
+    it('ignora marca que não seja negrito ou itálico', function () {
+        $componente = ($this->tela)()
+            ->set("formulario.{$this->questao->id}.enunciado", 'Leia a palavra');
+
+        $componente->call('alternarMarca', "formulario.{$this->questao->id}.enunciado",
+            'Leia a ', 'palavra', '', '~~');
+
+        $componente->assertSet("formulario.{$this->questao->id}.enunciado", 'Leia a palavra');
     });
 
     it('guarda as marcas como texto, sem virar HTML no banco', function () {

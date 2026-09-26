@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuditoriaController;
-use App\Http\Controllers\ModuloEmConstrucaoController;
 use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
@@ -14,6 +13,8 @@ use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
+use App\Livewire\Importacoes\ListaImportacoes;
+use App\Livewire\Importacoes\NovaImportacao;
 use App\Livewire\ModelosProva\FormularioModeloProva;
 use App\Livewire\ModelosProva\ListaModelosProva;
 use App\Livewire\Painel;
@@ -22,6 +23,7 @@ use App\Livewire\Provas\ListaProvas;
 use App\Livewire\Provas\MontarProva;
 use App\Livewire\Questoes\ListaQuestoes;
 use App\Livewire\Questoes\ResponderSolicitacao;
+use App\Livewire\Resultados\ListaResultados;
 use App\Livewire\Solicitacoes\DetalheSolicitacao;
 use App\Livewire\Solicitacoes\FormularioSolicitacao;
 use App\Livewire\Solicitacoes\ListaSolicitacoes;
@@ -96,10 +98,12 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/modelos-prova/criar', FormularioModeloProva::class)->name('modelos-prova.criar');
     Route::get('/modelos-prova/{modelo}/editar', FormularioModeloProva::class)->name('modelos-prova.editar');
 
-    Route::get('/importacoes', ModuloEmConstrucaoController::class)->name('importacoes.index');
-    Route::get('/importacoes/criar', ModuloEmConstrucaoController::class)->name('importacoes.criar');
+    // A importação tem dois passos: conferir não grava nada, confirmar
+    // grava o que a conferência aprovou.
+    Route::get('/importacoes', ListaImportacoes::class)->name('importacoes.index');
+    Route::get('/importacoes/criar', NovaImportacao::class)->name('importacoes.criar');
 
-    Route::get('/resultados', ModuloEmConstrucaoController::class)->name('resultados.index');
+    Route::get('/resultados', ListaResultados::class)->name('resultados.index');
 
     // --- Administração ---------------------------------------------------
     Route::get('/usuarios', ListaUsuarios::class)->name('usuarios.index');

@@ -118,15 +118,14 @@ em `professor_disciplina` e independe do perfil.
 | 3 | Solicitações de questões, área do professor, prazos | ✅ concluído |
 | 4 | Análise, feedbacks, reenvio e versionamento | ✅ concluído |
 | 5 | Montagem da prova, modelo, pré-visualização, PDF e Word | ✅ concluído |
-| 6 | Importação XLS em dois passos | schema pronto, UI pendente |
-| 7 | Cálculo de notas por disciplina | schema pronto, UI pendente |
+| 6 | Importação XLS em dois passos e notas por disciplina | ✅ concluído |
+| 7 | Cálculo de notas por disciplina | ✅ concluído (junto com o 6) |
 | 8 | Dashboards, auditoria e refino de UI | parcial |
 
-Todas as 24 tabelas de domínio já existem com chaves estrangeiras, índices e
-constraints. Os módulos ainda sem tela respondem por
-`ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
-um professor recebe 403 em `/importacoes/criar` desde hoje, não quando a
-tela ficar pronta.
+Todas as 24 tabelas de domínio existem com chaves estrangeiras, índices e
+constraints, e **todos os módulos têm tela** — o
+`ModuloEmConstrucaoController`, que segurava as rotas ainda sem interface,
+deixou de existir.
 
 ## Solicitação de questões
 
@@ -469,6 +468,67 @@ ou proxy.
 
 Quem for servir os arquivos de outro domínio define
 `FILESYSTEM_PUBLIC_URL`.
+
+## Importação de resultados
+
+A planilha é a que o leitor de folhas de resposta exporta:
+
+```
+Quiz Name, Class, ZipGrade Id, External Id, First Name, Last Name,
+Num Questions, Num Correct, Percent Correct, Key Version, Q1, Q2, Q3…
+```
+
+Cada `Q` é uma questão: **1 acertou, 0 errou**. O leitor não diz qual
+alternativa o aluno marcou, só se bateu com o gabarito — por isso
+`respostas_alunos.alternativa_marcada` fica nula e o que se guarda é o
+acerto.
+
+As colunas são procuradas pelo nome, sem depender da ordem: uma coluna a
+mais no meio não quebra a leitura.
+
+### Dois passos, e o primeiro não grava nada
+
+**Conferir** lê a planilha e monta um relatório linha a linha — de qual
+aluno ela é, por qual critério foi reconhecida, e o motivo quando não
+deu. **Confirmar** grava só o que a conferência aprovou, numa transação.
+Entre os dois há uma tela para olhar: importar resultado no aluno errado
+não tem desfazer fácil.
+
+### O cadastro do aluno não é alterado
+
+A planilha serve apenas para dizer de quem é cada linha. O nome no
+sistema continua exatamente como está. `ConciliadorDeAlunos` tenta, da
+mais firme para a mais frouxa:
+
+| critério | quando |
+|---|---|
+| matrícula | `External Id` bate com a matrícula de um aluno da turma |
+| nome idêntico | ignorando acento, caixa e espaço sobrando |
+| primeiro e último nome | o leitor costuma encurtar "Ana Paula Souza" para "Ana Souza" |
+
+Dois alunos com o mesmo nome, ou nenhum, **recusa a linha** e diz por
+quê, com os candidatos. Reimportar a mesma prova substitui o resultado
+anterior do aluno: vale a última leitura da folha, não a soma.
+
+### O peso vale dentro da disciplina
+
+Este é o ponto que mais se implementa errado. Uma prova com Lógica,
+Redes e Banco de Dados produz **três notas independentes**, cada uma de
+0 a 10:
+
+```
+nota = 10 × (soma dos pesos acertados ÷ soma dos pesos da disciplina)
+```
+
+Pesos 1; 1; 0,5; 0,5; 0,75 somam 3,75. Acertando 1 + 1 + 0,5 = 2,5, a
+nota é **6,67** — é o critério de aceite 10, e tem teste com esse número.
+
+Somar questões de disciplinas diferentes numa nota só apagaria
+exatamente o que a escola quer ver, e por isso `notas_disciplina` guarda
+também a soma dos pesos de cada lado: a conta fica conferível.
+
+A tela mostra as notas e, abaixo, o acerto de cada questão (✓/✗) com o
+número que o aluno viu na folha.
 
 ## Estrutura acadêmica
 

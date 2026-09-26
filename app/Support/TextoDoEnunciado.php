@@ -119,6 +119,66 @@ final class TextoDoEnunciado
         return implode('', array_column(self::segmentos($texto), 'texto'));
     }
 
+    /**
+     * Liga ou desliga uma marca no trecho selecionado.
+     *
+     * Chega em três pedaços — o que vem antes, a seleção e o que vem
+     * depois — em vez de posições: o navegador conta em unidades UTF-16
+     * e o PHP em bytes, e um acento no enunciado já basta para os dois
+     * discordarem.
+     *
+     * O número de estrelas de cada lado é que diz o estado: uma é
+     * itálico, duas é negrito, três é os dois. Por isso ligar o negrito
+     * sobre um itálico soma em vez de trocar — era esse o defeito de
+     * alternar cada marca por conta própria.
+     *
+     * @return array{antes: string, selecao: string, depois: string}
+     */
+    public static function alternar(string $antes, string $selecao, string $depois, string $marca): array
+    {
+        // Marcas encostadas na seleção contam como dela: quem marcou a
+        // palavra e depois selecionou só a palavra espera desmarcar.
+        $vizinhas = min(
+            self::estrelasNoFim($antes),
+            self::estrelasNoInicio($depois),
+        );
+
+        if ($vizinhas > 0) {
+            $antes = substr($antes, 0, -$vizinhas);
+            $selecao = str_repeat('*', $vizinhas).$selecao.str_repeat('*', $vizinhas);
+            $depois = substr($depois, $vizinhas);
+        }
+
+        $estrelas = min(self::estrelasNoInicio($selecao), self::estrelasNoFim($selecao), 3);
+        $nucleo = $estrelas > 0 ? substr($selecao, $estrelas, -$estrelas) : $selecao;
+
+        // Seleção feita só de estrelas: não há núcleo a formatar.
+        if ($nucleo === '') {
+            [$estrelas, $nucleo] = [0, $selecao];
+        }
+
+        $negrito = $estrelas >= 2;
+        $italico = $estrelas === 1 || $estrelas === 3;
+
+        $marca === self::MARCA_NEGRITO
+            ? $negrito = ! $negrito
+            : $italico = ! $italico;
+
+        $novas = str_repeat('*', ($negrito ? 2 : 0) + ($italico ? 1 : 0));
+
+        return ['antes' => $antes, 'selecao' => $novas.$nucleo.$novas, 'depois' => $depois];
+    }
+
+    protected static function estrelasNoInicio(string $texto): int
+    {
+        return strlen((string) (preg_match('/^\*{1,3}/', $texto, $achado) ? $achado[0] : ''));
+    }
+
+    protected static function estrelasNoFim(string $texto): int
+    {
+        return strlen((string) (preg_match('/\*{1,3}$/', $texto, $achado) ? $achado[0] : ''));
+    }
+
     public static function temFormatacao(string $texto): bool
     {
         return collect(self::segmentos($texto))

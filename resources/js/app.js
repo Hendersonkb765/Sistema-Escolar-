@@ -27,13 +27,31 @@ document.addEventListener('livewire:update', realcarCodigo);
 /**
  * Negrito e itálico nos campos de enunciado.
  *
- * A formatação é guardada como marca no próprio texto (`**negrito**`,
- * `*itálico*`): quem a interpreta é o PHP, num lugar só
- * (`App\Support\TextoDoEnunciado`), e que serve à tela, ao PDF e ao
- * Word. Aqui só se envolve a seleção — nenhuma regra é duplicada.
+ * Aqui só se lê o que está selecionado e se devolve o cursor ao lugar.
+ * Quem decide o que a marca faz é `App\Support\TextoDoEnunciado`, no
+ * servidor — uma segunda cópia da regra em JavaScript é o caminho curto
+ * para as duas divergirem.
  */
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('marcasDeTexto', () => ({
+        init() {
+            // O campo é redesenhado com o valor novo, e o cursor cairia
+            // no fim. O servidor diz onde ele estava.
+            window.addEventListener('marca-aplicada', (evento) => {
+                const campo = this.$refs.campo;
+                const { campo: caminho, inicio, fim } = evento.detail ?? {};
+
+                if (!campo || caminho !== this.caminhoDoCampo(campo)) {
+                    return;
+                }
+
+                requestAnimationFrame(() => {
+                    campo.focus();
+                    campo.setSelectionRange(inicio, fim);
+                });
+            });
+        },
+
         envolver(marca) {
             const campo = this.$refs.campo;
 
@@ -41,50 +59,24 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const inicio = campo.selectionStart;
-            const fim = campo.selectionEnd;
-            const texto = campo.value;
-            const selecao = texto.slice(inicio, fim);
+            const { value: texto, selectionStart: inicio, selectionEnd: fim } = campo;
 
-            const jaMarcado =
-                selecao.length > marca.length * 2 &&
-                selecao.startsWith(marca) &&
-                selecao.endsWith(marca);
-
-            // Clicar de novo com o mesmo trecho selecionado desfaz.
-            const trocado = jaMarcado
-                ? selecao.slice(marca.length, -marca.length)
-                : marca + selecao + marca;
-
-            campo.value = texto.slice(0, inicio) + trocado + texto.slice(fim);
-
-            // Sem seleção, o cursor fica entre as marcas, pronto para
-            // digitar; com seleção, ela continua selecionada.
-            const cursor = selecao === ''
-                ? inicio + marca.length
-                : inicio + trocado.length;
-
-            campo.focus();
-            campo.setSelectionRange(selecao === '' ? cursor : inicio, cursor);
-
-            this.avisarLivewire(campo);
+            this.$wire.alternarMarca(
+                this.caminhoDoCampo(campo),
+                texto.slice(0, inicio),
+                texto.slice(inicio, fim),
+                texto.slice(fim),
+                marca,
+            );
         },
 
-        /**
-         * Os campos usam `wire:model.blur`, que só sincroniza ao sair do
-         * campo. Sem avisar, um clique em B seguido de "Salvar" perderia
-         * a marca recém-inserida.
-         */
-        avisarLivewire(campo) {
+        /** A propriedade Livewire que o campo edita. */
+        caminhoDoCampo(campo) {
             const atributo = [...campo.attributes]
                 .map((a) => a.name)
                 .find((nome) => nome.startsWith('wire:model'));
 
-            if (atributo && this.$wire) {
-                this.$wire.set(campo.getAttribute(atributo), campo.value, false);
-            }
-
-            campo.dispatchEvent(new Event('input', { bubbles: true }));
+            return atributo ? campo.getAttribute(atributo) : null;
         },
     }));
 });

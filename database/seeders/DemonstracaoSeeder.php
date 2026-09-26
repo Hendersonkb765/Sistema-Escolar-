@@ -9,17 +9,21 @@ use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
+use App\Actions\Resultado\CalcularNotasAction;
 use App\Enums\Bimestre;
 use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
+use App\Enums\StatusImportacao;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
 use App\Models\QuestaoBloco;
+use App\Models\ResultadoAluno;
 use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
@@ -124,6 +128,7 @@ class DemonstracaoSeeder extends Seeder
 
         $this->solicitacoes($curso, $admin, $professor, $paeetTecnologia, $disciplinas);
         $this->provaMontada($admin, $modeloTecnologia);
+        $this->resultadosImportados($admin);
 
         $this->command?->info('Demonstração pronta. Senha de todos: senha-forte-123');
     }
@@ -284,6 +289,67 @@ class DemonstracaoSeeder extends Seeder
             dataAplicacao: now()->addWeek(),
             configuracao: ['colunas' => 2, 'gabarito' => true, 'mostrar_pesos' => false],
         );
+    }
+
+    /**
+     * Uma importação já confirmada, para as telas de resultado abrirem
+     * com o que mostrar. Os acertos são sorteados por aluno, mas com
+     * semente fixa: a demonstração é a mesma a cada `migrate:fresh`.
+     */
+    protected function resultadosImportados(User $admin): void
+    {
+        $prova = Prova::query()->with('turma')->first();
+
+        if ($prova === null || ResultadoAluno::query()->exists()) {
+            return;
+        }
+
+        $questoes = $prova->questoes()->orderBy('numero')->get();
+        $alunos = $prova->turma->alunos()->orderBy('nome')->get();
+
+        if ($questoes->isEmpty() || $alunos->isEmpty()) {
+            return;
+        }
+
+        $importacao = Importacao::query()->create([
+            'prova_id' => $prova->id,
+            'usuario_id' => $admin->id,
+            'arquivo' => 'importacoes/demonstracao.xlsx',
+            'nome_original' => 'resultados-demonstracao.xlsx',
+            'hash' => hash('sha256', 'demonstracao'),
+            'status' => StatusImportacao::Confirmada,
+            'total_linhas' => $alunos->count(),
+            'total_erros' => 0,
+            'confirmada_em' => now(),
+        ]);
+
+        $calcular = app(CalcularNotasAction::class);
+
+        foreach ($alunos->values() as $posicao => $aluno) {
+            $resultado = ResultadoAluno::query()->create([
+                'prova_id' => $prova->id,
+                'aluno_id' => $aluno->id,
+                'importacao_id' => $importacao->id,
+            ]);
+
+            foreach ($questoes as $indice => $questao) {
+                // Padrão fixo: o primeiro aluno acerta tudo, o último
+                // quase nada, e os do meio variam.
+                $acertou = ($posicao + $indice) % ($posicao + 2) !== 0;
+
+                $resultado->respostas()->create([
+                    'prova_questao_id' => $questao->id,
+                    'alternativa_marcada' => null,
+                    'acertou' => $acertou,
+                    'peso' => $questao->peso,
+                    'pontuacao' => $acertou ? $questao->peso : 0,
+                ]);
+            }
+
+            $calcular->executar($resultado->refresh());
+        }
+
+        $this->command?->info('Resultados de demonstração importados.');
     }
 
     protected function enunciado(SolicitacaoParte $parte, Questao $questao): string

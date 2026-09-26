@@ -14,6 +14,7 @@ use App\Livewire\Concerns\Notifica;
 use App\Models\Questao;
 use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
+use App\Support\TextoDoEnunciado;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -244,6 +245,45 @@ class ResponderSolicitacao extends Component
 
         $this->formulario[(int) $questaoId]['blocos'][(int) $indice]['caminho'] = $caminho;
         unset($this->imagens[$questaoId][$indice]);
+    }
+
+    /**
+     * Liga ou desliga negrito/itálico no trecho selecionado.
+     *
+     * A conta é do `TextoDoEnunciado`, no servidor: manter uma segunda
+     * cópia da regra em JavaScript é o caminho curto para as duas
+     * divergirem. O navegador só informa o que está selecionado.
+     */
+    public function alternarMarca(string $caminho, string $antes, string $selecao, string $depois, string $marca): void
+    {
+        if (! in_array($marca, [TextoDoEnunciado::MARCA_NEGRITO, TextoDoEnunciado::MARCA_ITALICO], true)) {
+            return;
+        }
+
+        // O caminho vem do navegador: só os campos de texto da própria
+        // questão são aceitos, e só se ela ainda puder ser editada.
+        if (preg_match('/^formulario\\.(\\d+)\\.(enunciado|blocos\\.\\d+\\.conteudo)$/', $caminho, $achado) !== 1) {
+            return;
+        }
+
+        $questao = Questao::query()->find((int) $achado[1]);
+
+        if ($questao === null || auth()->user()->cannot('update', $questao)) {
+            return;
+        }
+
+        $partes = TextoDoEnunciado::alternar($antes, $selecao, $depois, $marca);
+
+        data_set($this, $caminho, $partes['antes'].$partes['selecao'].$partes['depois']);
+
+        // O campo é redesenhado com o valor novo; sem isto o cursor cai
+        // no fim e quem estava formatando perde o lugar.
+        $this->dispatch(
+            'marca-aplicada',
+            campo: $caminho,
+            inicio: mb_strlen($partes['antes']),
+            fim: mb_strlen($partes['antes'].$partes['selecao']),
+        );
     }
 
     /** Marcar uma correta desmarca as demais da mesma questão. */
