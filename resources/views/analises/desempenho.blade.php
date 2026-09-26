@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Js')
+
 <div class="space-y-4">
     <x-cartao titulo="Recorte">
         @if ($turmaDoRecorte)
@@ -147,7 +149,11 @@
                                     <x-barra-de-acerto :percentual="$item['percentual']" :atencao="$item['atencao']"/>
                                 </td>
                                 <td class="px-4 py-3 text-right sm:px-6">
-                                    <x-botao variante="discreto" wire:click="verAlunos(@js($item['habilidade']))">
+                                    {{-- `{{ }}`, e não `@js(...)`: dentro da tag de um
+                                         componente a diretiva não é compilada e sai
+                                         literal no HTML, deixando o botão morto. --}}
+                                    <x-botao variante="discreto"
+                                             wire:click="verAlunos({{ Js::from($item['habilidade']) }})">
                                         {{ $habilidadeAberta === $item['habilidade'] ? 'Fechar' : 'Ver alunos' }}
                                     </x-botao>
                                 </td>

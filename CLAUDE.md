@@ -63,11 +63,24 @@ esconde o botão (`@can(...)` + `@if ($modelo->podeAlgo())`).
 
 ## Componentes Blade e diretivas
 
-Nunca use `@disabled(...)`, `@checked(...)` ou `@readonly(...)` **dentro da
-tag de um componente** (`<x-input @disabled(...)>`): o Blade não compila a
-tag, ela fica literal no HTML e o campo desaparece da página sem erro
-nenhum. O componente declara uma prop (`:desabilitado="$expr"`) e aplica a
-diretiva no elemento HTML lá dentro.
+Nenhuma diretiva funciona **dentro da tag de um componente** —
+`@disabled(...)`, `@checked(...)`, `@readonly(...)` e também `@js(...)`.
+O Blade não compila a tag: ela fica literal no HTML e o atributo não
+existe. Nada quebra em voz alta — o campo some da página, ou o botão
+fica lá com a aparência certa e não faz nada ao ser clicado.
+
+`{{ }}`, esse sim, é interpretado dentro da tag. Então:
+
+- para desabilitar, o componente declara uma prop (`:desabilitado="$expr"`)
+  e aplica a diretiva no elemento HTML lá dentro;
+- para passar uma string a um método Livewire, use
+  `wire:click="metodo({{ Js::from($valor) }})"`, e nunca `@js(...)`.
+  `Js::from()` é o que a diretiva usa por baixo, e escapa acento e aspas
+  do mesmo jeito.
+
+`tests/Feature/Interface/DiretivasCompiladasTest.php` varre o HTML de
+todas as telas atrás de diretiva crua. É o teste que pega a família
+inteira de uma vez: `assertSee` não pega, porque o rótulo continua lá.
 
 Pelo mesmo motivo, `:atributo="$php"` só é interpretado em componentes. Num
 `<button>` ou `<input>` puro ele vira uma diretiva do Alpine.
