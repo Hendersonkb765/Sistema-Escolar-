@@ -1,7 +1,7 @@
 <div class="space-y-4">
     <x-cartao>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-4">
+            <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-5">
                 <x-campo rotulo="Buscar" para="busca">
                     <x-input id="busca" wire:model.live.debounce.400ms="busca" placeholder="Disciplina, turma ou professor"/>
                 </x-campo>
@@ -16,6 +16,15 @@
                         </x-select>
                     </x-campo>
                 @endif
+
+                <x-campo rotulo="Bimestre" para="filtro-bimestre">
+                    <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
+                        <option value="">Todos</option>
+                        @foreach ($bimestres as $valor => $rotulo)
+                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        @endforeach
+                    </x-select>
+                </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-status">
                     <x-select id="filtro-status" wire:model.live="filtroStatus">

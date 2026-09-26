@@ -46,7 +46,7 @@ class ResponderSolicitacao extends Component
     /**
      * Rascunho de cada questão, indexado pelo id.
      *
-     * @var array<int, array{enunciado: ?string, peso: string, alternativas: array<int, array{letra: string, texto: ?string, correta: bool}>, blocos: array<int, array<string, mixed>>}>
+     * @var array<int, array{enunciado: ?string, habilidade: ?string, peso: string, alternativas: array<int, array{letra: string, texto: ?string, correta: bool}>, blocos: array<int, array<string, mixed>>}>
      */
     public array $formulario = [];
 
@@ -146,6 +146,7 @@ class ResponderSolicitacao extends Component
             ->mapWithKeys(fn (Questao $questao) => [
                 $questao->getKey() => [
                     'enunciado' => $questao->enunciado,
+                    'habilidade' => $questao->habilidade,
                     'peso' => (string) (float) $questao->peso,
                     'alternativas' => $questao->alternativas
                         ->sortBy('letra')
@@ -325,6 +326,7 @@ class ResponderSolicitacao extends Component
                 enunciado: $rascunho['enunciado'] ?: null,
                 alternativas: $rascunho['alternativas'],
                 peso: $rascunho['peso'] ?? null,
+                habilidade: $rascunho['habilidade'] ?? null,
             );
 
             app(SalvarBlocosDaQuestaoAction::class)->executar(
@@ -360,6 +362,7 @@ class ResponderSolicitacao extends Component
                     enunciado: $this->formulario[$questaoId]['enunciado'] ?: null,
                     alternativas: $this->formulario[$questaoId]['alternativas'],
                     peso: $this->formulario[$questaoId]['peso'] ?? null,
+                    habilidade: $this->formulario[$questaoId]['habilidade'] ?? null,
                 );
 
                 app(SalvarBlocosDaQuestaoAction::class)->executar(
@@ -410,6 +413,7 @@ class ResponderSolicitacao extends Component
                     enunciado: $rascunho['enunciado'] ?: null,
                     alternativas: $rascunho['alternativas'],
                     peso: $rascunho['peso'] ?? null,
+                    habilidade: $rascunho['habilidade'] ?? null,
                 );
 
                 app(SalvarBlocosDaQuestaoAction::class)->executar(
@@ -499,6 +503,11 @@ class ResponderSolicitacao extends Component
             'podeEditar' => $solicitacao->aceitaEnvio(),
             'emFoco' => $this->questaoEmFoco !== null,
             'linguagens' => LinguagemCodigo::opcoes(),
+            // Habilidades já escritas na disciplina, para o professor
+            // reusar a mesma redação em vez de criar uma variação.
+            'habilidadesPorParte' => $partes->mapWithKeys(fn (SolicitacaoParte $parte) => [
+                $parte->getKey() => Questao::habilidadesDaDisciplina($parte->disciplina_id),
+            ]),
             // O que a coordenação devolveu, para o topo da tela avisar.
             'devolvidas' => $questoes
                 ->filter(fn (Questao $questao) => $questao->status === StatusQuestao::Rejeitada)

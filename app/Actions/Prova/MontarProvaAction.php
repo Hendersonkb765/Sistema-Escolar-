@@ -105,6 +105,7 @@ class MontarProvaAction
                         'peso' => $questao->peso,
                         'versao_questao' => $questao->versao,
                         'enunciado_snapshot' => (string) $questao->enunciado,
+                        'habilidade_snapshot' => $questao->habilidade,
                         'blocos_snapshot' => $this->congelarBlocos($questao),
                         'alternativas_snapshot' => $this->congelarAlternativas($questao),
                         'letra_correta' => $questao->alternativaCorreta()?->letra ?? 'A',

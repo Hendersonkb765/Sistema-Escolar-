@@ -161,6 +161,7 @@ function completarQuestao(
     User $professor,
     ?string $enunciado = null,
     float $peso = 1,
+    ?string $habilidade = null,
 ): Questao {
     $quantidade = (int) $questao->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
 
@@ -178,14 +179,22 @@ function completarQuestao(
         enunciado: $enunciado ?? "Enunciado da questão {$questao->ordem}",
         alternativas: $alternativas,
         peso: $peso,
+        habilidade: $habilidade ?? "Habilidade da questão {$questao->ordem}",
     );
 }
 
-/** Preenche e envia uma parte inteira. */
-function enviarParte(SolicitacaoParte $parte, User $professor): SolicitacaoParte
+/**
+ * Preenche e envia uma parte inteira.
+ *
+ * `$habilidades` permite dar a mesma habilidade a questões diferentes,
+ * que é o caso que a análise por habilidade precisa exercitar.
+ *
+ * @param  array<int, string>  $habilidades  ordem da questão => habilidade
+ */
+function enviarParte(SolicitacaoParte $parte, User $professor, array $habilidades = []): SolicitacaoParte
 {
     foreach ($parte->questoes()->get() as $questao) {
-        completarQuestao($questao, $professor);
+        completarQuestao($questao, $professor, habilidade: $habilidades[$questao->ordem] ?? null);
     }
 
     return app(EnviarParteAction::class)->executar($parte->refresh(), $professor);

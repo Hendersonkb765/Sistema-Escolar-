@@ -157,6 +157,27 @@ lembrar. Quando as questões vêm de bimestres diferentes não há o que
 herdar, e a tela deixa escolher. O bimestre sai no cabeçalho da folha,
 no PDF e no Word.
 
+Toda tela ligada a prova filtra por bimestre: solicitações, provas,
+importações, resultados e a análise de desempenho. O filtro entra na URL
+(`?bimestre=2`), então um recorte é um link.
+
+### Habilidade avaliada
+
+Cada questão declara **o que ela mede**, preenchido pelo professor. Sem
+isso a questão não pode ser enviada — é uma pendência como as outras
+(`Questao::pendencias()`), e não uma validação que impede salvar
+rascunho.
+
+A habilidade é **congelada na montagem** (`habilidade_snapshot`), como o
+enunciado: a análise de uma prova antiga tem de continuar dizendo o que
+aquela questão avaliava na época.
+
+O campo é texto livre com um `datalist` das habilidades já escritas
+**naquela disciplina**, para o professor reusar a mesma redação em vez
+de criar uma variação a cada questão — e a análise agrupa ignorando
+caixa e espaço sobrando. Não há catálogo fechado de habilidades; se a
+escola quiser uma lista controlada, é o próximo passo natural.
+
 ### Negrito e itálico no enunciado
 
 O professor formata o enunciado e os blocos de texto com marcas no
@@ -529,6 +550,26 @@ também a soma dos pesos de cada lado: a conta fica conferível.
 
 A tela mostra as notas e, abaixo, o acerto de cada questão (✓/✗) com o
 número que o aluno viu na folha.
+
+## Análise de desempenho
+
+Onde a turma teve dificuldade, em duas leituras:
+
+- **por habilidade** — "interpretar estruturas de repetição: 50%" diz o
+  que ensinar de novo;
+- **por questão** — o número, com a habilidade ao lado.
+
+A leitura por número diz *onde* erraram; a por habilidade diz *o quê*, e
+é essa que permite intervir. Duas questões da mesma habilidade somam
+numa linha só, ainda que estejam em provas diferentes.
+
+Abaixo de 60% de acerto (`AnalisarDesempenhoAction::LIMITE_DE_ATENCAO`)
+a linha vai destacada, e a ordenação começa pela que mais precisa de
+atenção.
+
+O escopo é o de quem lê: o **professor** vê as habilidades das questões
+dele, a **coordenação** vê as do seu Eixo. Os recortes são turma,
+bimestre, prova e disciplina, todos na URL.
 
 ## Estrutura acadêmica
 

@@ -4,6 +4,7 @@ use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
+use App\Livewire\Analises\Desempenho;
 use App\Livewire\Cursos\DetalheCurso;
 use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
@@ -104,6 +105,7 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/importacoes/criar', NovaImportacao::class)->name('importacoes.criar');
 
     Route::get('/resultados', ListaResultados::class)->name('resultados.index');
+    Route::get('/analises', Desempenho::class)->name('analises.index');
 
     // --- Administração ---------------------------------------------------
     Route::get('/usuarios', ListaUsuarios::class)->name('usuarios.index');

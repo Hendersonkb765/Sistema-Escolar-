@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Importacoes;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusImportacao;
 use App\Livewire\Concerns\ComTabela;
 use App\Models\Importacao;
@@ -18,6 +19,9 @@ class ListaImportacoes extends Component
 
     #[Url(as: 'situacao', except: '')]
     public string $filtroStatus = '';
+
+    #[Url(as: 'bimestre', except: '')]
+    public string $filtroBimestre = '';
 
     public function mount(): void
     {
@@ -39,6 +43,11 @@ class ListaImportacoes extends Component
         $this->resetPage();
     }
 
+    public function updatedFiltroBimestre(): void
+    {
+        $this->resetPage();
+    }
+
     public function render(): View
     {
         $consulta = Importacao::query()
@@ -55,11 +64,16 @@ class ListaImportacoes extends Component
                     ->where('nome_original', 'like', $termo)
                     ->orWhereHas('prova', fn (Builder $p) => $p->where('titulo', 'like', $termo)));
             })
-            ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus));
+            ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
+            // O bimestre é da prova; a importação herda o recorte dela.
+            ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->whereHas(
+                'prova', fn (Builder $p) => $p->where('bimestre', $this->filtroBimestre)
+            ));
 
         return view('importacoes.lista', [
             'importacoes' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
             'situacoes' => StatusImportacao::opcoes(),
+            'bimestres' => Bimestre::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Importações',
             'subtitulo' => 'Cada envio guarda o relatório da conferência que o aprovou',

@@ -258,6 +258,7 @@ class DemonstracaoSeeder extends Seeder
                     enunciado: $this->enunciado($parte, $questao),
                     alternativas: $this->alternativas($solicitacao->quantidade_alternativas),
                     peso: $questao->ordem === 1 ? 1.5 : 1,
+                    habilidade: $this->habilidade($parte, $questao),
                 );
             }
 
@@ -350,6 +351,25 @@ class DemonstracaoSeeder extends Seeder
         }
 
         $this->command?->info('Resultados de demonstração importados.');
+    }
+
+    /**
+     * Habilidades de demonstração, repetidas de propósito: a análise só
+     * tem o que mostrar quando duas questões avaliam a mesma coisa.
+     */
+    protected function habilidade(SolicitacaoParte $parte, Questao $questao): string
+    {
+        $porDisciplina = [
+            'LOG' => ['Interpretar estruturas de repetição', 'Aplicar condicionais', 'Depurar um algoritmo'],
+            'RED' => ['Identificar camadas do modelo OSI', 'Calcular endereçamento IP'],
+            'BKD' => ['Modelar entidades e relações', 'Escrever consultas com junção'],
+            'FRT' => ['Estruturar um documento semântico', 'Aplicar estilos responsivos'],
+        ];
+
+        $disciplina = $parte->loadMissing('disciplina')->disciplina;
+        $lista = $porDisciplina[$disciplina->codigo] ?? ['Habilidade de '.$disciplina->nome];
+
+        return $lista[($questao->ordem - 1) % count($lista)];
     }
 
     protected function enunciado(SolicitacaoParte $parte, Questao $questao): string

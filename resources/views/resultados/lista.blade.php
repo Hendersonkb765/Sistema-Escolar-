@@ -1,6 +1,15 @@
 <div class="space-y-4">
     <x-cartao>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <x-campo rotulo="Bimestre" para="filtro-bimestre">
+                <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
+                    <option value="">Todos</option>
+                    @foreach ($bimestres as $valor => $rotulo)
+                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                    @endforeach
+                </x-select>
+            </x-campo>
+
             <x-campo rotulo="Prova" para="prova">
                 <x-select id="prova" wire:model.live="prova_id">
                     <option value="">Selecione…</option>

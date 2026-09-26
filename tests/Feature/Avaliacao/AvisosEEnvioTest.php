@@ -151,6 +151,7 @@ it('grava o que está na tela antes de enviar', function () {
     $componente = Livewire::actingAs($this->professor)
         ->test(ResponderSolicitacao::class, ['solicitacao' => $solicitacao])
         ->set("formulario.{$questao->id}.enunciado", 'Escrito e enviado sem salvar antes')
+        ->set("formulario.{$questao->id}.habilidade", 'Interpretar estruturas de repetição')
         ->set("formulario.{$questao->id}.peso", '3')
         ->set("formulario.{$questao->id}.alternativas.0.texto", 'Alternativa A')
         ->set("formulario.{$questao->id}.alternativas.1.texto", 'Alternativa B')
@@ -163,6 +164,7 @@ it('grava o que está na tela antes de enviar', function () {
     $questao->refresh();
 
     expect($questao->enunciado)->toBe('Escrito e enviado sem salvar antes')
+        ->and($questao->habilidade)->toBe('Interpretar estruturas de repetição')
         ->and((float) $questao->peso)->toBe(3.0)
         ->and($questao->status)->toBe(StatusQuestao::Enviada)
         ->and($questao->alternativas()->where('correta', true)->value('letra'))->toBe('C');

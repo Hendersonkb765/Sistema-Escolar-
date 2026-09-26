@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Resultados;
 
+use App\Enums\Bimestre;
 use App\Models\Prova;
 use App\Models\ResultadoAluno;
 use Illuminate\Contracts\View\View;
@@ -27,6 +28,9 @@ class ListaResultados extends Component
     #[Url(as: 'disciplina', except: '')]
     public string $filtroDisciplina = '';
 
+    #[Url(as: 'bimestre', except: '')]
+    public string $filtroBimestre = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', ResultadoAluno::class);
@@ -51,6 +55,7 @@ class ListaResultados extends Component
             ->visivelPara(auth()->user())
             ->with(['turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id'])
             ->whereHas('resultados')
+            ->when($this->filtroBimestre !== '', fn ($q) => $q->where('bimestre', $this->filtroBimestre))
             ->orderByDesc('gerada_em')
             ->get();
     }
@@ -82,6 +87,7 @@ class ListaResultados extends Component
 
         return view('resultados.lista', [
             'provas' => $this->provasDisponiveis(),
+            'bimestres' => Bimestre::opcoes(),
             'prova' => $prova,
             'questoes' => $this->filtroDisciplina === ''
                 ? $questoes

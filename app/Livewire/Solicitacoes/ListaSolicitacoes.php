@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Solicitacoes;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Livewire\Concerns\ComTabela;
@@ -32,6 +33,9 @@ class ListaSolicitacoes extends Component
     #[Url(as: 'prazo', except: '')]
     public string $filtroPrazo = '';
 
+    #[Url(as: 'bimestre', except: '')]
+    public string $filtroBimestre = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', SolicitacaoProva::class);
@@ -58,6 +62,11 @@ class ListaSolicitacoes extends Component
     }
 
     public function updatedFiltroPrazo(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFiltroBimestre(): void
     {
         $this->resetPage();
     }
@@ -91,6 +100,7 @@ class ListaSolicitacoes extends Component
             })
             ->when($this->filtroCurso !== '', fn (Builder $q) => $q->where('curso_id', $this->filtroCurso))
             ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
+            ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
             // "Atrasada" é estado de prazo, não de fluxo: pendente com
             // prazo vencido, ou enviada depois do combinado.
             // "Atrasada" é estado de prazo, não de fluxo: alguma parte
@@ -112,6 +122,7 @@ class ListaSolicitacoes extends Component
             'solicitacoes' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
             'cursos' => Curso::query()->visivelPara($usuario)->orderBy('nome')->pluck('nome', 'id'),
             'situacoes' => StatusSolicitacao::opcoes(),
+            'bimestres' => Bimestre::opcoes(),
             'ehGestao' => $usuario->ehGestao(),
         ])->layout('components.layouts.app', [
             'titulo' => $usuario->ehGestao() ? 'Solicitações de questões' : 'Minhas solicitações',

@@ -124,6 +124,7 @@ it('preenche e envia as questões pela tela', function () {
     foreach ($this->noPrazo->questoes()->get() as $questao) {
         $componente
             ->set("formulario.{$questao->id}.enunciado", "Enunciado {$questao->id}")
+            ->set("formulario.{$questao->id}.habilidade", "Habilidade {$questao->id}")
             ->set("formulario.{$questao->id}.alternativas.0.texto", 'Alternativa A')
             ->set("formulario.{$questao->id}.alternativas.1.texto", 'Alternativa B')
             ->set("formulario.{$questao->id}.alternativas.2.texto", 'Alternativa C')

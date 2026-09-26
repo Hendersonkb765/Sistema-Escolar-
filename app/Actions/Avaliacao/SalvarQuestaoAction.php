@@ -26,6 +26,7 @@ class SalvarQuestaoAction
         ?string $enunciado,
         array $alternativas,
         float|string|null $peso = null,
+        ?string $habilidade = null,
     ): Questao {
         Gate::forUser($autor)->authorize('update', $questao);
 
@@ -66,8 +67,15 @@ class SalvarQuestaoAction
             throw RegraDeNegocioException::porque('O peso da questão precisa ser maior que zero.');
         }
 
-        return DB::transaction(function () use ($questao, $enunciado, $alternativas, $esperadas, $peso) {
-            $atualizacao = ['enunciado' => $enunciado];
+        return DB::transaction(function () use ($questao, $enunciado, $alternativas, $esperadas, $peso, $habilidade) {
+            $atualizacao = [
+                'enunciado' => $enunciado,
+                // Espaço sobrando faz a mesma habilidade virar duas na
+                // análise; o que se guarda já vem aparado.
+                'habilidade' => is_string($habilidade)
+                    ? (trim(preg_replace('/\s+/', ' ', $habilidade) ?? '') ?: null)
+                    : null,
+            ];
 
             // Peso ausente significa "não mexa", e não "zere".
             if ($peso !== null) {

@@ -13,8 +13,10 @@ use App\Actions\Prova\GerarDocxDaProvaAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\Bimestre;
+use App\Livewire\Provas\ListaProvas;
 use App\Livewire\Provas\MontarProva;
 use App\Livewire\Solicitacoes\FormularioSolicitacao;
+use App\Livewire\Solicitacoes\ListaSolicitacoes;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
 use App\Models\Prova;
@@ -177,6 +179,58 @@ it('recusa bimestre fora do intervalo na montagem', function () {
         ->assertHasErrors('bimestre');
 
     expect(Prova::query()->count())->toBe(0);
+});
+
+it('filtra por bimestre em todas as telas de prova', function () {
+    // Duas solicitações em bimestres diferentes, e cada listagem tem de
+    // saber separá-las.
+    solicitacaoCom($this->paeet, $this->turma, [
+        ['disciplina' => $this->montagem['disciplinas']['Lógica'], 'professor' => $this->profLogica],
+    ], titulo: 'Do segundo', bimestre: Bimestre::Segundo);
+
+    solicitacaoCom($this->paeet, $this->turma, [
+        ['disciplina' => $this->montagem['disciplinas']['Redes'], 'professor' => $this->profRedes],
+    ], titulo: 'Do quarto', bimestre: Bimestre::Quarto);
+
+    $lista = fn () => Livewire::actingAs($this->paeet)
+        ->test(ListaSolicitacoes::class);
+
+    $lista()->assertSee('Do segundo')->assertSee('Do quarto');
+
+    $lista()->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->assertSee('Do segundo')
+        ->assertDontSee('Do quarto');
+
+    $lista()->set('filtroBimestre', (string) Bimestre::Quarto->value)
+        ->assertDontSee('Do segundo')
+        ->assertSee('Do quarto');
+});
+
+it('filtra as provas montadas por bimestre', function () {
+    ($this->aprovada)(Bimestre::Segundo, [
+        ['disciplina' => $this->montagem['disciplinas']['Lógica'], 'professor' => $this->profLogica, 'questoes' => 2],
+    ]);
+
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Avaliação do segundo',
+    );
+
+    $outra = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Avaliação do quarto', bimestre: Bimestre::Quarto,
+    );
+
+    expect($prova->bimestre)->toBe(Bimestre::Segundo)
+        ->and($outra->bimestre)->toBe(Bimestre::Quarto);
+
+    $lista = fn () => Livewire::actingAs($this->paeet)->test(ListaProvas::class);
+
+    $lista()->assertSee('Avaliação do segundo')->assertSee('Avaliação do quarto');
+
+    $lista()->set('filtroBimestre', (string) Bimestre::Quarto->value)
+        ->assertDontSee('Avaliação do segundo')
+        ->assertSee('Avaliação do quarto');
 });
 
 it('imprime o bimestre no cabeçalho da folha e no Word', function () {
