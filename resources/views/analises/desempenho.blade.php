@@ -1,5 +1,17 @@
 <div class="space-y-4">
     <x-cartao titulo="Recorte">
+        @if ($turmaDoRecorte)
+            <x-slot:acoes>
+                <x-botao variante="secundario"
+                         href="{{ route('resultados.boletim', array_filter([
+                            'turma' => $turmaDoRecorte->id,
+                            'bimestre' => $filtroBimestre ?: null,
+                         ])) }}"
+                         title="PDF com uma página por aluno, para entregar a folha certa a cada um.">
+                    Gerar boletins
+                </x-botao>
+            </x-slot:acoes>
+        @endif
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <x-campo rotulo="Turma" para="filtro-turma">
                 <x-select id="filtro-turma" wire:model.live="filtroTurma">
@@ -48,6 +60,50 @@
         @endif
     </x-cartao>
 
+    @unless ($grafico->vazio())
+        <x-cartao titulo="Evolução por bimestre"
+                  descricao="Nota média de cada disciplina. Bimestre sem avaliação não vira zero — a linha se interrompe.">
+            {!! $grafico->svg() !!}
+
+            {{-- A leitura em tabela é obrigatória: quem não distingue as
+                 cores, ou lê por leitor de tela, precisa dos números. --}}
+            <details class="mt-2">
+                <summary class="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                    Ver os mesmos números em tabela
+                </summary>
+
+                <div class="-mx-4 mt-2 overflow-x-auto sm:-mx-6">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                <th class="px-4 py-2 sm:px-6">Disciplina</th>
+                                @foreach ($grafico->bimestres as $rotulo)
+                                    <th class="px-4 py-2 text-right">{{ $rotulo }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($grafico->series as $serie)
+                                <tr wire:key="serie-{{ $loop->index }}">
+                                    <td class="px-4 py-2 sm:px-6">
+                                        <span class="mr-1 inline-block h-2 w-4 rounded-full align-middle"
+                                              style="background: {{ $serie['cor'] }}"></span>
+                                        <span class="text-slate-900 dark:text-slate-100">{{ $serie['nome'] }}</span>
+                                    </td>
+                                    @foreach ($serie['pontos'] as $ponto)
+                                        <td class="px-4 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">
+                                            {{ $ponto === null ? '—' : number_format($ponto, 2, ',', '.') }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </x-cartao>
+    @endunless
+
     @if ($porHabilidade->isEmpty())
         <x-cartao>
             <x-vazio titulo="Nada para analisar neste recorte"
@@ -65,6 +121,7 @@
                             <th class="hidden px-4 py-2 lg:table-cell">Questões</th>
                             <th class="px-4 py-2 text-center">Acertos</th>
                             <th class="px-4 py-2">Índice de acerto</th>
+                            <th class="px-4 py-2 text-right sm:px-6">Alunos</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -89,7 +146,62 @@
                                 <td class="px-4 py-3">
                                     <x-barra-de-acerto :percentual="$item['percentual']" :atencao="$item['atencao']"/>
                                 </td>
+                                <td class="px-4 py-3 text-right sm:px-6">
+                                    <x-botao variante="discreto" wire:click="verAlunos(@js($item['habilidade']))">
+                                        {{ $habilidadeAberta === $item['habilidade'] ? 'Fechar' : 'Ver alunos' }}
+                                    </x-botao>
+                                </td>
                             </tr>
+
+                            @if ($habilidadeAberta === $item['habilidade'])
+                                <tr wire:key="alunos-{{ $loop->index }}">
+                                    <td colspan="6" class="bg-slate-50 px-4 py-3 sm:px-6 dark:bg-slate-900/40">
+                                        <p class="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Aluno a aluno — de quem mais precisa de ajuda para quem menos
+                                        </p>
+
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full text-sm">
+                                                <thead>
+                                                    <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                        <th class="py-1 pr-4">Aluno</th>
+                                                        <th class="py-1 pr-4">Questões</th>
+                                                        <th class="py-1 pr-4 text-center">Acertos</th>
+                                                        <th class="py-1">Índice</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($alunosDaHabilidade as $aluno)
+                                                        <tr wire:key="aluno-{{ $loop->index }}">
+                                                            <td class="py-1.5 pr-4">
+                                                                <span class="text-slate-900 dark:text-slate-100">{{ $aluno['aluno'] }}</span>
+                                                                <span class="block text-xs text-slate-400">{{ $aluno['matricula'] }}</span>
+                                                            </td>
+                                                            <td class="py-1.5 pr-4">
+                                                                @foreach ($aluno['questoes'] as $questao)
+                                                                    <span @class([
+                                                                        'mr-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs',
+                                                                        'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' => $questao['acertou'],
+                                                                        'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300' => ! $questao['acertou'],
+                                                                    ]) title="{{ $questao['prova'] }}">
+                                                                        {{ $questao['acertou'] ? '✓' : '✗' }} {{ $questao['numero'] }}
+                                                                    </span>
+                                                                @endforeach
+                                                            </td>
+                                                            <td class="py-1.5 pr-4 text-center tabular-nums text-slate-600 dark:text-slate-300">
+                                                                {{ $aluno['acertos'] }}/{{ $aluno['respostas'] }}
+                                                            </td>
+                                                            <td class="py-1.5">
+                                                                <x-barra-de-acerto :percentual="$aluno['percentual']" :atencao="$aluno['atencao']"/>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endif
                         @endforeach
                     </tbody>
                 </table>

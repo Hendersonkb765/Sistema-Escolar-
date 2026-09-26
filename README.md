@@ -571,6 +571,41 @@ O escopo é o de quem lê: o **professor** vê as habilidades das questões
 dele, a **coordenação** vê as do seu Eixo. Os recortes são turma,
 bimestre, prova e disciplina, todos na URL.
 
+### Quem errou a habilidade
+
+Cada linha abre aluno a aluno, ordenada de quem mais precisa de ajuda:
+a lista por habilidade diz que a turma foi mal em "aplicar
+condicionais"; esta diz **em quem**, com o acerto de cada questão.
+
+### Evolução por bimestre
+
+Uma linha por disciplina, com a nota média de cada bimestre. Bimestre
+sem avaliação **não vira zero** — a linha se interrompe, porque zero
+diria "foram mal" e o que houve foi "não houve prova".
+
+O gráfico é SVG desenhado no servidor, e não uma biblioteca no
+navegador: não entra dependência nova, o resultado é conferível pela
+mesma suíte (a geometria mora em `GraficoDeEvolucao::coordenadas()`) e a
+mesma marcação serve aos dois temas — cada série carrega o tom claro e o
+escuro, e o CSS escolhe.
+
+A paleta é categórica de ordem fixa, **nunca ciclada**: além de seis
+séries a cauda não vira um tom inventado. Ela foi validada para
+daltonismo e contraste contra as duas superfícies. Como o contraste no
+tema claro fica abaixo de 3:1, a identidade nunca depende só da cor —
+cada linha leva rótulo na ponta e há uma tabela com os mesmos números.
+
+Linhas que terminam próximas teriam os rótulos sobrepostos. Em vez de
+empurrá-los e soltá-los das suas linhas, `GraficoDeEvolucao::rotulos()`
+os afasta o mínimo e a view traça um fio ligando cada nome à sua ponta.
+
+### Boletim
+
+**Uma página por aluno**, com a nota de cada disciplina e a soma dos
+pesos que a produziu. Um documento único com a turma inteira seria mais
+simples de gerar e impossível de entregar sem mostrar a nota de um aluno
+para o outro.
+
 ## A barra lateral se recolhe
 
 O botão na barra de cima esconde o menu e devolve os 16 rem dele ao

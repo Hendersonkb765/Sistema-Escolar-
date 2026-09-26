@@ -5,7 +5,11 @@ namespace App\Http\Controllers;
 use App\Actions\Prova\GerarDocxDaProvaAction;
 use App\Actions\Prova\GerarGabaritoCsvAction;
 use App\Actions\Prova\GerarPdfDaProvaAction;
+use App\Actions\Resultado\GerarBoletimAction;
+use App\Enums\Bimestre;
+use App\Exceptions\RegraDeNegocioException;
 use App\Models\Prova;
+use App\Models\Turma;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -57,6 +61,31 @@ class ProvaArquivoController extends Controller
             ->header(
                 'Content-Disposition',
                 'attachment; filename="'.$action->nomeDoArquivo($prova).'"'
+            );
+    }
+
+    /**
+     * Boletins da turma: um PDF com uma página por aluno.
+     *
+     * A folha de cada um sai sozinha da pilha, para a escola entregar a
+     * certa a cada aluno sem mostrar a nota de um para o outro.
+     */
+    public function boletim(Request $request, GerarBoletimAction $action): Response
+    {
+        $turma = Turma::query()->findOrFail($request->integer('turma'));
+        $bimestre = Bimestre::tryFrom($request->integer('bimestre'));
+
+        try {
+            $conteudo = $action->conteudo($turma, $request->user(), $bimestre);
+        } catch (RegraDeNegocioException $excecao) {
+            return response($excecao->getMessage(), 422)->header('Content-Type', 'text/plain; charset=UTF-8');
+        }
+
+        return response($conteudo)
+            ->header('Content-Type', 'application/pdf')
+            ->header(
+                'Content-Disposition',
+                'attachment; filename="'.$action->nomeDoArquivo($turma, $bimestre).'"'
             );
     }
 

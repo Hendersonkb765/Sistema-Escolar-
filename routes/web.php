@@ -106,6 +106,7 @@ Route::middleware(['auth', 'ativo'])->group(function () {
 
     Route::get('/resultados', ListaResultados::class)->name('resultados.index');
     Route::get('/analises', Desempenho::class)->name('analises.index');
+    Route::get('/boletins', [ProvaArquivoController::class, 'boletim'])->name('resultados.boletim');
 
     // --- Administração ---------------------------------------------------
     Route::get('/usuarios', ListaUsuarios::class)->name('usuarios.index');

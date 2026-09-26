@@ -8,6 +8,7 @@ use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
+use App\Support\GraficoDeEvolucao;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -41,6 +42,10 @@ class Desempenho extends Component
     #[Url(as: 'disciplina', except: '')]
     public string $filtroDisciplina = '';
 
+    /** A habilidade aberta para ver aluno a aluno. */
+    #[Url(as: 'habilidade', except: '')]
+    public string $habilidadeAberta = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', ResultadoAluno::class);
@@ -70,6 +75,25 @@ class Desempenho extends Component
             ->orderByDesc('gerada_em');
     }
 
+    public function verAlunos(string $habilidade): void
+    {
+        $this->habilidadeAberta = $this->habilidadeAberta === $habilidade ? '' : $habilidade;
+    }
+
+    /** A turma do recorte, quando ele aponta para uma só. */
+    public function turmaDoRecorte(): ?Turma
+    {
+        if ($this->filtroTurma !== '') {
+            return Turma::query()->visivelPara(auth()->user())->find($this->filtroTurma);
+        }
+
+        $turmas = $this->provasAnalisadas()->pluck('turma_id')->unique();
+
+        return $turmas->count() === 1
+            ? Turma::query()->visivelPara(auth()->user())->find($turmas->first())
+            : null;
+    }
+
     public function render(AnalisarDesempenhoAction $analisar): View
     {
         $provas = $this->provasAnalisadas();
@@ -85,8 +109,20 @@ class Desempenho extends Component
                 ->unique()
                 ->sort();
 
+        // A evolução ignora o filtro de prova: comparar bimestres exige
+        // olhar além do recorte de uma avaliação só.
+        $paraEvolucao = $this->consultaDeProvas()->get();
+
         return view('analises.desempenho', [
             'provas' => $provas,
+            'grafico' => GraficoDeEvolucao::de(
+                array_values(Bimestre::opcoes()),
+                $analisar->evolucaoPorBimestre($paraEvolucao, auth()->user(), $disciplina),
+            ),
+            'alunosDaHabilidade' => $this->habilidadeAberta === ''
+                ? collect()
+                : $analisar->porAluno($provas, auth()->user(), $this->habilidadeAberta, $disciplina),
+            'turmaDoRecorte' => $this->turmaDoRecorte(),
             'provasDisponiveis' => $this->consultaDeProvas()->get(),
             'turmas' => Turma::query()->visivelPara(auth()->user())->orderBy('nome')->pluck('nome', 'id'),
             'bimestres' => Bimestre::opcoes(),
