@@ -571,6 +571,22 @@ O escopo é o de quem lê: o **professor** vê as habilidades das questões
 dele, a **coordenação** vê as do seu Eixo. Os recortes são turma,
 bimestre, prova e disciplina, todos na URL.
 
+## A barra lateral se recolhe
+
+O botão na barra de cima esconde o menu e devolve os 16 rem dele ao
+conteúdo — a pré-visualização da prova, as tabelas largas de resultado e
+a análise de desempenho são o motivo.
+
+A escolha fica no `localStorage` (`$persist`), então vale para as
+próximas visitas. E um véu no `<head>` lê a mesma chave **antes da
+primeira pintura**: sem ele, quem deixou a barra escondida a veria
+aparecer e sumir a cada recarga. O véu sai em `alpine:initialized`,
+porque a partir dali quem posiciona a barra são as classes do Alpine e
+as duas regras brigariam.
+
+No celular a barra já é um painel sobreposto, que não ocupa espaço —
+lá o botão não aparece.
+
 ## Estrutura acadêmica
 
 ```

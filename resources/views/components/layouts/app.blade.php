@@ -18,12 +18,33 @@
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
+
+    {{--
+        Antes da primeira pintura: sem isto, quem deixou a barra
+        escondida a vê aparecer e sumir a cada recarga. É só um véu — a
+        partir da hidratação quem manda é o `$persist` do Alpine, que lê
+        a mesma chave.
+    --}}
+    <script>
+        try {
+            if (localStorage.getItem('menu-recolhido') === 'true') {
+                document.documentElement.classList.add('menu-recolhido');
+            }
+        } catch (erro) {
+            // Janela anônima ou armazenamento bloqueado: segue aberta.
+        }
+    </script>
+    <style>
+        .menu-recolhido .barra-lateral { display: none !important; }
+        .menu-recolhido .area-de-conteudo { padding-left: 0 !important; }
+    </style>
 </head>
 <body class="h-full bg-slate-100 font-sans antialiased dark:bg-slate-950">
-<div x-data="{ menuAberto: false }" class="min-h-full">
+<div x-data="{ menuAberto: false, menuRecolhido: $persist(false).as('menu-recolhido') }" class="min-h-full">
 
     {{-- Sidebar (desktop) --}}
-    <aside class="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex dark:border-slate-800 dark:bg-slate-900">
+    <aside class="barra-lateral fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+           :class="{ 'lg:flex': ! menuRecolhido }">
         @include('layouts.partials.sidebar', ['navegacao' => $navegacao, 'usuario' => $usuario])
     </aside>
 
@@ -39,13 +60,27 @@
         </div>
     </div>
 
-    <div class="lg:pl-64">
+    <div class="area-de-conteudo" :class="{ 'lg:pl-64': ! menuRecolhido }">
         {{-- Topbar --}}
         <header class="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 dark:border-slate-800 dark:bg-slate-900/90">
             <button type="button" class="-ml-1 rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
                     @click="menuAberto = true" aria-label="Abrir menu">
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/>
+                </svg>
+            </button>
+
+            {{-- No celular a barra já é um painel sobreposto; recolher
+                 só faz sentido onde ela ocupa espaço de verdade. --}}
+            <button type="button"
+                    class="-ml-1 hidden rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:inline-flex dark:text-slate-300 dark:hover:bg-slate-800"
+                    @click="menuRecolhido = ! menuRecolhido"
+                    :aria-label="menuRecolhido ? 'Mostrar o menu lateral' : 'Esconder o menu lateral'"
+                    :title="menuRecolhido ? 'Mostrar o menu lateral' : 'Esconder o menu lateral para ganhar espaço'"
+                    :aria-expanded="(! menuRecolhido).toString()">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M3.75 5.25h16.5v13.5H3.75V5.25zM9.75 5.25v13.5"/>
                 </svg>
             </button>
 
@@ -91,5 +126,13 @@
 </div>
 <x-notificacoes/>
 @livewireScripts
+
+<script>
+    // O véu do `<head>` cumpriu o papel; daqui em diante as classes do
+    // Alpine é que posicionam a barra, e as duas regras brigariam.
+    document.addEventListener('alpine:initialized', () => {
+        document.documentElement.classList.remove('menu-recolhido');
+    });
+</script>
 </body>
 </html>
