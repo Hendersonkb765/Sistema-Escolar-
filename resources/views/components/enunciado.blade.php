@@ -1,3 +1,5 @@
+@use('App\Support\TextoDoEnunciado')
+
 @props([
     'questao',
     'texto' => null,
@@ -7,7 +9,7 @@
      na ordem em que o professor os montou. --}}
 <div class="space-y-3">
     @if ($texto ?? $questao->enunciado)
-        <p class="whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{{ $texto ?? $questao->enunciado }}</p>
+        <p class="whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{!! TextoDoEnunciado::paraHtml((string) ($texto ?? $questao->enunciado)) !!}</p>
     @endif
 
     @foreach ($questao->blocos as $bloco)
@@ -25,7 +27,7 @@
                 </figure>
             @endif
         @else
-            <p class="whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{{ $bloco->conteudo }}</p>
+            <p class="whitespace-pre-line text-sm text-slate-700 dark:text-slate-200">{!! TextoDoEnunciado::paraHtml((string) $bloco->conteudo) !!}</p>
         @endif
     @endforeach
 </div>

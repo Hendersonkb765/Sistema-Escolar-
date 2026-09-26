@@ -9,6 +9,7 @@ use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
+use App\Enums\Bimestre;
 use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
 use App\Models\Aluno;
@@ -190,6 +191,7 @@ class DemonstracaoSeeder extends Seeder
             ],
             quantidadeAlternativas: 4,
             prazo: now()->addWeek(),
+            bimestre: Bimestre::Segundo,
             titulo: 'Avaliação do 2º bimestre',
             observacoes: 'Priorize conteúdo do segundo bimestre.',
         );
@@ -212,6 +214,7 @@ class DemonstracaoSeeder extends Seeder
             ],
             quantidadeAlternativas: 5,
             prazo: now()->subDays(3),
+            bimestre: Bimestre::Terceiro,
             titulo: 'Recuperação',
         );
     }

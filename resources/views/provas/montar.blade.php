@@ -34,9 +34,18 @@
                     </x-campo>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <x-campo rotulo="Título" para="titulo" obrigatorio :erro="$errors->first('titulo')">
                         <x-input id="titulo" wire:model="titulo" required placeholder="Avaliação do 2º bimestre"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Bimestre" para="bimestre" obrigatorio :erro="$errors->first('bimestre')"
+                             ajuda="Sugerido pelas solicitações que geraram as questões.">
+                        <x-select id="bimestre" wire:model="bimestre" required>
+                            @foreach ($bimestres as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            @endforeach
+                        </x-select>
                     </x-campo>
 
                     <x-campo rotulo="Data de aplicação" para="data_aplicacao"

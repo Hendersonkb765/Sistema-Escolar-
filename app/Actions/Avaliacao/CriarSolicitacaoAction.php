@@ -2,6 +2,7 @@
 
 namespace App\Actions\Avaliacao;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusSolicitacao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Models\Disciplina;
@@ -30,6 +31,7 @@ class CriarSolicitacaoAction
         array $partes,
         int $quantidadeAlternativas,
         \DateTimeInterface $prazo,
+        Bimestre $bimestre,
         ?string $titulo = null,
         ?string $observacoes = null,
     ): SolicitacaoProva {
@@ -41,13 +43,14 @@ class CriarSolicitacaoAction
         $this->validar($turma, $partes, $quantidadeAlternativas);
 
         return DB::transaction(function () use (
-            $autor, $turma, $partes, $quantidadeAlternativas, $prazo, $titulo, $observacoes
+            $autor, $turma, $partes, $quantidadeAlternativas, $prazo, $bimestre, $titulo, $observacoes
         ) {
             $solicitacao = SolicitacaoProva::create([
                 'curso_id' => $turma->curso_id,
                 'turma_id' => $turma->getKey(),
                 'criado_por' => $autor->getKey(),
                 'titulo' => $titulo,
+                'bimestre' => $bimestre,
                 'quantidade_alternativas' => $quantidadeAlternativas,
                 'prazo' => $prazo,
                 'status' => StatusSolicitacao::Aberta,

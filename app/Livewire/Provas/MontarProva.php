@@ -3,6 +3,7 @@
 namespace App\Livewire\Provas;
 
 use App\Actions\Prova\MontarProvaAction;
+use App\Enums\Bimestre;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
 use App\Models\ModeloProva;
@@ -30,6 +31,8 @@ class MontarProva extends Component
 
     public string $titulo = '';
 
+    public int $bimestre = 1;
+
     public string $data_aplicacao = '';
 
     public int $colunas = 2;
@@ -49,12 +52,14 @@ class MontarProva extends Component
         $this->data_aplicacao = now()->addWeek()->format('Y-m-d');
 
         $this->sincronizarEscolhas();
+        $this->sugerirBimestre();
         $this->sugerirModelo();
     }
 
     public function updatedTurmaId(): void
     {
         $this->sincronizarEscolhas();
+        $this->sugerirBimestre();
         $this->sugerirModelo();
     }
 
@@ -65,6 +70,16 @@ class MontarProva extends Component
 
         if ($this->titulo === '' && $this->turmaSelecionada() !== null) {
             $this->titulo = 'Avaliação — '.$this->turmaSelecionada()->nome;
+        }
+    }
+
+    /** O bimestre vem das solicitações que produziram as questões. */
+    protected function sugerirBimestre(): void
+    {
+        $aprovadas = $this->questoesAprovadas();
+
+        if ($aprovadas->isNotEmpty()) {
+            $this->bimestre = app(MontarProvaAction::class)->bimestreDasQuestoes($aprovadas)->value;
         }
     }
 
@@ -115,6 +130,7 @@ class MontarProva extends Component
             'turma_id' => ['required', Rule::in($this->turmasDisponiveis()->pluck('id')->all())],
             'modelo_prova_id' => ['required', Rule::in($this->modelosDisponiveis()->pluck('id')->all())],
             'titulo' => ['required', 'string', 'max:255'],
+            'bimestre' => ['required', Rule::in(Bimestre::valores())],
             'data_aplicacao' => ['nullable', 'date'],
             'colunas' => ['required', 'integer', Rule::in([1, 2])],
             'instrucoes' => ['nullable', 'string', 'max:2000'],
@@ -129,6 +145,7 @@ class MontarProva extends Component
             'turma_id' => 'turma',
             'modelo_prova_id' => 'modelo de prova',
             'titulo' => 'título',
+            'bimestre' => 'bimestre',
             'data_aplicacao' => 'data de aplicação',
             'questoesEscolhidas' => 'questões',
         ];
@@ -155,6 +172,7 @@ class MontarProva extends Component
                 turma: Turma::query()->findOrFail($dados['turma_id']),
                 modelo: ModeloProva::query()->findOrFail($dados['modelo_prova_id']),
                 titulo: $dados['titulo'],
+                bimestre: Bimestre::from($dados['bimestre']),
                 dataAplicacao: $dados['data_aplicacao'] ? now()->parse($dados['data_aplicacao']) : null,
                 questoesEscolhidas: $this->escolhidas(),
                 configuracao: [
@@ -229,6 +247,7 @@ class MontarProva extends Component
         return view('provas.montar', [
             'turmas' => $this->turmasDisponiveis(),
             'modelos' => $this->modelosDisponiveis(),
+            'bimestres' => Bimestre::opcoes(),
             'turmaSelecionada' => $this->turmaSelecionada(),
             'porDisciplina' => $aprovadas->groupBy(fn (Questao $q) => $q->disciplina->nome),
             'totalEscolhido' => $escolhidas->count(),

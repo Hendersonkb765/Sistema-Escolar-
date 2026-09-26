@@ -2,6 +2,7 @@
 
 namespace App\Actions\Prova;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Enums\StatusQuestao;
 use App\Exceptions\RegraDeNegocioException;
@@ -37,6 +38,7 @@ class MontarProvaAction
         Turma $turma,
         ModeloProva $modelo,
         string $titulo,
+        ?Bimestre $bimestre = null,
         ?\DateTimeInterface $dataAplicacao = null,
         ?array $questoesEscolhidas = null,
         array $configuracao = [],
@@ -59,8 +61,12 @@ class MontarProvaAction
             );
         }
 
+        // Sem escolha explícita, vale o bimestre das solicitações que
+        // produziram estas questões — quando elas concordam.
+        $bimestre ??= $this->bimestreDasQuestoes($questoes);
+
         return DB::transaction(function () use (
-            $autor, $turma, $modelo, $titulo, $dataAplicacao, $questoes, $configuracao, $instrucoes
+            $autor, $turma, $modelo, $titulo, $bimestre, $dataAplicacao, $questoes, $configuracao, $instrucoes
         ) {
             $versao = (int) Prova::query()
                 ->withTrashed()
@@ -72,13 +78,13 @@ class MontarProvaAction
                 'turma_id' => $turma->getKey(),
                 'modelo_prova_id' => $modelo->getKey(),
                 'titulo' => $titulo,
+                'bimestre' => $bimestre,
                 'data_aplicacao' => $dataAplicacao,
                 'versao' => $versao,
                 'status' => StatusProva::Gerada,
                 'instrucoes' => $instrucoes ?? $modelo->instrucoes,
                 'configuracao' => [
                     'colunas' => (int) ($configuracao['colunas'] ?? 2),
-                    'gabarito' => (bool) ($configuracao['gabarito'] ?? false),
                     'mostrar_pesos' => (bool) ($configuracao['mostrar_pesos'] ?? false),
                 ],
                 'gerada_por' => $autor->getKey(),
@@ -128,6 +134,23 @@ class MontarProvaAction
      * @param  array<int, int>|null  $escolhidas
      * @return Collection<int, Questao>
      */
+    /**
+     * O bimestre que as questões trazem de origem. Se vierem de
+     * solicitações de bimestres diferentes, não há o que herdar e o
+     * primeiro serve de ponto de partida para quem monta escolher.
+     *
+     * @param  Collection<int, Questao>  $questoes
+     */
+    public function bimestreDasQuestoes(Collection $questoes): Bimestre
+    {
+        $bimestres = $questoes
+            ->loadMissing('solicitacao:id,bimestre')
+            ->map(fn (Questao $questao) => $questao->solicitacao->bimestre)
+            ->unique();
+
+        return $bimestres->count() === 1 ? $bimestres->first() : Bimestre::Primeiro;
+    }
+
     public function questoesElegiveis(Turma $turma, ?array $escolhidas = null): Collection
     {
         return Questao::query()

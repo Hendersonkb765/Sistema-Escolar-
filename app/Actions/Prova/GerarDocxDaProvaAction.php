@@ -8,10 +8,12 @@ use App\Models\ProvaQuestao;
 use App\Models\User;
 use App\Support\LayoutDaFolha;
 use App\Support\LogoDaFolha;
+use App\Support\TextoDoEnunciado;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\Element\Cell;
 use PhpOffice\PhpWord\Element\Section;
+use PhpOffice\PhpWord\Element\TextRun;
 use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
 use PhpOffice\PhpWord\Shared\Converter;
@@ -212,6 +214,7 @@ class GerarDocxDaProvaAction
 
         $secao->addText(
             "{$turma->curso->nome} · Turma {$turma->nome} · {$turma->periodo}º período"
+            .' · '.$prova->bimestre->rotulo()
             .($prova->data_aplicacao ? ' · '.$prova->data_aplicacao->format('d/m/Y') : ''),
             'discreto',
             $centrado,
@@ -412,7 +415,7 @@ class GerarDocxDaProvaAction
 
         $paragrafo = $secao->addTextRun('justificado');
         $paragrafo->addText("{$questao->numero}.{$peso} ", ['bold' => true]);
-        $paragrafo->addText((string) $questao->enunciado_snapshot);
+        $this->escreverFormatado($paragrafo, (string) $questao->enunciado_snapshot);
 
         foreach ($questao->blocos() as $bloco) {
             if ($bloco['tipo'] === 'codigo') {
@@ -443,7 +446,10 @@ class GerarDocxDaProvaAction
                     $secao->addText($bloco['legenda'], 'discreto');
                 }
             } else {
-                $secao->addText((string) $bloco['conteudo'], null, 'justificado');
+                $this->escreverFormatado(
+                    $secao->addTextRun('justificado'),
+                    (string) $bloco['conteudo'],
+                );
             }
         }
 
@@ -456,6 +462,32 @@ class GerarDocxDaProvaAction
         }
 
         $secao->addTextBreak(1);
+    }
+
+    /**
+     * Escreve o texto respeitando o negrito e o itálico das marcas.
+     *
+     * O Word não lê `**assim**`: cada trecho vira um `run` com o seu
+     * próprio estilo, que é por isso que a formatação mora em
+     * `TextoDoEnunciado::segmentos()` e não em HTML.
+     *
+     * @param  array<string, mixed>  $estiloBase
+     */
+    protected function escreverFormatado(TextRun $paragrafo, string $texto, array $estiloBase = []): void
+    {
+        foreach (TextoDoEnunciado::segmentos($texto) as $trecho) {
+            $estilo = $estiloBase;
+
+            if ($trecho['negrito']) {
+                $estilo['bold'] = true;
+            }
+
+            if ($trecho['italico']) {
+                $estilo['italic'] = true;
+            }
+
+            $paragrafo->addText($trecho['texto'], $estilo ?: null);
+        }
     }
 
     protected function gabarito(PhpWord $documento, Prova $prova, LayoutDaFolha $layout): void

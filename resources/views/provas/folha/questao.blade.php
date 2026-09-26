@@ -1,4 +1,5 @@
 {{-- Uma questão da folha: número, enunciado, blocos e alternativas. --}}
+@use('App\Support\TextoDoEnunciado')
 @use('App\Support\TrechoDeCodigo')
 
 <div class="questao">
@@ -7,7 +8,7 @@
         @if ($mostrarPesos)
             <span class="peso">(peso {{ number_format((float) $questao->peso, 2, ',', '.') }})</span>
         @endif
-        {{ $questao->enunciado_snapshot }}
+        {!! TextoDoEnunciado::paraHtml((string) $questao->enunciado_snapshot) !!}
     </div>
 
     @foreach ($questao->blocos() as $bloco)
@@ -31,7 +32,7 @@
                 @endif
             </div>
         @else
-            <div class="enunciado">{{ $bloco['conteudo'] }}</div>
+            <div class="enunciado">{!! TextoDoEnunciado::paraHtml((string) $bloco['conteudo']) !!}</div>
         @endif
     @endforeach
 

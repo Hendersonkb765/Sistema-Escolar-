@@ -3,6 +3,7 @@
 namespace App\Livewire\Solicitacoes;
 
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
+use App\Enums\Bimestre;
 use App\Enums\StatusTurma;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
@@ -31,6 +32,8 @@ class FormularioSolicitacao extends Component
     public ?int $turma_id = null;
 
     public string $titulo = '';
+
+    public int $bimestre = 1;
 
     public int $quantidade_alternativas = 4;
 
@@ -113,6 +116,7 @@ class FormularioSolicitacao extends Component
         return [
             'turma_id' => ['required', Rule::in($this->turmasDisponiveis()->pluck('id')->all())],
             'titulo' => ['nullable', 'string', 'max:255'],
+            'bimestre' => ['required', Rule::in(Bimestre::valores())],
             'quantidade_alternativas' => ['required', 'integer', 'min:2', 'max:6'],
             'prazo' => ['required', 'date'],
             'observacoes' => ['nullable', 'string', 'max:2000'],
@@ -134,6 +138,7 @@ class FormularioSolicitacao extends Component
     {
         return [
             'turma_id' => 'turma',
+            'bimestre' => 'bimestre',
             'quantidade_alternativas' => 'quantidade de alternativas',
             'prazo' => 'prazo',
             'partes' => 'disciplinas',
@@ -172,6 +177,7 @@ class FormularioSolicitacao extends Component
                     'observacoes' => $parte['observacoes'] ?: null,
                 ], $dados['partes']),
                 quantidadeAlternativas: $dados['quantidade_alternativas'],
+                bimestre: Bimestre::from($dados['bimestre']),
                 prazo: now()->parse($dados['prazo']),
                 titulo: $dados['titulo'] ?: null,
                 observacoes: $dados['observacoes'] ?: null,
@@ -270,6 +276,7 @@ class FormularioSolicitacao extends Component
             'sugeridosPorDisciplina' => $disciplinas
                 ->mapWithKeys(fn (Disciplina $d) => [$d->getKey() => $this->professoresDaDisciplina($d->getKey())]),
             'totalDeQuestoes' => collect($this->partes)->sum(fn (array $p) => (int) ($p['quantidade_questoes'] ?? 0)),
+            'bimestres' => Bimestre::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Nova solicitação de questões',
             'subtitulo' => 'Uma prova reúne várias disciplinas — cada uma com seu professor e sua cota',

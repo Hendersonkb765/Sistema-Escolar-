@@ -31,10 +31,11 @@
     <div class="space-y-4">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <x-campo rotulo="Enunciado" :para="'enunciado-'.$questao->id" obrigatorio class="sm:col-span-3">
-                <x-area-texto id="enunciado-{{ $questao->id }}" :linhas="3"
-                              wire:model.blur="formulario.{{ $questao->id }}.enunciado"
-                              :desabilitado="$bloqueado"
-                              placeholder="O comando da questão"/>
+                <x-area-texto-formatada id="enunciado-{{ $questao->id }}" :linhas="3"
+                                        wire:model.blur="formulario.{{ $questao->id }}.enunciado"
+                                        :desabilitado="$bloqueado"
+                                        :valor="$dados['enunciado'] ?? ''"
+                                        placeholder="O comando da questão"/>
             </x-campo>
 
             <x-campo rotulo="Peso da questão" :para="'peso-'.$questao->id" obrigatorio
@@ -136,9 +137,10 @@
                                 </div>
                             @else
                                 <x-campo rotulo="Texto" class="mt-2">
-                                    <x-area-texto :linhas="3"
-                                                  wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
-                                                  :desabilitado="$bloqueado"/>
+                                    <x-area-texto-formatada :linhas="3"
+                                                            wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
+                                                            :desabilitado="$bloqueado"
+                                                            :valor="$bloco['conteudo'] ?? ''"/>
                                 </x-campo>
                             @endif
                         </div>

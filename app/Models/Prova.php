@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Models\Concerns\AplicaEscopoDeEixo;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ class Prova extends Model
         'turma_id',
         'modelo_prova_id',
         'titulo',
+        'bimestre',
         'data_aplicacao',
         'versao',
         'status',
@@ -38,10 +40,22 @@ class Prova extends Model
         'gerada_em',
     ];
 
+    /**
+     * Instância nova já nasce com os mesmos padrões da tabela: sem
+     * isso, um model não persistido devolve `null` onde a view espera
+     * um enum.
+     */
+    protected $attributes = [
+        'status' => 'rascunho',
+        'bimestre' => 1,
+        'versao' => 1,
+    ];
+
     protected function casts(): array
     {
         return [
             'status' => StatusProva::class,
+            'bimestre' => Bimestre::class,
             'data_aplicacao' => 'date',
             'configuracao' => 'array',
             'gerada_em' => 'datetime',

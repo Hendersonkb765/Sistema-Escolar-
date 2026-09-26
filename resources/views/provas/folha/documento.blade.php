@@ -41,7 +41,7 @@
                     <div class="avaliacao">{{ $modelo->nome_avaliacao ?: 'Avaliação' }} — {{ $prova->titulo }}</div>
                     <div class="meta">
                         {{ $prova->turma->curso->nome }} · Turma {{ $prova->turma->nome }} ·
-                        {{ $prova->turma->periodo }}º período
+                        {{ $prova->turma->periodo }}º período · {{ $prova->bimestre->rotulo() }}
                         @if ($prova->data_aplicacao)
                             · {{ $prova->data_aplicacao->format('d/m/Y') }}
                         @endif

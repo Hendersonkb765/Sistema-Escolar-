@@ -149,6 +149,38 @@ duas delas.
 Cada questão pedida nasce em rascunho, ligada à sua parte. O professor abre
 a solicitação e encontra os campos prontos — só os da parte dele.
 
+### Bimestre
+
+A solicitação declara de que **bimestre** ela é, e são quatro por ano
+letivo (`App\Enums\Bimestre`). A prova **herda** o bimestre das
+solicitações que produziram as suas questões — quem monta não precisa
+lembrar. Quando as questões vêm de bimestres diferentes não há o que
+herdar, e a tela deixa escolher. O bimestre sai no cabeçalho da folha,
+no PDF e no Word.
+
+### Negrito e itálico no enunciado
+
+O professor formata o enunciado e os blocos de texto com marcas no
+próprio texto: `**negrito**`, `*itálico*` e `***os dois***`. Os botões
+**B** e *I* só envolvem a seleção; quem interpreta as marcas é
+`App\Support\TextoDoEnunciado`, num lugar só, e os três destinos o
+consultam:
+
+| destino | o que recebe |
+|---|---|
+| tela e PDF | `paraHtml()` — tudo escapado, só as marcas viram `<strong>`/`<em>` |
+| Word | `segmentos()` — trechos com `bold`/`italic`, porque o .docx é montado trecho a trecho e não lê HTML |
+| onde não cabe formatar | `semMarcas()` |
+
+Guardar HTML seria o caminho óbvio e o errado: o enunciado é entrada de
+usuário e teria de ser higienizado na tela, o mPDF aceita só um
+subconjunto e o Word não aceita HTML nenhum. Com marcas, o que está no
+banco continua sendo texto, sem superfície de XSS.
+
+As marcas exigem encostar no texto (`**assim**`, nunca `** assim **`).
+É o que impede `3 * 4 * 5` de virar itálico — e numa prova de lógica
+isso aparece.
+
 ### A entrega é por disciplina
 
 O prazo é da prova inteira, mas o envio é de cada parte: o professor de

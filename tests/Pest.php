@@ -4,6 +4,7 @@ use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
+use App\Enums\Bimestre;
 use App\Enums\PerfilUsuario;
 use App\Models\Curso;
 use App\Models\Disciplina;
@@ -136,6 +137,7 @@ function solicitacaoCom(
     int $alternativas = 4,
     ?DateTimeInterface $prazo = null,
     ?string $titulo = null,
+    ?Bimestre $bimestre = null,
 ): SolicitacaoProva {
     return app(CriarSolicitacaoAction::class)->executar(
         autor: $autor,
@@ -148,6 +150,7 @@ function solicitacaoCom(
         ], $partes),
         quantidadeAlternativas: $alternativas,
         prazo: $prazo ?? now()->addWeek(),
+        bimestre: $bimestre ?? Bimestre::Primeiro,
         titulo: $titulo,
     );
 }
