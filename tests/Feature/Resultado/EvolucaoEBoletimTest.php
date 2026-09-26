@@ -259,6 +259,31 @@ it('encontra a habilidade mesmo com outra caixa', function () {
         ->toHaveCount(2);
 });
 
+it('o botão da tela chama o método com a habilidade certa', function () {
+    // O elo que faltava: `@js(...)` dentro da tag do componente saía
+    // literal e o botão não chamava nada. Aqui o argumento é lido do
+    // HTML renderizado e devolvido ao método.
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        '1001' => [1 => false, 2 => false, 3 => true],
+        '1002' => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+
+    preg_match_all('/wire:click="verAlunos\((.+?)\)"/', $componente->html(), $achados);
+
+    expect($achados[1])->not->toBeEmpty();
+
+    // O que o navegador entregaria ao Livewire, já sem o escape de HTML.
+    $argumento = json_decode(str_replace("'", '"', html_entity_decode($achados[1][0])));
+
+    expect($argumento)->toBeString();
+
+    $componente->call('verAlunos', $argumento)
+        ->assertSet('habilidadeAberta', $argumento)
+        ->assertSee('Aluno a aluno');
+});
+
 it('abre e fecha o detalhe na tela', function () {
     ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
         '1001' => [1 => false, 2 => false, 3 => true],
