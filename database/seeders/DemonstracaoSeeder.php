@@ -400,6 +400,9 @@ class DemonstracaoSeeder extends Seeder
             [
                 'nome' => $nome,
                 'password' => Hash::make('senha-forte-123'),
+                // Contas de demonstração entram direto, sem a tela de
+                // primeira senha atrapalhar quem está só conhecendo.
+                'senha_definida_em' => now(),
                 'perfil' => $perfil,
                 'ativo' => true,
                 'criado_por' => $autor?->id,

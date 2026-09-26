@@ -5,6 +5,7 @@ use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
 use App\Livewire\Analises\Desempenho;
+use App\Livewire\Autenticacao\PrimeiraSenha;
 use App\Livewire\Cursos\DetalheCurso;
 use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
@@ -47,7 +48,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/painel')->name('inicio');
 
-Route::middleware(['auth', 'ativo'])->group(function () {
+/*
+ * O primeiro acesso fica fora do grupo que exige senha própria: é
+ * justamente a tela onde ela é escolhida.
+ */
+Route::middleware(['auth', 'ativo'])
+    ->get('/primeira-senha', PrimeiraSenha::class)
+    ->name('primeira-senha');
+
+Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/painel', Painel::class)->name('painel');
 
     // --- Estrutura acadêmica -------------------------------------------

@@ -52,6 +52,30 @@ O `ativo` é verificado em três camadas independentes:
 2. `GarantirUsuarioAtivo` — middleware `web`, derruba a sessão em curso;
 3. `Gate::before()` — nega qualquer autorização, inclusive fora do HTTP.
 
+### No primeiro acesso, a senha passa a ser do dono
+
+Quem cria a conta define uma senha provisória e a entrega por algum
+canal — conversa, mensagem, papel. Ela serve para entrar **uma vez**:
+antes de qualquer outra tela, o professor ou o PAEET escolhe a sua, e
+daí em diante ninguém mais a conhece.
+
+`usuarios.senha_definida_em` guarda quando o próprio dono escolheu.
+Nulo significa que a senha em uso é de outra pessoa, e o middleware
+`senha-propria` desvia para `/primeira-senha` **a cada request** — só
+no login não bastaria: digitar outro endereço seguiria valendo.
+
+Continuam abertas apenas a própria troca e a saída: quem não quiser
+trocar agora pode sair, mas não usar o sistema com a senha alheia. A
+tela recusa repetir a provisória, porque mantê-la deixaria a senha nas
+mãos de quem a entregou.
+
+Redefinir a senha de alguém pela coordenação zera o campo de novo:
+**senha definida por outra pessoa é sempre provisória**. Trocar a
+própria senha no perfil marca como definida.
+
+Isto não é autocadastro: a conta já existe, criada pela coordenação. O
+que muda é de quem é a senha.
+
 ## Como rodar
 
 ```bash
