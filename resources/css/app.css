@@ -1,3 +1,74 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+    Barra de rolagem no tom do layout.
+
+    Duas sintaxes porque nenhuma cobre tudo: `scrollbar-color` é a
+    padronizada (Firefox e Chrome novo) e `::-webkit-scrollbar` atende
+    Safari e Chrome antigo. Quando as duas valem, a padronizada ganha —
+    por isso as cores são as mesmas nas duas, e não duas aparências
+    diferentes conforme o navegador.
+
+    A folha de prova, dentro do `iframe`, é outro documento e continua
+    com a barra do sistema: ela imita papel, e uma barra escura sobre o
+    branco destoaria.
+*/
+@layer base {
+    html {
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.slate.300') transparent;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: theme('colors.slate.300');
+        border-radius: 9999px;
+        /* A borda transparente afina o polegar sem encolher a área de
+           clique, que continua com os 10px inteiros. */
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: theme('colors.marca.500');
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        html {
+            scrollbar-color: theme('colors.slate.700') transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: theme('colors.slate.700');
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: theme('colors.marca.500');
+        }
+    }
+
+    /* No modo de alto contraste quem manda é o sistema. */
+    @media (forced-colors: active) {
+        html {
+            scrollbar-color: auto;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: ButtonBorder;
+        }
+    }
+}

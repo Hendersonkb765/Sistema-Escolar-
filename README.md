@@ -103,6 +103,31 @@ Em produção não há seeder de acesso. A primeira conta nasce pelo terminal:
 php artisan usuario:criar-admin
 ```
 
+## O que a demonstração traz
+
+`php artisan migrate:fresh --seed` monta um ano letivo em andamento, não
+uma tela vazia:
+
+- **dois Eixos com curso de verdade** — Tecnologia (8 matérias) e Gestão
+  (4), cada um com turma, alunos, professores e modelo de prova;
+- **três bimestres fechados de ponta a ponta** na turma 1 A: solicitação,
+  respostas dos professores, aprovação, prova montada e resultados
+  importados. É o que faz o gráfico de evolução ter o que comparar;
+- **duas solicitações em aberto** — uma no prazo, para o professor ter o
+  que responder, e uma vencida, porque o selo "Atrasada" precisa de um
+  caso.
+
+Cada ciclo roda **na época dele** (`Carbon::setTestNow`). Sem isso, um
+prazo no passado somado a um envio agora marcaria toda solicitação
+antiga como "Entregue em atraso", e o selo vermelho apareceria em todas
+em vez de apontar a única que interessa.
+
+Os acertos são sorteados com semente fixa e a turma melhora a cada
+bimestre: uma distribuição plana faria o gráfico de evolução ser uma
+reta e não mostrar nada.
+
+O seeder é idempotente — cada peça se guarda pelo próprio título.
+
 ## Escopo por Eixo
 
 O isolamento multi-tenant é lógico e se apoia no pivot `eixo_usuario`. Cada
