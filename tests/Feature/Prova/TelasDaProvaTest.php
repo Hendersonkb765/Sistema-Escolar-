@@ -113,6 +113,36 @@ it('monta a prova e leva para a tela dela', function () {
         ->and($prova->colunas())->toBe(2);
 });
 
+it('oferece os campos de cabeçalho com o modelo como marca-d\'água', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(MontarProva::class)
+        ->set('turma_id', $this->turma->id)
+        ->set('modelo_prova_id', $this->modelo->id)
+        ->assertSee('Nome no topo da folha')
+        ->assertSee('Nome da avaliação')
+        // O valor do modelo entra como sugestão, não preenchido: em
+        // branco é o modelo que vale.
+        ->assertSet('instituicao', '')
+        ->assertSet('nome_avaliacao', '');
+});
+
+it('monta a prova com o cabeçalho escolhido na tela', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(MontarProva::class)
+        ->set('turma_id', $this->turma->id)
+        ->set('modelo_prova_id', $this->modelo->id)
+        ->set('titulo', 'Avaliação bimestral')
+        ->set('instituicao', 'Colégio Parceiro Dom Pedro')
+        ->set('nome_avaliacao', 'Avaliação de Recuperação')
+        ->call('montar')
+        ->assertHasNoErrors();
+
+    $prova = Prova::query()->latest('id')->first();
+
+    expect($prova->instituicao)->toBe('Colégio Parceiro Dom Pedro')
+        ->and($prova->nomeDaAvaliacao())->toBe('Avaliação de Recuperação');
+});
+
 it('recusa montar sem questão nenhuma marcada', function () {
     Livewire::actingAs($this->paeet)
         ->test(MontarProva::class)

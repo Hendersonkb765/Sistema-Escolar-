@@ -25,7 +25,9 @@
                                 </a> antes de montar a prova.
                             </x-alerta>
                         @else
-                            <x-select id="modelo_prova_id" wire:model="modelo_prova_id" required>
+                            {{-- `.live` para a marca-d'água dos campos de
+                                 cabeçalho acompanhar o modelo escolhido. --}}
+                            <x-select id="modelo_prova_id" wire:model.live="modelo_prova_id" required>
                                 @foreach ($modelos as $modelo)
                                     <option value="{{ $modelo->id }}">{{ $modelo->nome }}</option>
                                 @endforeach
@@ -51,6 +53,29 @@
                     <x-campo rotulo="Data de aplicação" para="data_aplicacao"
                              :erro="$errors->first('data_aplicacao')">
                         <x-input tipo="date" id="data_aplicacao" wire:model="data_aplicacao"/>
+                    </x-campo>
+                </div>
+
+                {{--
+                    As duas primeiras linhas da folha vêm do modelo, que
+                    é compartilhado. Aqui esta prova pode dizer outra
+                    coisa sem obrigar a criar um modelo só para ela — por
+                    isso o valor do modelo aparece como marca-d'água, e
+                    não preenchido.
+                --}}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <x-campo rotulo="Nome no topo da folha" para="instituicao"
+                             :erro="$errors->first('instituicao')"
+                             ajuda="Em branco, usa o nome do modelo.">
+                        <x-input id="instituicao" wire:model="instituicao"
+                                 :placeholder="$modeloEscolhido?->instituicao ?: config('app.name')"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Nome da avaliação" para="nome_avaliacao"
+                             :erro="$errors->first('nome_avaliacao')"
+                             ajuda="Vem antes do título. Ex.: Avaliação de Recuperação.">
+                        <x-input id="nome_avaliacao" wire:model="nome_avaliacao"
+                                 :placeholder="$modeloEscolhido?->nome_avaliacao ?: 'Avaliação'"/>
                     </x-campo>
                 </div>
 

@@ -321,13 +321,13 @@ class GerarDocxDaProvaAction
         $centro = $tabela->addCell($this->twips($util - 2 * $ladoDaLogo));
 
         $centro->addText(
-            $modelo->instituicao ?: config('app.name'),
+            $prova->instituicaoDaFolha(),
             ['bold' => true, 'size' => $layout->tamanho + 1, 'allCaps' => true],
             ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
         );
 
         $centro->addText(
-            ($modelo->nome_avaliacao ?: 'Avaliação').' — '.$prova->titulo,
+            $prova->nomeDaAvaliacao().' — '.$prova->titulo,
             ['size' => $layout->tamanho],
             ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
         );

@@ -28,6 +28,8 @@ class Prova extends Model
         'turma_id',
         'modelo_prova_id',
         'titulo',
+        'instituicao',
+        'nome_avaliacao',
         'bimestre',
         'data_aplicacao',
         'versao',
@@ -163,6 +165,26 @@ class Prova extends Model
             ->orderBy('numero')
             ->get()
             ->mapWithKeys(fn (ProvaQuestao $questao) => [$questao->numero => $questao->letra_correta]);
+    }
+
+    /**
+     * O que sai na primeira linha da folha.
+     *
+     * A prova pode ter escolhido um texto próprio na montagem; sem
+     * isso vale o do modelo, e corrigir o modelo corrige a reimpressão
+     * de todas as provas que não escolheram.
+     */
+    public function instituicaoDaFolha(): string
+    {
+        return $this->instituicao
+            ?: ($this->loadMissing('modelo')->modelo->instituicao ?: (string) config('app.name'));
+    }
+
+    /** O que sai na segunda linha, antes do título da prova. */
+    public function nomeDaAvaliacao(): string
+    {
+        return $this->nome_avaliacao
+            ?: ($this->loadMissing('modelo')->modelo->nome_avaliacao ?: 'Avaliação');
     }
 
     /** Uma prova já gerada tem snapshot imutável. */

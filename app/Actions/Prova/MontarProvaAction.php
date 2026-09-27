@@ -43,6 +43,8 @@ class MontarProvaAction
         ?array $questoesEscolhidas = null,
         array $configuracao = [],
         ?string $instrucoes = null,
+        ?string $instituicao = null,
+        ?string $nomeAvaliacao = null,
     ): Prova {
         Gate::forUser($autor)->authorize('create', Prova::class);
         Gate::forUser($autor)->authorize('view', $turma);
@@ -66,7 +68,8 @@ class MontarProvaAction
         $bimestre ??= $this->bimestreDasQuestoes($questoes);
 
         return DB::transaction(function () use (
-            $autor, $turma, $modelo, $titulo, $bimestre, $dataAplicacao, $questoes, $configuracao, $instrucoes
+            $autor, $turma, $modelo, $titulo, $bimestre, $dataAplicacao, $questoes, $configuracao,
+            $instrucoes, $instituicao, $nomeAvaliacao
         ) {
             $versao = (int) Prova::query()
                 ->withTrashed()
@@ -78,6 +81,10 @@ class MontarProvaAction
                 'turma_id' => $turma->getKey(),
                 'modelo_prova_id' => $modelo->getKey(),
                 'titulo' => $titulo,
+                // Em branco vale o do modelo: só se guarda o que foi
+                // escolhido de propósito para esta prova.
+                'instituicao' => $this->aparado($instituicao),
+                'nome_avaliacao' => $this->aparado($nomeAvaliacao),
                 'bimestre' => $bimestre,
                 'data_aplicacao' => $dataAplicacao,
                 'versao' => $versao,
@@ -150,6 +157,11 @@ class MontarProvaAction
             ->unique();
 
         return $bimestres->count() === 1 ? $bimestres->first() : Bimestre::Primeiro;
+    }
+
+    protected function aparado(?string $texto): ?string
+    {
+        return $texto === null ? null : (trim($texto) ?: null);
     }
 
     public function questoesElegiveis(Turma $turma, ?array $escolhidas = null): Collection

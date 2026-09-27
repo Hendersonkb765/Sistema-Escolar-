@@ -390,6 +390,16 @@ papel timbrado vale também para a reimpressão de provas antigas.
 Desativar um modelo o esconde da montagem sem tocar nas provas que já o
 usaram.
 
+As duas primeiras linhas da folha — o nome no topo e o nome da avaliação
+— podem ser trocadas **por prova**, na montagem. Serve para uma
+recuperação, ou para uma prova aplicada numa escola parceira, sem
+obrigar a criar um modelo só para ela.
+
+O campo aparece vazio, com o texto do modelo como marca-d'água, porque
+em branco é o modelo que vale. Quem escreveu um texto próprio deixa de
+ser alcançado por correções no modelo; quem não escreveu continua
+sendo, que é o que se quer de um papel timbrado.
+
 ### Duas colunas, mesma folha para tela e papel
 
 A pré-visualização dentro do sistema, o PDF e o Word saem da **mesma**

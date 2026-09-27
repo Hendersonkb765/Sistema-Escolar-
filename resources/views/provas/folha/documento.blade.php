@@ -37,8 +37,8 @@
                     @endif
                 </td>
                 <td class="titulo">
-                    <div class="instituicao">{{ $modelo->instituicao ?: config('app.name') }}</div>
-                    <div class="avaliacao">{{ $modelo->nome_avaliacao ?: 'Avaliação' }} — {{ $prova->titulo }}</div>
+                    <div class="instituicao">{{ $prova->instituicaoDaFolha() }}</div>
+                    <div class="avaliacao">{{ $prova->nomeDaAvaliacao() }} — {{ $prova->titulo }}</div>
                     <div class="meta">
                         {{ $prova->turma->curso->nome }} · Turma {{ $prova->turma->nome }} ·
                         {{ $prova->turma->periodo }}º período · {{ $prova->bimestre->rotulo() }}

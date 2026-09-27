@@ -233,6 +233,84 @@ it('não põe imagem nenhuma no Word quando os dois lados dispensam a logo', fun
 
 /*
 |--------------------------------------------------------------------------
+| O cabeçalho da prova
+|--------------------------------------------------------------------------
+*/
+
+it('usa o cabeçalho do modelo quando a prova não escolhe outro', function () {
+    $html = app(RenderizarProvaAction::class)->paraTela(($this->montar)());
+
+    expect($html)->toContain('Escola Técnica Estadual')
+        ->toContain('Avaliação — Avaliação bimestral');
+});
+
+it('deixa a prova escolher o próprio nome no topo', function () {
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Com cabeçalho próprio',
+        instituicao: 'Colégio Parceiro Dom Pedro',
+        nomeAvaliacao: 'Avaliação de Recuperação',
+    );
+
+    expect($prova->instituicaoDaFolha())->toBe('Colégio Parceiro Dom Pedro')
+        ->and($prova->nomeDaAvaliacao())->toBe('Avaliação de Recuperação');
+
+    $html = app(RenderizarProvaAction::class)->paraTela($prova);
+
+    expect($html)->toContain('Colégio Parceiro Dom Pedro')
+        ->toContain('Avaliação de Recuperação — Com cabeçalho próprio')
+        // O nome do modelo não aparece mais nesta prova.
+        ->not->toContain('Escola Técnica Estadual');
+});
+
+it('trata espaço em branco como "usa o do modelo"', function () {
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Só espaços', instituicao: '   ', nomeAvaliacao: '',
+    );
+
+    expect($prova->instituicao)->toBeNull()
+        ->and($prova->nome_avaliacao)->toBeNull()
+        ->and($prova->instituicaoDaFolha())->toBe('Escola Técnica Estadual');
+});
+
+it('corrigir o modelo alcança quem não escolheu cabeçalho próprio', function () {
+    $herdeira = ($this->montar)();
+
+    $propria = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Com nome próprio', instituicao: 'Colégio Parceiro',
+    );
+
+    $this->modelo->update(['instituicao' => 'Escola Técnica Estadual de Sumaré']);
+
+    expect($herdeira->refresh()->instituicaoDaFolha())->toBe('Escola Técnica Estadual de Sumaré')
+        // Quem escolheu o seu não é alcançado.
+        ->and($propria->refresh()->instituicaoDaFolha())->toBe('Colégio Parceiro');
+});
+
+it('leva o cabeçalho próprio para o Word', function () {
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'No Word', instituicao: 'Colégio Parceiro Dom Pedro',
+    );
+
+    $docx = app(GerarDocxDaProvaAction::class)->conteudo($prova, $this->paeet);
+
+    $arquivo = tempnam(sys_get_temp_dir(), 'prova').'.docx';
+    file_put_contents($arquivo, $docx);
+
+    $zip = new ZipArchive;
+    $zip->open($arquivo);
+    $xml = (string) $zip->getFromName('word/document.xml');
+    $zip->close();
+    @unlink($arquivo);
+
+    expect($xml)->toContain('Colégio Parceiro Dom Pedro');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Normas da ABNT
 |--------------------------------------------------------------------------
 */
