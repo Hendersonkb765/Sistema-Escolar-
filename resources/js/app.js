@@ -33,10 +33,10 @@ document.addEventListener('livewire:update', realcarCodigo);
  * para as duas divergirem.
  */
 document.addEventListener('alpine:init', () => {
-    window.Alpine.data('marcasDeTexto', () => ({
+        window.Alpine.data('marcasDeTexto', () => ({
         init() {
-            // O campo é redesenhado com o valor novo, e o cursor cairia
-            // no fim. O servidor diz onde ele estava.
+            // O campo é redesenhado com o valor novo, e o cursor cairia no
+            // fim. O servidor diz onde ele estava.
             window.addEventListener('marca-aplicada', (evento) => {
                 const campo = this.$refs.campo;
                 const { campo: caminho, inicio, fim } = evento.detail ?? {};
@@ -77,6 +77,56 @@ document.addEventListener('alpine:init', () => {
                 .find((nome) => nome.startsWith('wire:model'));
 
             return atributo ? campo.getAttribute(atributo) : null;
+        },
+    }));
+});
+
+/**
+ * Escolha do tema: claro, escuro ou o do aparelho.
+ *
+ * O `<head>` já aplicou a classe antes da primeira pintura; aqui só se
+ * troca a escolha e se guarda. A regra de qual classe vale está nos
+ * dois lugares por necessidade — um deles roda antes de o Alpine
+ * existir —, e por isso é uma linha só em cada.
+ */
+document.addEventListener('alpine:init', () => {
+        window.Alpine.data('seletorDeTema', () => ({
+        escolha: 'sistema',
+        aberto: false,
+
+        init() {
+            try {
+                this.escolha = localStorage.getItem('tema') || 'sistema';
+            } catch (erro) {
+                this.escolha = 'sistema';
+            }
+
+            // Em "sistema", acompanhar o aparelho sem recarregar a página.
+            window
+                .matchMedia('(prefers-color-scheme: dark)')
+                .addEventListener('change', () => this.aplicar());
+        },
+
+        escolher(valor) {
+            this.escolha = valor;
+            this.aberto = false;
+
+            try {
+                localStorage.setItem('tema', valor);
+            } catch (erro) {
+                // Sem guardar, a escolha vale só para esta visita.
+            }
+
+            this.aplicar();
+        },
+
+        aplicar() {
+            const doSistema = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            document.documentElement.classList.toggle(
+                'dark',
+                this.escolha === 'escuro' || (this.escolha === 'sistema' && doSistema),
+            );
         },
     }));
 });

@@ -47,18 +47,17 @@
         background: transparent;
     }
 
-    @media (prefers-color-scheme: dark) {
-        html {
-            scrollbar-color: theme('colors.slate.700') transparent;
-        }
+    /* Pela classe, como o resto do tema: quem escolhe é o usuário. */
+    .dark {
+        scrollbar-color: theme('colors.slate.700') transparent;
+    }
 
-        ::-webkit-scrollbar-thumb {
-            background-color: theme('colors.slate.700');
-        }
+    .dark ::-webkit-scrollbar-thumb {
+        background-color: theme('colors.slate.700');
+    }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background-color: theme('colors.marca.500');
-        }
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background-color: theme('colors.marca.500');
     }
 
     /* No modo de alto contraste quem manda é o sistema. */

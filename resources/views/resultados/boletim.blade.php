@@ -63,7 +63,7 @@
                     @endif
                 </td>
                 <td class="titulo">
-                    <div class="instituicao">{{ $modelo?->instituicao ?: config('app.name') }}</div>
+                    <div class="instituicao">{{ $modelo?->instituicao ?: config('instituicao.nome') }}</div>
                     <div class="documento">
                         Boletim de notas{{ $bimestre ? ' — '.$bimestre->rotulo() : '' }}
                     </div>

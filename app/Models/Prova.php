@@ -177,7 +177,7 @@ class Prova extends Model
     public function instituicaoDaFolha(): string
     {
         return $this->instituicao
-            ?: ($this->loadMissing('modelo')->modelo->instituicao ?: (string) config('app.name'));
+            ?: ($this->loadMissing('modelo')->modelo->instituicao ?: (string) config('instituicao.nome'));
     }
 
     /** O que sai na segunda linha, antes do título da prova. */

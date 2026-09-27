@@ -191,7 +191,7 @@ class DemonstracaoSeeder extends Seeder
         return ModeloProva::query()->firstOrCreate(
             ['eixo_id' => $eixo->id, 'nome' => 'Padrão — '.$eixo->nome],
             [
-                'instituicao' => config('app.name'),
+                'instituicao' => config('instituicao.nome'),
                 'nome_avaliacao' => 'Avaliação Bimestral',
                 'cabecalho' => 'Eixo de '.$eixo->nome,
                 'instrucoes' => 'Leia cada questão com atenção e marque apenas uma alternativa. '

@@ -15,8 +15,14 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     {{-- A tela de primeira senha é Livewire; as do Fortify ignoram. --}}
     @livewireStyles
+
+    @include('layouts.partials.tema')
 </head>
-<body class="h-full bg-slate-100 font-sans antialiased dark:bg-slate-950">
+<body class="relative h-full bg-slate-100 font-sans antialiased dark:bg-slate-950">
+    <div class="absolute right-4 top-4">
+        @include('layouts.partials.seletor-de-tema')
+    </div>
+
     <div class="flex min-h-full flex-col justify-center px-4 py-12 sm:px-6">
         <div class="mx-auto w-full max-w-md">
             <div class="mb-8 text-center">

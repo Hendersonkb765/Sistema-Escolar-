@@ -109,7 +109,7 @@ class FormularioModeloProva extends Component
         $this->authorize('create', ModeloProva::class);
 
         $this->eixo_id = auth()->user()->eixoIds()[0] ?? null;
-        $this->instituicao = (string) config('app.name');
+        $this->instituicao = (string) config('instituicao.nome');
 
         $this->carregarLayout(LayoutDaFolha::de([]));
     }

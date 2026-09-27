@@ -19,6 +19,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
+    @include('layouts.partials.tema')
+
     {{--
         Antes da primeira pintura: sem isto, quem deixou a barra
         escondida a vê aparecer e sumir a cada recarga. É só um véu — a
@@ -90,6 +92,8 @@
                     <p class="truncate text-xs text-slate-500 dark:text-slate-400">{{ $subtitulo }}</p>
                 @endif
             </div>
+
+            @include('layouts.partials.seletor-de-tema')
 
             <div x-data="{ aberto: false }" class="relative">
                 <button type="button" @click="aberto = ! aberto" @click.outside="aberto = false"

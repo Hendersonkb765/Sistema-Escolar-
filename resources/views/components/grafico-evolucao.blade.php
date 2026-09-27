@@ -25,15 +25,14 @@
             .rotulo-serie { fill: #52514e; font-size: 11px; }
             .valor { fill: #0b0b0b; font-size: 11px; font-weight: 600; }
             .anel { stroke: #fcfcfb; stroke-width: 2; }
-            @media (prefers-color-scheme: dark) {
-                .grade { stroke: #2c2c2a; }
-                .eixo { stroke: #383835; }
-                .rotulo-serie { fill: #c3c2b7; }
-                .valor { fill: #ffffff; }
-                .anel { stroke: #1a1a19; }
-                .serie { stroke: var(--escura); }
-                .ponto { fill: var(--escura); }
-            }
+            /* Pela classe no `<html>`, como o resto do tema. */
+            .dark .grade { stroke: #2c2c2a; }
+            .dark .eixo { stroke: #383835; }
+            .dark .rotulo-serie { fill: #c3c2b7; }
+            .dark .valor { fill: #ffffff; }
+            .dark .anel { stroke: #1a1a19; }
+            .dark .serie { stroke: var(--escura); }
+            .dark .ponto { fill: var(--escura); }
             .serie { stroke: var(--clara); fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
             .ponto { fill: var(--clara); }
         </style>

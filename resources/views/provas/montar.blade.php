@@ -68,7 +68,7 @@
                              :erro="$errors->first('instituicao')"
                              ajuda="Em branco, usa o nome do modelo.">
                         <x-input id="instituicao" wire:model="instituicao"
-                                 :placeholder="$modeloEscolhido?->instituicao ?: config('app.name')"/>
+                                 :placeholder="$modeloEscolhido?->instituicao ?: config('instituicao.nome')"/>
                     </x-campo>
 
                     <x-campo rotulo="Nome da avaliação" para="nome_avaliacao"

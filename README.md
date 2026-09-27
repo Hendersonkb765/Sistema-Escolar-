@@ -11,7 +11,7 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 |---|---|
 | Runtime | PHP 8.5 · Laravel 13.17.0 |
 | Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
-| Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
+| Front | Livewire 3 · Blade · Tailwind CSS 3 (tema por classe) · Alpine (embarcado no Livewire) |
 | Auth | Laravel Fortify **sem registro público** |
 | PDF | `mpdf/mpdf` |
 | Planilhas | `maatwebsite/excel` |
@@ -664,6 +664,37 @@ os afasta o mínimo e a view traça um fio ligando cada nome à sua ponta.
 pesos que a produziu. Um documento único com a turma inteira seria mais
 simples de gerar e impossível de entregar sem mostrar a nota de um aluno
 para o outro.
+
+## O nome da escola não é o nome do sistema
+
+`app.name` nomeia o **software** — é o que aparece na aba do navegador e
+no menu. `instituicao.nome` nomeia **a escola**, e é o que sai nos
+documentos: folha de prova e boletim.
+
+Os dois estavam misturados, e a prova saía assinada pelo programa. Agora
+o padrão é a escola (`INSTITUICAO_NOME` no `.env`), o modelo de prova
+pode dizer outro nome, e cada prova pode dizer outro ainda — do mais
+geral para o mais específico.
+
+## Claro, escuro ou como o aparelho
+
+O tema é escolha de quem usa, e não a preferência do sistema imposta
+pelo CSS: o Tailwind roda em `darkMode: 'selector'` e a classe `.dark`
+no `<html>` é que manda. A escolha fica no navegador e vale também na
+tela de entrada, onde o seletor também aparece.
+
+Um script no `<head>` aplica a classe **antes da primeira pintura** —
+sem ele, a página nasce clara e escurece quando o JavaScript roda, um
+lampejo branco a cada recarga. Ele é síncrono de propósito: adiar seria
+o mesmo que não fazer.
+
+Em "como o aparelho", mudar a preferência do sistema troca o tema na
+hora, sem recarregar.
+
+O que o projeto escreve à mão — a barra de rolagem e o gráfico de
+evolução — acompanha a mesma classe, e não uma `@media` própria: duas
+fontes de verdade divergiriam no dia em que alguém escolhesse o claro
+num aparelho escuro.
 
 ## A barra lateral se recolhe
 
