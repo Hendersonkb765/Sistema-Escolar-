@@ -400,6 +400,12 @@ em branco é o modelo que vale. Quem escreveu um texto próprio deixa de
 ser alcançado por correções no modelo; quem não escreveu continua
 sendo, que é o que se quer de um papel timbrado.
 
+O **corpo do nome** também se escolhe, no modelo e na prova: "E. E.
+Prof. Francisco Pereira de Souza Filho" quebra em duas linhas no
+tamanho que servia a um nome curto. Ele fica fora do bloco que a ABNT
+trava — a norma fala do corpo do texto, não do timbre — e é limitado
+entre 8 e 28 pt, para o nome não sumir nem tomar a folha.
+
 ### Duas colunas, mesma folha para tela e papel
 
 A pré-visualização dentro do sistema, o PDF e o Word saem da **mesma**
@@ -690,6 +696,12 @@ o mesmo que não fazer.
 
 Em "como o aparelho", mudar a preferência do sistema troca o tema na
 hora, sem recarregar.
+
+A classe é reaplicada em `livewire:navigated`. Numa navegação do
+Livewire o documento não recarrega: ele chama `replaceHtmlAttributes` e
+troca os atributos do `<html>` pelos do documento novo, que vem do
+servidor sem a classe. Sem reaplicar, o tema escolhido se perdia na
+primeira troca de página.
 
 O que o projeto escreve à mão — a barra de rolagem e o gráfico de
 evolução — acompanha a mesma classe, e não uma `@media` própria: duas

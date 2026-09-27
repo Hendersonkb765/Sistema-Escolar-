@@ -19,7 +19,7 @@
         .marca .logo { width: 24mm; vertical-align: middle; }
         .marca .logo.direita { text-align: right; }
         .marca .titulo { text-align: center; vertical-align: middle; }
-        .instituicao { font-size: {{ $layout->tamanho + 1 }}pt; font-weight: bold; }
+        .instituicao { font-size: {{ $layout->tamanhoDaInstituicao() }}pt; font-weight: bold; line-height: 1.2; }
         .documento { font-size: {{ $layout->tamanho }}pt; }
         .meta { font-size: {{ $layout->tamanhoSecundario() }}pt; color: #444; }
         .cabecalho { border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }

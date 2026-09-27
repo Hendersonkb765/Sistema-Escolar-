@@ -61,6 +61,9 @@ class FormularioModeloProva extends Component
 
     public float $espacamento = 1.5;
 
+    /** O corpo do nome da instituição, que a norma não governa. */
+    public int $tamanho_instituicao = 13;
+
     public float $margem_superior = 30;
 
     public float $margem_inferior = 20;
@@ -120,6 +123,7 @@ class FormularioModeloProva extends Component
         $this->fonte = $layout->fonte;
         $this->tamanho = $layout->tamanho;
         $this->espacamento = $layout->espacamento;
+        $this->tamanho_instituicao = $layout->tamanhoDaInstituicao();
         $this->margem_superior = $layout->margens['superior'];
         $this->margem_inferior = $layout->margens['inferior'];
         $this->margem_esquerda = $layout->margens['esquerda'];
@@ -147,6 +151,7 @@ class FormularioModeloProva extends Component
             'fonte' => $this->fonte,
             'tamanho' => $this->tamanho,
             'espacamento' => $this->espacamento,
+            'tamanho_instituicao' => $this->tamanho_instituicao,
             'margens' => [
                 'superior' => $this->margem_superior,
                 'inferior' => $this->margem_inferior,
@@ -174,6 +179,11 @@ class FormularioModeloProva extends Component
             'fonte' => ['required', Rule::in(array_keys(LayoutDaFolha::FONTES))],
             'tamanho' => ['required', 'integer', 'min:8', 'max:16'],
             'espacamento' => ['required', 'numeric', 'min:1', 'max:2'],
+            'tamanho_instituicao' => [
+                'required', 'integer',
+                'min:'.LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO,
+                'max:'.LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO,
+            ],
             'margem_superior' => ['required', 'numeric', 'min:5', 'max:50'],
             'margem_inferior' => ['required', 'numeric', 'min:5', 'max:50'],
             'margem_esquerda' => ['required', 'numeric', 'min:5', 'max:50'],
@@ -200,6 +210,7 @@ class FormularioModeloProva extends Component
             'norma' => 'norma de formatação',
             'tamanho' => 'tamanho da fonte',
             'espacamento' => 'espaçamento entre linhas',
+            'tamanho_instituicao' => 'tamanho do nome da instituição',
             'margem_superior' => 'margem superior',
             'margem_inferior' => 'margem inferior',
             'margem_esquerda' => 'margem esquerda',

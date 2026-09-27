@@ -322,7 +322,7 @@ class GerarDocxDaProvaAction
 
         $centro->addText(
             $prova->instituicaoDaFolha(),
-            ['bold' => true, 'size' => $layout->tamanho + 1, 'allCaps' => true],
+            ['bold' => true, 'size' => $prova->tamanhoDaInstituicao(), 'allCaps' => true],
             ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
         );
 

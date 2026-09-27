@@ -289,6 +289,57 @@ it('corrigir o modelo alcança quem não escolheu cabeçalho próprio', function
         ->and($propria->refresh()->instituicaoDaFolha())->toBe('Colégio Parceiro');
 });
 
+it('deixa escolher o corpo do nome da instituição', function () {
+    // "E. E. Prof. Francisco Pereira de Souza Filho" quebra em duas
+    // linhas no corpo que servia a um nome curto.
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Nome grande', tamanhoInstituicao: 9,
+    );
+
+    expect($prova->tamanhoDaInstituicao())->toBe(9)
+        ->and(app(RenderizarProvaAction::class)->paraTela($prova))
+        ->toContain('.instituicao { font-size: 9pt');
+});
+
+it('usa o tamanho do modelo quando a prova não escolhe', function () {
+    $this->modelo->update(['layout' => ['norma' => 'abnt', 'fonte' => 'sans', 'tamanho_instituicao' => 16]]);
+
+    expect(($this->montar)()->tamanhoDaInstituicao())->toBe(16);
+});
+
+it('cai no corpo do texto mais um ponto quando ninguém escolhe', function () {
+    // O comportamento de antes, para quem nunca tocou no campo.
+    expect(($this->montar)()->tamanhoDaInstituicao())->toBe(13);
+});
+
+it('não deixa o nome sumir nem tomar a folha', function () {
+    foreach ([1 => LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO, 99 => LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO] as $pedido => $esperado) {
+        expect(LayoutDaFolha::de([])->tamanhoDaInstituicao($pedido))->toBe($esperado);
+    }
+});
+
+it('leva o tamanho escolhido para o Word', function () {
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,
+        titulo: 'Word pequeno', tamanhoInstituicao: 9,
+    );
+
+    $docx = app(GerarDocxDaProvaAction::class)->conteudo($prova, $this->paeet);
+
+    $arquivo = tempnam(sys_get_temp_dir(), 'prova').'.docx';
+    file_put_contents($arquivo, $docx);
+
+    $zip = new ZipArchive;
+    $zip->open($arquivo);
+    $xml = (string) $zip->getFromName('word/document.xml');
+    $zip->close();
+    @unlink($arquivo);
+
+    // O PhpWord grava meio-pontos: 9pt vira sz 18.
+    expect($xml)->toContain('<w:sz w:val="18"/>');
+});
+
 it('leva o cabeçalho próprio para o Word', function () {
     $prova = app(MontarProvaAction::class)->executar(
         autor: $this->paeet, turma: $this->turma, modelo: $this->modelo,

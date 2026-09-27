@@ -30,6 +30,7 @@ class Prova extends Model
         'titulo',
         'instituicao',
         'nome_avaliacao',
+        'tamanho_instituicao',
         'bimestre',
         'data_aplicacao',
         'versao',
@@ -178,6 +179,14 @@ class Prova extends Model
     {
         return $this->instituicao
             ?: ($this->loadMissing('modelo')->modelo->instituicao ?: (string) config('instituicao.nome'));
+    }
+
+    /** O corpo do nome da instituição, em pontos. */
+    public function tamanhoDaInstituicao(): int
+    {
+        return $this->loadMissing('modelo')->modelo
+            ->layoutDaFolha()
+            ->tamanhoDaInstituicao($this->tamanho_instituicao);
     }
 
     /** O que sai na segunda linha, antes do título da prova. */

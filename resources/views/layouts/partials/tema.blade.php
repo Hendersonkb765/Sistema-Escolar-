@@ -6,11 +6,17 @@
     no `<head>`, síncrono de propósito: adiar seria o mesmo que não
     fazer.
 
+    Fica em `window` porque três lugares precisam da mesma regra: aqui,
+    o seletor no Alpine e o `livewire:navigated`. O `wire:navigate`
+    troca os atributos do `<html>` pelos do documento novo, que vem do
+    servidor sem a classe — sem reaplicar, o tema se perde na primeira
+    navegação.
+
     Três escolhas: `claro`, `escuro` e `sistema` (o padrão), que segue a
     preferência do aparelho.
 --}}
 <script>
-    (function () {
+    window.aplicarTema = function () {
         var escolha = 'sistema';
 
         try {
@@ -25,5 +31,13 @@
             'dark',
             escolha === 'escuro' || (escolha === 'sistema' && doSistema),
         );
-    })();
+    };
+
+    window.aplicarTema();
+
+    /*
+     * Logo após a troca de página, e não no `DOMContentLoaded`: numa
+     * navegação do Livewire o documento não recarrega.
+     */
+    document.addEventListener('livewire:navigated', window.aplicarTema);
 </script>

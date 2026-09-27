@@ -63,7 +63,7 @@
                     isso o valor do modelo aparece como marca-d'água, e
                     não preenchido.
                 --}}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <x-campo rotulo="Nome no topo da folha" para="instituicao"
                              :erro="$errors->first('instituicao')"
                              ajuda="Em branco, usa o nome do modelo.">
@@ -76,6 +76,15 @@
                              ajuda="Vem antes do título. Ex.: Avaliação de Recuperação.">
                         <x-input id="nome_avaliacao" wire:model="nome_avaliacao"
                                  :placeholder="$modeloEscolhido?->nome_avaliacao ?: 'Avaliação'"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Tamanho do nome (pt)" para="tamanho_instituicao"
+                             :erro="$errors->first('tamanho_instituicao')"
+                             ajuda="Nome longo pede corpo menor para não quebrar em duas linhas.">
+                        <x-input tipo="number" id="tamanho_instituicao" wire:model="tamanho_instituicao"
+                                 min="{{ App\Support\LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO }}"
+                                 max="{{ App\Support\LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO }}"
+                                 :placeholder="$tamanhoDoModelo"/>
                     </x-campo>
                 </div>
 

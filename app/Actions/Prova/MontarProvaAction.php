@@ -45,6 +45,7 @@ class MontarProvaAction
         ?string $instrucoes = null,
         ?string $instituicao = null,
         ?string $nomeAvaliacao = null,
+        ?int $tamanhoInstituicao = null,
     ): Prova {
         Gate::forUser($autor)->authorize('create', Prova::class);
         Gate::forUser($autor)->authorize('view', $turma);
@@ -69,7 +70,7 @@ class MontarProvaAction
 
         return DB::transaction(function () use (
             $autor, $turma, $modelo, $titulo, $bimestre, $dataAplicacao, $questoes, $configuracao,
-            $instrucoes, $instituicao, $nomeAvaliacao
+            $instrucoes, $instituicao, $nomeAvaliacao, $tamanhoInstituicao
         ) {
             $versao = (int) Prova::query()
                 ->withTrashed()
@@ -85,6 +86,7 @@ class MontarProvaAction
                 // escolhido de propósito para esta prova.
                 'instituicao' => $this->aparado($instituicao),
                 'nome_avaliacao' => $this->aparado($nomeAvaliacao),
+                'tamanho_instituicao' => $tamanhoInstituicao,
                 'bimestre' => $bimestre,
                 'data_aplicacao' => $dataAplicacao,
                 'versao' => $versao,

@@ -85,9 +85,8 @@ document.addEventListener('alpine:init', () => {
  * Escolha do tema: claro, escuro ou o do aparelho.
  *
  * O `<head>` já aplicou a classe antes da primeira pintura; aqui só se
- * troca a escolha e se guarda. A regra de qual classe vale está nos
- * dois lugares por necessidade — um deles roda antes de o Alpine
- * existir —, e por isso é uma linha só em cada.
+ * troca a escolha, se guarda e se manda reaplicar. A regra de qual
+ * classe vale é uma só, em `window.aplicarTema`.
  */
 document.addEventListener('alpine:init', () => {
         window.Alpine.data('seletorDeTema', () => ({
@@ -120,13 +119,10 @@ document.addEventListener('alpine:init', () => {
             this.aplicar();
         },
 
+        // A regra de qual classe vale é a do `<head>`, que roda antes
+        // de o Alpine existir e por isso não pode morar aqui.
         aplicar() {
-            const doSistema = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-            document.documentElement.classList.toggle(
-                'dark',
-                this.escolha === 'escuro' || (this.escolha === 'sistema' && doSistema),
-            );
+            window.aplicarTema();
         },
     }));
 });

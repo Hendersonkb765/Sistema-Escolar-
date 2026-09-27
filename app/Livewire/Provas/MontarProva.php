@@ -10,6 +10,7 @@ use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
 use App\Models\Turma;
+use App\Support\LayoutDaFolha;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -45,6 +46,9 @@ class MontarProva extends Component
     public string $instituicao = '';
 
     public string $nome_avaliacao = '';
+
+    /** Vazio usa o tamanho do modelo. */
+    public string $tamanho_instituicao = '';
 
     /** Questões marcadas para entrar. @var array<int, int> */
     public array $questoesEscolhidas = [];
@@ -141,6 +145,11 @@ class MontarProva extends Component
             'instrucoes' => ['nullable', 'string', 'max:2000'],
             'instituicao' => ['nullable', 'string', 'max:255'],
             'nome_avaliacao' => ['nullable', 'string', 'max:255'],
+            'tamanho_instituicao' => [
+                'nullable', 'integer',
+                'min:'.LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO,
+                'max:'.LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO,
+            ],
             'questoesEscolhidas' => ['array', 'min:1'],
         ];
     }
@@ -157,6 +166,7 @@ class MontarProva extends Component
             'questoesEscolhidas' => 'questões',
             'instituicao' => 'nome no topo da folha',
             'nome_avaliacao' => 'nome da avaliação',
+            'tamanho_instituicao' => 'tamanho do nome',
         ];
     }
 
@@ -191,6 +201,7 @@ class MontarProva extends Component
                 instrucoes: $dados['instrucoes'] ?: null,
                 instituicao: $dados['instituicao'] ?: null,
                 nomeAvaliacao: $dados['nome_avaliacao'] ?: null,
+                tamanhoInstituicao: $dados['tamanho_instituicao'] === '' ? null : (int) $dados['tamanho_instituicao'],
             );
         } catch (RegraDeNegocioException $excecao) {
             $this->notificarErro($excecao->getMessage());
@@ -270,6 +281,7 @@ class MontarProva extends Component
             // O que o modelo diria, para o campo mostrar como marca-d'água
             // em vez de vir preenchido: em branco o modelo é que vale.
             'modeloEscolhido' => $this->modeloEscolhido(),
+            'tamanhoDoModelo' => $this->modeloEscolhido()?->layoutDaFolha()->tamanhoDaInstituicao(),
             'porDisciplina' => $aprovadas->groupBy(fn (Questao $q) => $q->disciplina->nome),
             'totalEscolhido' => $escolhidas->count(),
             'somaDosPesos' => (float) $escolhidas->sum('peso'),

@@ -11,6 +11,7 @@
         'colunas' => $prova->colunas(),
         'layout' => $layout,
         'paraImpressao' => $paraImpressao,
+        'tamanhoDaInstituicao' => $prova->tamanhoDaInstituicao(),
     ])
 </head>
 <body>

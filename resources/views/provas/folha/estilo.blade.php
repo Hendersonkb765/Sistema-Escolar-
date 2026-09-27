@@ -62,7 +62,7 @@
     .marca .logo.direita { text-align: right; }
     .marca .titulo { text-align: center; vertical-align: middle; }
 
-    .instituicao { font-size: {{ $tamanho + 1 }}pt; font-weight: bold; }
+    .instituicao { font-size: {{ $tamanhoDaInstituicao }}pt; font-weight: bold; line-height: 1.2; }
     .avaliacao { font-size: {{ $tamanho }}pt; }
     .meta { font-size: {{ $secundario }}pt; color: #444; }
 
