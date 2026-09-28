@@ -4,6 +4,7 @@ namespace App\Livewire\Resultados;
 
 use App\Enums\Bimestre;
 use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -53,17 +54,6 @@ class ListaResultados extends Component
     {
         $this->authorize('viewAny', ResultadoAluno::class);
 
-        /*
-         * A tela abre já mostrando alguma coisa.
-         *
-         * Só quando ninguém escolheu: uma prova no endereço é decisão de
-         * quem montou o link, mesmo que ela ainda não tenha resultado —
-         * aí a tela diz isso, que é a informação certa.
-         */
-        if ($this->prova_id === '') {
-            $this->prova_id = (string) ($this->provasDisponiveis()->first()?->id ?? '');
-        }
-
         $this->sincronizarDisciplinas();
     }
 
@@ -91,16 +81,14 @@ class ListaResultados extends Component
     /**
      * Mudar o recorte muda as opções do select de prova.
      *
-     * A escolha anterior pode ter ficado de fora, e uma escolha que
-     * aponta para fora da lista deixa a tela em branco sem dizer por quê.
-     * Nesse caso vale a primeira do novo recorte.
+     * Uma escolha que aponta para fora da lista deixaria a tela em branco
+     * sem dizer por quê; nesse caso ela volta a "todas do recorte", que é
+     * o que a pessoa acabou de pedir ao trocar o filtro.
      */
     protected function reescolherProva(): void
     {
-        $disponiveis = $this->provasDisponiveis();
-
-        if ($this->prova_id === '' || ! $disponiveis->contains('id', (int) $this->prova_id)) {
-            $this->prova_id = (string) ($disponiveis->first()?->id ?? '');
+        if ($this->prova_id !== '' && ! $this->provasDisponiveis()->contains('id', (int) $this->prova_id)) {
+            $this->prova_id = '';
         }
 
         $this->sincronizarDisciplinas();
@@ -131,16 +119,35 @@ class ListaResultados extends Component
             ->get();
     }
 
-    public function provaSelecionada(): ?Prova
+    /**
+     * As provas que a tela desenha, cada uma na sua seção.
+     *
+     * Sem prova escolhida, todas as do recorte: ao filtrar por turma, o
+     * que se quer é ver as notas dela prova a prova, e não escolher uma
+     * de cada vez. Com uma escolhida, só ela.
+     *
+     * @return Collection<int, Prova>
+     */
+    public function provasMostradas(): Collection
     {
         if ($this->prova_id === '') {
-            return null;
+            return $this->provasDisponiveis();
         }
 
-        return Prova::query()
+        $escolhida = $this->provasDisponiveis()->firstWhere('id', (int) $this->prova_id);
+
+        /*
+         * Uma prova pedida por endereço entra mesmo sem resultado: ela
+         * não está no select, que só lista as que têm, mas quem montou o
+         * link merece saber que a prova existe e ainda não foi importada
+         * — e não "nenhuma prova com resultado", que sugere outra coisa.
+         */
+        $escolhida ??= Prova::query()
             ->visivelPara(auth()->user())
             ->with(['turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id'])
             ->find((int) $this->prova_id);
+
+        return $escolhida === null ? new Collection : new Collection([$escolhida]);
     }
 
     /*
@@ -150,22 +157,27 @@ class ListaResultados extends Component
     */
 
     /**
-     * Todas as disciplinas da prova escolhida.
+     * As disciplinas do recorte inteiro, e não de uma prova.
+     *
+     * Com várias provas na tela, a lista de caixas precisa ser a união
+     * delas: uma caixa que some ao rolar a página não é filtro.
      *
      * @return ColecaoSimples<int, string> id => nome
      */
     public function disciplinasDaProva(): ColecaoSimples
     {
-        $prova = $this->provaSelecionada();
+        $provas = $this->provasMostradas();
 
-        if ($prova === null) {
+        if ($provas->isEmpty()) {
             return collect();
         }
 
-        return $prova->questoes()
+        return ProvaQuestao::query()
+            ->whereIn('prova_id', $provas->modelKeys())
             ->with('disciplina:id,nome')
             ->get()
             ->pluck('disciplina.nome', 'disciplina.id')
+            ->unique()
             ->sort();
     }
 
@@ -245,37 +257,20 @@ class ListaResultados extends Component
 
     public function render(): View
     {
-        $prova = $this->provaSelecionada();
+        $disciplinasDoRecorte = $this->disciplinasDaProva();
 
-        $disciplinasDaProva = $this->disciplinasDaProva();
-
-        $mostradas = $disciplinasDaProva->filter(
+        $mostradas = $disciplinasDoRecorte->filter(
             fn (string $nome, int $id) => in_array((string) $id, $this->disciplinasEscolhidas, true)
         );
-
-        $resultados = $prova === null
-            ? collect()
-            : ResultadoAluno::query()
-                ->where('prova_id', $prova->getKey())
-                ->visivelPara(auth()->user())
-                ->with([
-                    'aluno:id,nome,ra,turma_id',
-                    'notas:id,resultado_aluno_id,disciplina_id,nota,soma_pesos_acertos,soma_pesos_total',
-                    'notas.disciplina:id,nome',
-                ])
-                ->get()
-                ->sortBy(fn (ResultadoAluno $resultado) => $resultado->aluno->nome)
-                ->values();
 
         return view('resultados.lista', [
             'turmas' => $this->turmasDisponiveis(),
             'provas' => $this->provasDisponiveis(),
             'bimestres' => Bimestre::opcoes(),
-            'prova' => $prova,
-            'disciplinasDaProva' => $disciplinasDaProva,
+            'secoes' => $this->secoes($mostradas),
+            'disciplinasDaProva' => $disciplinasDoRecorte,
             'disciplinas' => $mostradas,
             'minhasDisciplinas' => $this->minhasDisciplinas(),
-            'resultados' => $resultados,
             'bimestreEscolhido' => $this->filtroBimestre === ''
                 ? null
                 : Bimestre::tryFrom((int) $this->filtroBimestre)?->rotulo(),
@@ -283,5 +278,56 @@ class ListaResultados extends Component
             'titulo' => 'Resultados e notas',
             'subtitulo' => 'A nota de cada aluno em cada disciplina, para conferir e lançar',
         ]);
+    }
+
+    /**
+     * Uma seção por prova: a prova e as notas dela.
+     *
+     * As disciplinas mostradas são as do recorte, mas cada prova só tem
+     * as suas — a seção da prova de Matemática não ganha uma coluna de
+     * Inglês vazia por causa de outra prova da lista.
+     *
+     * @param  ColecaoSimples<int, string>  $mostradas
+     * @return array<int, array{prova: Prova, disciplinas: ColecaoSimples<int, string>, resultados: ColecaoSimples<int, ResultadoAluno>}>
+     */
+    protected function secoes(ColecaoSimples $mostradas): array
+    {
+        $provas = $this->provasMostradas();
+
+        if ($provas->isEmpty() || $mostradas->isEmpty()) {
+            return [];
+        }
+
+        $porProva = ProvaQuestao::query()
+            ->whereIn('prova_id', $provas->modelKeys())
+            ->whereIn('disciplina_id', $mostradas->keys()->all())
+            ->get(['id', 'prova_id', 'disciplina_id'])
+            ->groupBy('prova_id');
+
+        $resultados = ResultadoAluno::query()
+            ->whereIn('prova_id', $provas->modelKeys())
+            ->visivelPara(auth()->user())
+            ->with([
+                'aluno:id,nome,ra,turma_id',
+                'notas:id,resultado_aluno_id,disciplina_id,nota,soma_pesos_acertos,soma_pesos_total',
+                'notas.disciplina:id,nome',
+            ])
+            ->get()
+            ->sortBy(fn (ResultadoAluno $resultado) => $resultado->aluno->nome)
+            ->groupBy('prova_id');
+
+        $secoes = [];
+
+        foreach ($provas as $prova) {
+            $daProva = ($porProva[$prova->getKey()] ?? collect())->pluck('disciplina_id')->unique();
+
+            $secoes[] = [
+                'prova' => $prova,
+                'disciplinas' => $mostradas->filter(fn ($nome, $id) => $daProva->contains($id)),
+                'resultados' => ($resultados[$prova->getKey()] ?? collect())->values(),
+            ];
+        }
+
+        return $secoes;
     }
 }

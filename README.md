@@ -128,6 +128,19 @@ reta e não mostrar nada.
 
 O seeder é idempotente — cada peça se guarda pelo próprio título.
 
+## O que o professor enxerga
+
+Fora do próprio Eixo ele não vê nada; dentro dele, só as turmas em que
+atua. Esse "em que atua" se lê pelas **partes** da solicitação, e não pela
+solicitação: quem responde uma disciplina é a parte.
+
+Os três escopos — turma, curso e aluno — procuravam `professor_id` em
+`solicitacoes_prova`, onde a coluna não existe. No SQLite o defeito é
+mudo: um identificador entre aspas que não resolve para coluna nenhuma
+vira **texto literal**, e `'professor_id' = 5` é apenas falso. No MySQL
+seria "Unknown column" e a tela estouraria. O professor via zero turmas,
+zero cursos e zero alunos, sem erro em lugar nenhum.
+
 ## Escopo por Eixo
 
 O isolamento multi-tenant é lógico e se apoia no pivot `eixo_usuario`. Cada
@@ -623,9 +636,15 @@ Ela serve a uma tarefa concreta — olhar as notas e lançá-las noutro
 sistema —, e é por isso que mostra nota e não análise. Quem quer saber
 onde a turma tropeçou vai à Análise de desempenho, que lê por habilidade.
 
-O recorte é turma, bimestre e prova. A prova é uma só: somar as notas de
-duas provas numa tabela não significa nada, e a escolha automática já cai
-na mais recente do recorte.
+O recorte é turma, bimestre e prova. Sem prova escolhida valem todas as do
+recorte, **uma seção por prova** — ao filtrar por turma o que se quer é ver
+as notas dela prova a prova, e não escolher uma de cada vez. Cada seção
+traz o título da prova, o bimestre, a data e as disciplinas daquela prova:
+a seção de uma prova que não avaliou Redes não ganha uma coluna vazia de
+Redes por causa de outra prova da lista.
+
+Somar duas provas numa tabela só é que não acontece — a nota de cada
+disciplina vale dentro da prova em que ela saiu.
 
 ### O professor abre vendo as disciplinas dele
 

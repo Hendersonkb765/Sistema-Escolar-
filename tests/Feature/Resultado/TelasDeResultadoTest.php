@@ -20,6 +20,7 @@ use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
+use App\Models\Prova;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use Illuminate\Http\UploadedFile;
@@ -81,13 +82,14 @@ beforeEach(function () {
     );
     $this->segundaProva->update(['status' => StatusProva::Aplicada]);
 
-    $this->arquivo = function (array $linhas): UploadedFile {
+    $this->arquivo = function (array $linhas, int $questoes = 4): UploadedFile {
         $planilha = new Spreadsheet;
         $aba = $planilha->getActiveSheet();
 
         $aba->fromArray([
             'Quiz Name', 'Class', 'ZipGrade Id', 'External Id', 'First Name', 'Last Name',
-            'Num Questions', 'Num Correct', 'Percent Correct', 'Key Version', 'Q1', 'Q2', 'Q3', 'Q4',
+            'Num Questions', 'Num Correct', 'Percent Correct', 'Key Version',
+            ...array_map(fn (int $n) => 'Q'.$n, range(1, $questoes)),
         ], null, 'A1');
         $aba->fromArray($linhas, null, 'A2');
 
@@ -108,13 +110,14 @@ beforeEach(function () {
     ];
 
     /** Importa de ponta a ponta, para as telas de resultado. */
-    $this->importado = function () {
+    $this->importarEm = function (Prova $prova, ?array $linhas = null, int $questoes = 4) {
         $importacao = Importacao::create([
-            'prova_id' => $this->prova->id,
+            'prova_id' => $prova->id,
             'usuario_id' => $this->paeet->id,
-            'arquivo' => ($this->arquivo)($this->duasLinhas)->store('importacoes', 'local'),
+            'arquivo' => ($this->arquivo)($linhas ?? $this->duasLinhas, $questoes)
+                ->store('importacoes', 'local'),
             'nome_original' => 'resultados.xlsx',
-            'hash' => hash('sha256', 'x'),
+            'hash' => hash('sha256', 'x'.$prova->id),
             'status' => StatusImportacao::Validando,
         ]);
 
@@ -122,6 +125,36 @@ beforeEach(function () {
         app(ConfirmarImportacaoAction::class)->executar($importacao->refresh(), $this->paeet);
 
         return $importacao->refresh();
+    };
+
+    $this->importado = fn () => ($this->importarEm)($this->prova);
+
+    $this->importarNaSegunda = fn () => ($this->importarEm)($this->segundaProva);
+
+    /*
+     * Uma terceira prova, montada só com as questões de Lógica: é o que
+     * permite afirmar que cada seção traz as disciplinas da prova dela, e
+     * não as do recorte inteiro.
+     */
+    $this->soLogicaNaSegunda = function () use ($solicitacao) {
+        $daLogica = $solicitacao->questoes()
+            ->whereHas('disciplina', fn ($q) => $q->where('nome', 'Lógica'))
+            ->pluck('id')->all();
+
+        $prova = app(MontarProvaAction::class)->executar(
+            autor: $this->paeet, turma: $this->turma,
+            modelo: ModeloProva::factory()->create(['eixo_id' => $this->eixo->id]),
+            titulo: 'Recuperação de Lógica',
+            questoesEscolhidas: $daLogica,
+        );
+        $prova->update(['status' => StatusProva::Aplicada]);
+
+        ($this->importarEm)($prova, [
+            ['Prova', '1 A', '5001', '1001', 'Marina', 'Alves', 2, 2, 100, 'A', 1, 1],
+            ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 2, 1, 50, 'A', 1, 0],
+        ], questoes: 2);
+
+        return $prova;
     };
 });
 
@@ -242,15 +275,16 @@ it('lista as importações com duas linhas', function () {
  * Nenhum teste pegou porque todos faziam `set('prova_id', ...)` antes de
  * olhar, pulando o estado em que a pessoa chega na tela.
  */
-it('abre já mostrando a prova mais recente que tem resultado', function () {
+it('abre já mostrando as notas, sem pedir que se escolha uma prova', function () {
     ($this->importado)();
 
     Livewire::actingAs($this->paeet)
         ->test(ListaResultados::class)
         ->assertOk()
-        ->assertSet('prova_id', (string) $this->prova->id)
+        ->assertSet('prova_id', '')
         ->assertSee('Marina Alves')
         ->assertSee('Caio Prado')
+        ->assertSee('Avaliação bimestral')
         ->assertDontSee('Escolha uma prova');
 });
 
@@ -271,15 +305,16 @@ it('respeita a prova escolhida no endereço', function () {
 it('troca de prova quando o bimestre filtrado deixa a escolhida de fora', function () {
     ($this->importado)();
 
-    $componente = Livewire::actingAs($this->paeet)
-        ->test(ListaResultados::class)
-        ->assertSet('prova_id', (string) $this->prova->id);
-
     $outro = $this->prova->bimestre === Bimestre::Primeiro
         ? Bimestre::Segundo
         : Bimestre::Primeiro;
 
-    $componente->set('filtroBimestre', (string) $outro->value)
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->set('filtroBimestre', (string) $outro->value)
+        // A escolha saiu do recorte: volta a "todas do recorte", que
+        // neste bimestre não tem nenhuma.
         ->assertSet('prova_id', '')
         ->assertSee('Nenhuma prova com resultado');
 });
@@ -471,7 +506,6 @@ it('abre com as disciplinas do professor já marcadas', function () {
 
     $html = Livewire::actingAs($this->profLogica)
         ->test(ListaResultados::class)
-        ->assertSet('prova_id', (string) $this->prova->id)
         ->assertSet('disciplinasEscolhidas', [(string) $logica])
         ->html();
 
@@ -515,9 +549,106 @@ it('volta às disciplinas do professor com um clique', function () {
 
 /*
 |--------------------------------------------------------------------------
+| Uma seção por prova
+|--------------------------------------------------------------------------
+|
+| Ao filtrar por turma, o que se quer é ver as notas dela prova a prova —
+| e não escolher uma de cada vez no select.
+*/
+
+/** Quantos blocos de identificação de prova a tela desenhou. */
+function quantasSecoes(string $html): int
+{
+    return preg_match_all('/<section data-identificacao/', $html);
+}
+
+/**
+ * O texto de todos os blocos de identificação.
+ *
+ * Procurar o título de uma prova na página inteira não diz nada: ele está
+ * escrito no `<option>` do select, e continua lá mesmo quando a prova não
+ * é desenhada.
+ */
+function titulosDasSecoes(string $html): string
+{
+    preg_match_all('/<section data-identificacao.*?<\\/section>/s', $html, $achados);
+
+    return strip_tags(implode(' ', $achados[0]));
+}
+
+it('desenha uma seção por prova do recorte', function () {
+    ($this->importado)();
+    ($this->importarNaSegunda)();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('filtroTurma', (string) $this->turma->id)
+        ->assertOk()
+        ->html();
+
+    expect(quantasSecoes($html))->toBe(2)
+        ->and(titulosDasSecoes($html))
+        ->toContain('Avaliação bimestral')
+        ->toContain('Segunda chamada');
+});
+
+it('desenha uma seção só quando a prova é escolhida', function () {
+    ($this->importado)();
+    ($this->importarNaSegunda)();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->html();
+
+    expect(quantasSecoes($html))->toBe(1)
+        ->and(titulosDasSecoes($html))
+        ->toContain('Avaliação bimestral')
+        ->not->toContain('Segunda chamada');
+});
+
+/*
+ * Cada seção mostra as disciplinas da prova dela. Uma prova que não
+ * avaliou Redes não ganha uma coluna vazia de Redes por causa de outra
+ * prova da lista.
+ */
+it('não põe na seção de uma prova a disciplina que só existe na outra', function () {
+    ($this->importado)();
+    ($this->soLogicaNaSegunda)();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('filtroTurma', (string) $this->turma->id)
+        ->html();
+
+    preg_match_all('/<table data-notas.*?<\\/table>/s', $html, $tabelas);
+
+    $cabecalhos = array_map(fn (string $tabela) => strip_tags($tabela), $tabelas[0]);
+
+    expect($cabecalhos)->toHaveCount(2)
+        // A primeira prova avaliou as duas; a segunda, só Lógica.
+        ->and($cabecalhos[0])->toContain('Redes')
+        ->and($cabecalhos[1])->not->toContain('Redes');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Filtro por turma
 |--------------------------------------------------------------------------
 */
+
+/*
+ * O filtro abria vazio para o professor: `Turma::visivelPara()` procurava
+ * `professor_id` em `solicitacoes_prova`, onde a coluna não existe.
+ */
+it('oferece a turma ao professor que tem parte na solicitação dela', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->profLogica)
+        ->test(ListaResultados::class)
+        ->assertOk()
+        ->assertSee('1 A');
+});
 
 it('filtra as provas pela turma escolhida', function () {
     ($this->importado)();
@@ -530,7 +661,6 @@ it('filtra as provas pela turma escolhida', function () {
         ->test(ListaResultados::class)
         ->set('filtroTurma', (string) $outraTurma->id)
         // A turma nova não tem prova com resultado: o recorte fica vazio.
-        ->assertSet('prova_id', '')
         ->assertSee('Nenhuma prova com resultado');
 });
 
@@ -545,13 +675,19 @@ it('oferece só as turmas que já têm prova com resultado', function () {
         ->assertDontSee('1 Z');
 });
 
-it('avisa quando a prova ainda não tem resultado', function () {
+/*
+ * Uma prova sem resultado não está no select — ele só lista as que têm —,
+ * mas chega por link. Dizer "nenhuma prova com resultado" ali sugeriria
+ * que não há nenhuma em lugar nenhum.
+ */
+it('avisa quando a prova pedida por endereço ainda não tem resultado', function () {
     ($this->importado)();
 
     Livewire::actingAs($this->paeet)
         ->test(ListaResultados::class)
         ->set('prova_id', (string) $this->segundaProva->id)
-        ->assertSee('Esta prova ainda não tem resultados');
+        ->assertSee('Segunda chamada')
+        ->assertSee('Sem notas nesta prova');
 });
 
 /*
