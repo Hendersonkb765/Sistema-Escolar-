@@ -10,7 +10,6 @@ use App\Models\RespostaAluno;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection as ColecaoDeModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * Onde a turma teve dificuldade.
@@ -123,9 +122,33 @@ class AnalisarDesempenhoAction
      * @param  Collection<int, Prova>  $provas
      * @return Collection<int, Prova>
      */
+    /**
+     * Filtra pelo ESCOPO da prova, e não pela Policy dela.
+     *
+     * São perguntas diferentes: "esta prova me diz respeito?" e "posso
+     * abrir o documento dela?". O professor não abre a folha montada —
+     * ela é da coordenação, e traz as questões dos colegas —, mas os
+     * resultados das questões dele são dele. Filtrar aqui pela Policy
+     * esvaziava a análise inteira do professor no dia em que o acesso ao
+     * documento foi fechado.
+     *
+     * O recorte fino continua adiante: `respostas()` já limita o
+     * professor às questões que ele escreveu.
+     */
     protected function visiveis(Collection $provas, User $leitor): Collection
     {
-        return $provas->filter(fn (Prova $prova) => Gate::forUser($leitor)->allows('view', $prova));
+        if ($provas->isEmpty()) {
+            return $provas;
+        }
+
+        $permitidas = Prova::query()
+            ->visivelPara($leitor)
+            ->whereKey($provas->modelKeys())
+            ->pluck('id');
+
+        return $provas->filter(
+            fn (Prova $prova) => $permitidas->contains($prova->getKey())
+        )->values();
     }
 
     /**

@@ -130,6 +130,19 @@ O seeder é idempotente — cada peça se guarda pelo próprio título.
 
 ## O que o professor enxerga
 
+**A prova montada não.** Ela é o documento que a coordenação imprime, e
+nela estão as questões dos colegas na ordem e no recorte que a
+coordenação escolheu. O professor escreve as questões dele, acompanha a
+análise e vê as notas — mas não abre a folha, nem o PDF, nem o Word, nem
+o gabarito. Nem sendo autor de uma questão dela.
+
+Isso obrigou a separar duas perguntas que estavam coladas: *"esta prova
+me diz respeito?"* e *"posso abrir o documento dela?"*. A primeira é o
+escopo (`Prova::visivelPara`), e é por ele que as telas de notas e de
+desempenho sabem o que mostrar a quem; a segunda é a Policy. A análise
+filtrava pela Policy, e no dia em que o acesso ao documento foi fechado a
+tela do professor ficou vazia sem mensagem nenhuma.
+
 Fora do próprio Eixo ele não vê nada; dentro dele, só as turmas em que
 atua. Esse "em que atua" se lê pelas **partes** da solicitação, e não pela
 solicitação: quem responde uma disciplina é a parte.

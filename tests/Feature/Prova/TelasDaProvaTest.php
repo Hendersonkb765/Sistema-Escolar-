@@ -18,6 +18,7 @@ use App\Models\Eixo;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Turma;
+use App\Support\Navegacao;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -228,22 +229,46 @@ it('não vaza prova de outro Eixo na listagem', function () {
         ->assertDontSee('Avaliação bimestral');
 });
 
-it('mostra ao professor só as provas que têm questão dele', function () {
-    $prova = ($this->montarProva)('Avaliação bimestral');
-
-    // Um professor do mesmo Eixo, mas sem nenhuma questão nesta prova.
-    $estranho = professor($this->eixo);
-    $estranho->update(['nome' => 'Iara Melo', 'email' => 'iara@exemplo.test']);
+/*
+ * A prova montada é documento da coordenação: serve para imprimir. O
+ * professor escreve as questões dele e acompanha os resultados, mas não
+ * abre a folha pronta — nela estão as questões dos colegas, na ordem e no
+ * recorte que a coordenação escolheu.
+ */
+it('nega ao professor a listagem de provas', function () {
+    ($this->montarProva)('Avaliação bimestral');
 
     Livewire::actingAs($this->profLogica)
         ->test(ListaProvas::class)
-        ->assertSee('Avaliação bimestral');
+        ->assertForbidden();
+});
 
-    Livewire::actingAs($estranho)
-        ->test(ListaProvas::class)
-        ->assertDontSee('Avaliação bimestral');
+it('nega ao professor a prova, mesmo a que tem questão dele', function () {
+    $prova = ($this->montarProva)('Avaliação bimestral');
 
-    expect($prova->questoes()->where('professor_id', $estranho->id)->exists())->toBeFalse();
+    expect($prova->questoes()->where('professor_id', $this->profLogica->id)->exists())->toBeTrue()
+        ->and($this->profLogica->can('view', $prova))->toBeFalse();
+
+    Livewire::actingAs($this->profLogica)
+        ->test(DetalheProva::class, ['prova' => $prova])
+        ->assertForbidden();
+});
+
+it('nega ao professor os arquivos da prova', function (string $rota) {
+    $prova = ($this->montarProva)();
+
+    $this->actingAs($this->profLogica)->get(route($rota, $prova))->assertForbidden();
+})->with(['provas.show', 'provas.pdf', 'provas.docx', 'provas.gabarito']);
+
+it('não oferece Provas no menu do professor', function () {
+    ($this->montarProva)();
+
+    $rotulos = collect(Navegacao::paraUsuario($this->profLogica))
+        ->flatMap(fn (array $grupo) => array_column($grupo['itens'], 'rotulo'));
+
+    expect($rotulos)->not->toContain('Provas')
+        // O que é dele continua lá.
+        ->and($rotulos)->toContain('Minhas questões');
 });
 
 /*
@@ -274,18 +299,13 @@ it('mostra a composição por disciplina com a faixa de números', function () {
         ->assertSeeInOrder(['Lógica', '1 a 3', 'Redes', '4 a 5']);
 });
 
-it('oferece o gabarito à gestão e esconde do professor', function () {
+it('oferece o gabarito à gestão', function () {
     $prova = ($this->montarProva)();
 
     Livewire::actingAs($this->paeet)
         ->test(DetalheProva::class, ['prova' => $prova])
         ->assertSee('Gerar gabarito')
         ->assertDontSee('Ver com gabarito');
-
-    Livewire::actingAs($this->profLogica)
-        ->test(DetalheProva::class, ['prova' => $prova])
-        ->assertOk()
-        ->assertDontSee('Gerar gabarito');
 });
 
 it('explica na tela o que conferir antes de importar o gabarito', function () {
@@ -300,11 +320,6 @@ it('explica na tela o que conferir antes de importar o gabarito', function () {
         ->test(DetalheProva::class, ['prova' => $prova])
         ->assertSee('Confira antes de importar o gabarito')
         ->assertSee('A, B, C, D');
-
-    // O professor não vê o gabarito, e portanto não vê os avisos dele.
-    Livewire::actingAs($this->profLogica)
-        ->test(DetalheProva::class, ['prova' => $prova])
-        ->assertDontSee('Confira antes de importar o gabarito');
 });
 
 it('não mostra aviso nenhum quando não há o que conferir', function () {
@@ -344,16 +359,25 @@ it('baixa o PDF e o Word pela rota', function () {
         ->and(substr($docx->getContent(), 0, 2))->toBe('PK');
 });
 
-it('ignora ?gabarito=1 para quem não pode ver o gabarito', function () {
+/*
+ * O `?gabarito=1` continua passando pela Policy antes de valer, e não
+ * pelo que veio na URL. Hoje quem abre o PDF já é só a coordenação, então
+ * a segunda tranca não muda desfecho nenhum — é ela que impede que
+ * afrouxar o `view` um dia volte a entregar o gabarito de graça.
+ */
+it('só entrega o gabarito a quem a Policy autoriza', function () {
     $prova = ($this->montarProva)();
 
     $comoGestao = $this->actingAs($this->paeet)
         ->get(route('provas.pdf', ['prova' => $prova, 'gabarito' => 1]));
-    $comoProfessor = $this->actingAs($this->profLogica)
-        ->get(route('provas.pdf', ['prova' => $prova, 'gabarito' => 1]));
 
-    expect($comoGestao->headers->get('content-disposition'))->toContain('gabarito')
-        ->and($comoProfessor->headers->get('content-disposition'))->not->toContain('gabarito');
+    expect($comoGestao->headers->get('content-disposition'))->toContain('gabarito');
+
+    $deOutroEixo = paeet(Eixo::factory()->create(['codigo' => 'ADM']));
+
+    $this->actingAs($deOutroEixo)
+        ->get(route('provas.pdf', ['prova' => $prova, 'gabarito' => 1]))
+        ->assertForbidden();
 });
 
 it('marca a prova como aplicada', function () {

@@ -235,6 +235,29 @@ it('mostra as duas leituras na tela', function () {
 });
 
 /*
+ * O professor não abre a prova montada — ela é o documento que a
+ * coordenação imprime. Isso não pode apagar as telas dele: os resultados
+ * das questões que ele escreveu continuam sendo dele.
+ *
+ * A análise filtrava as provas pela Policy do documento, e no dia em que
+ * o acesso à folha foi fechado a tela do professor ficou vazia sem
+ * mensagem nenhuma. Passou a filtrar pelo escopo, que é a outra pergunta.
+ */
+it('mostra a análise ao professor mesmo sem ele poder abrir a prova', function () {
+    $prova = ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => false, 2 => false, 3 => true],
+        1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    expect($this->profLogica->can('view', $prova))->toBeFalse();
+
+    Livewire::actingAs($this->profLogica)
+        ->test(Desempenho::class)
+        ->assertOk()
+        ->assertSee('Interpretar estruturas de repetição');
+});
+
+/*
 |--------------------------------------------------------------------------
 | O acerto de cada aluno, questão a questão
 |--------------------------------------------------------------------------
