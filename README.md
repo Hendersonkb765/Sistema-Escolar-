@@ -1,4 +1,4 @@
-# PAEET Avaliações
+# E.E Francisco Pereira
 
 Plataforma de gestão acadêmica e do ciclo completo de avaliações: estrutura
 acadêmica hierárquica, solicitação de questões aos professores, análise e

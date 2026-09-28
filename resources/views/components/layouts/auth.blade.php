@@ -26,9 +26,7 @@
     <div class="flex min-h-full flex-col justify-center px-4 py-12 sm:px-6">
         <div class="mx-auto w-full max-w-md">
             <div class="mb-8 text-center">
-                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-marca-600 text-lg font-bold text-white">
-                    {{ Str::substr(config('app.name'), 0, 2) }}
-                </div>
+                <x-emblema class="mx-auto h-12 w-12 rounded-xl text-lg"/>
                 <h1 class="mt-4 text-xl font-semibold text-slate-900 dark:text-slate-100">{{ config('app.name') }}</h1>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     {{ $subtitulo ?? 'Gestão acadêmica e avaliações' }}
