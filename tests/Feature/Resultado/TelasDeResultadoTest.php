@@ -16,6 +16,7 @@ use App\Livewire\Importacoes\ListaImportacoes;
 use App\Livewire\Importacoes\NovaImportacao;
 use App\Livewire\Resultados\ListaResultados;
 use App\Models\Aluno;
+use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
@@ -291,25 +292,13 @@ it('diz que não há prova com resultado quando de fato não há', function () {
         ->assertSee('Nenhuma prova com resultado');
 });
 
-it('mostra a nota de cada disciplina e o acerto de cada questão', function () {
-    ($this->importado)();
+/** A tabela de notas, sem o resto da página. */
+function tabelaDeNotas(string $html): string
+{
+    preg_match('/<table data-notas.*?<\/table>/s', $html, $achado);
 
-    Livewire::actingAs($this->paeet)
-        ->test(ListaResultados::class)
-        ->set('prova_id', (string) $this->prova->id)
-        ->assertOk()
-        ->assertSee('Marina Alves')
-        ->assertSee('Caio Prado')
-        // Uma nota por disciplina.
-        ->assertSee('Lógica')
-        ->assertSee('Redes')
-        ->assertSee('10,00')
-        ->assertSee('5,00')
-        // Acerto e erro questão a questão.
-        ->assertSee('✓')
-        ->assertSee('✗')
-        ->assertSee('2/4');
-});
+    return strip_tags($achado[0] ?? '');
+}
 
 /**
  * O bloco que identifica a prova, sem o resto da página.
@@ -391,19 +380,192 @@ it('não inventa data quando a prova não tem uma', function () {
     expect(identificacaoDaProva($html))->not->toContain('Aplicada em');
 });
 
-it('filtra as questões por disciplina', function () {
+it('mostra a nota de cada aluno em cada disciplina', function () {
     ($this->importado)();
-
-    $logica = $this->prova->questoes()
-        ->whereHas('disciplina', fn ($q) => $q->where('nome', 'Lógica'))
-        ->pluck('disciplina_id')->first();
 
     Livewire::actingAs($this->paeet)
         ->test(ListaResultados::class)
         ->set('prova_id', (string) $this->prova->id)
-        ->set('filtroDisciplina', (string) $logica)
         ->assertOk()
-        ->assertSee('Marina Alves');
+        ->assertSee('Marina Alves')
+        ->assertSee('Caio Prado')
+        // Uma nota por disciplina.
+        ->assertSee('Lógica')
+        ->assertSee('Redes')
+        ->assertSee('10,00')
+        ->assertSee('5,00');
+});
+
+/*
+ * A tarefa da tela é a nota, e é ela que aparece de saída. O acerto
+ * questão a questão continua existindo — é a única leitura nominal por
+ * questão do sistema, já que a Análise lê o índice da turma —, mas atrás
+ * de um clique.
+ */
+it('deixa o acerto questão a questão fechado, e abre quando pedem', function () {
+    ($this->importado)();
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->assertSet('mostrarQuestoes', false)
+        ->assertDontSee('✓');
+
+    $componente->set('mostrarQuestoes', true)
+        ->assertSee('✓')
+        ->assertSee('✗')
+        ->assertSee('2/4');
+});
+
+/*
+ * Com a tabela filtrada por disciplina, o total de acertos precisa contar
+ * só o que está à vista. "8/10" ao lado de três colunas é número certo
+ * para pergunta nenhuma.
+ */
+it('conta os acertos só das questões mostradas', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->set('mostrarQuestoes', true)
+        ->set('disciplinasEscolhidas', [(string) $logica])
+        // Lógica tem 2 questões: a Marina acertou as duas, o Caio uma.
+        ->assertSee('2/2')
+        ->assertSee('1/2')
+        ->assertDontSee('/4');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Escolher quais disciplinas aparecem
+|--------------------------------------------------------------------------
+*/
+
+it('mostra só as disciplinas marcadas', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->set('disciplinasEscolhidas', [(string) $logica])
+        ->assertOk()
+        ->html();
+
+    expect(tabelaDeNotas($html))
+        ->toContain('Marina Alves')
+        ->toContain('Lógica')
+        ->not->toContain('Redes');
+});
+
+it('avisa quando ninguém marcou disciplina nenhuma, em vez de abrir vazia', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->set('disciplinasEscolhidas', [])
+        ->assertSee('Nenhuma disciplina marcada');
+});
+
+it('marca todas de volta com um clique', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->set('disciplinasEscolhidas', [])
+        ->call('mostrarTodasAsDisciplinas')
+        ->assertCount('disciplinasEscolhidas', 2);
+});
+
+/*
+ * O professor abre vendo só o que ele leciona: procurar as dele entre
+ * seis é exatamente o trabalho que esta tela existe para poupar.
+ */
+it('abre com as disciplinas do professor já marcadas', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    $html = Livewire::actingAs($this->profLogica)
+        ->test(ListaResultados::class)
+        ->assertSet('prova_id', (string) $this->prova->id)
+        ->assertSet('disciplinasEscolhidas', [(string) $logica])
+        ->html();
+
+    expect(tabelaDeNotas($html))->toContain('Lógica')->not->toContain('Redes');
+});
+
+/*
+ * "não deve ficar totalmente privado das informações das demais
+ * matérias": as outras continuam a um clique.
+ */
+it('deixa o professor ver as disciplinas dos colegas quando quiser', function () {
+    ($this->importado)();
+
+    $html = Livewire::actingAs($this->profLogica)
+        ->test(ListaResultados::class)
+        ->call('mostrarTodasAsDisciplinas')
+        ->html();
+
+    expect(tabelaDeNotas($html))->toContain('Lógica')->toContain('Redes');
+});
+
+it('abre com todas as disciplinas para quem é da gestão', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertCount('disciplinasEscolhidas', 2);
+});
+
+it('volta às disciplinas do professor com um clique', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    Livewire::actingAs($this->profLogica)
+        ->test(ListaResultados::class)
+        ->call('mostrarTodasAsDisciplinas')
+        ->call('mostrarSoAsMinhas')
+        ->assertSet('disciplinasEscolhidas', [(string) $logica]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Filtro por turma
+|--------------------------------------------------------------------------
+*/
+
+it('filtra as provas pela turma escolhida', function () {
+    ($this->importado)();
+
+    $outraTurma = Turma::factory()
+        ->doCurso($this->turma->curso)
+        ->create(['periodo' => 1, 'nome' => '1 B']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('filtroTurma', (string) $outraTurma->id)
+        // A turma nova não tem prova com resultado: o recorte fica vazio.
+        ->assertSet('prova_id', '')
+        ->assertSee('Nenhuma prova com resultado');
+});
+
+it('oferece só as turmas que já têm prova com resultado', function () {
+    ($this->importado)();
+
+    Turma::factory()->doCurso($this->turma->curso)->create(['periodo' => 1, 'nome' => '1 Z']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertSee('1 A')
+        ->assertDontSee('1 Z');
 });
 
 it('avisa quando a prova ainda não tem resultado', function () {

@@ -1,6 +1,17 @@
 <div class="space-y-4">
-    <x-cartao>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <x-cartao titulo="Recorte">
+        <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:p-6">
+            <x-campo rotulo="Turma" para="filtro-turma">
+                <x-select id="filtro-turma" wire:model.live="filtroTurma">
+                    <option value="">Todas</option>
+                    @foreach ($turmas as $opcao)
+                        <option value="{{ $opcao->id }}">
+                            {{ $opcao->nome }} — {{ $opcao->curso->nome }} ({{ $opcao->periodo_letivo }})
+                        </option>
+                    @endforeach
+                </x-select>
+            </x-campo>
+
             <x-campo rotulo="Bimestre" para="filtro-bimestre">
                 <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
                     <option value="">Todos</option>
@@ -20,18 +31,6 @@
                     @endforeach
                 </x-select>
             </x-campo>
-
-            @if ($disciplinas->count() > 1)
-                <x-campo rotulo="Disciplina" para="filtro-disciplina"
-                         ajuda="Cada uma tem a sua nota, de 0 a 10.">
-                    <x-select id="filtro-disciplina" wire:model.live="filtroDisciplina">
-                        <option value="">Todas</option>
-                        @foreach ($disciplinas as $id => $nome)
-                            <option value="{{ $id }}">{{ $nome }}</option>
-                        @endforeach
-                    </x-select>
-                </x-campo>
-            @endif
         </div>
     </x-cartao>
 
@@ -99,10 +98,70 @@
             </div>
         </section>
 
+        {{--
+            Quais disciplinas a tabela mostra.
+
+            Caixas, e não um select de uma opção: a tarefa é olhar três de
+            seis ao mesmo tempo para transcrever, e um select só deixa ver
+            uma por vez ou todas.
+        --}}
+        @if ($disciplinasDaProva->count() > 1)
+            <x-cartao>
+                <x-slot:titulo>Disciplinas mostradas</x-slot:titulo>
+                <x-slot:descricao>
+                    {{ $disciplinas->count() }} de {{ $disciplinasDaProva->count() }} marcadas.
+                    Desmarcar uma só a tira desta tela — a nota continua lá.
+                </x-slot:descricao>
+
+                <x-slot:acoes>
+                    @if ($minhasDisciplinas !== [])
+                        <x-botao variante="discreto" wire:click="mostrarSoAsMinhas"
+                                 title="Deixa marcadas apenas as disciplinas em que você leciona.">
+                            Só as minhas
+                        </x-botao>
+                    @endif
+                    <x-botao variante="discreto" wire:click="mostrarTodasAsDisciplinas">Todas</x-botao>
+                </x-slot:acoes>
+
+                <div class="grid gap-2 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+                    @foreach ($disciplinasDaProva as $id => $nome)
+                        <label wire:key="disc-{{ $id }}"
+                               class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                            <input type="checkbox" value="{{ $id }}" wire:model.live="disciplinasEscolhidas"
+                                   class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
+                            <span class="min-w-0">
+                                <span class="block truncate text-slate-900 dark:text-slate-100">{{ $nome }}</span>
+                                @if (in_array((string) $id, $minhasDisciplinas, true))
+                                    <span class="block text-xs text-marca-600 dark:text-marca-400">você leciona</span>
+                                @endif
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+            </x-cartao>
+        @endif
+
+        @if ($disciplinas->isEmpty())
+            <x-cartao>
+                <x-vazio titulo="Nenhuma disciplina marcada"
+                         descricao="Marque ao menos uma disciplina acima para ver as notas.">
+                    <x-slot:acoes>
+                        <x-botao wire:click="mostrarTodasAsDisciplinas">Mostrar todas</x-botao>
+                    </x-slot:acoes>
+                </x-vazio>
+            </x-cartao>
+        @else
         <x-cartao titulo="Notas por disciplina"
                   descricao="O peso vale dentro da disciplina: cada uma é medida contra a soma dos pesos dela.">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
-                <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                {{--
+                    `data-notas` marca a tabela para os testes. Procurar o
+                    nome de uma disciplina na página inteira não diz nada:
+                    ele está escrito também na lista de caixas, onde as
+                    desmarcadas continuam aparecendo — e é assim que tem de
+                    ser, senão não haveria como marcá-las de volta.
+                --}}
+                <table data-notas class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                     <thead>
                         <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="px-4 py-2 sm:px-6">Aluno</th>
@@ -145,6 +204,28 @@
             </div>
         </x-cartao>
 
+
+        {{--
+            O acerto questão a questão fica fechado.
+
+            A tarefa desta tela é a nota — abrir com uma tabela de trinta
+            colunas de ✓ e ✗ na frente atrapalha quem veio transcrever.
+            Mas é a única leitura nominal por questão que existe no
+            sistema (a Análise lê o índice da turma, não o aluno), então
+            ela fica, a um clique.
+        --}}
+        <x-cartao>
+            <div class="flex flex-wrap items-center justify-between gap-2 p-4 sm:p-6">
+                <p class="text-sm text-slate-500 dark:text-slate-400">
+                    Acerto de cada aluno, questão a questão.
+                </p>
+                <x-botao variante="secundario" wire:click="$toggle('mostrarQuestoes')">
+                    {{ $mostrarQuestoes ? 'Esconder' : 'Ver questão a questão' }}
+                </x-botao>
+            </div>
+        </x-cartao>
+
+        @if ($mostrarQuestoes)
         <x-cartao titulo="Questão a questão"
                   descricao="✓ acertou · ✗ errou. O número é o mesmo que o aluno viu na folha.">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
@@ -182,8 +263,20 @@
                                         @endif
                                     </td>
                                 @endforeach
+                                {{--
+                                    Conta só as questões mostradas. Somar
+                                    as dez enquanto a tabela mostra três
+                                    da disciplina escolhida dava "8/10" ao
+                                    lado de três colunas — número certo
+                                    para pergunta nenhuma.
+                                --}}
+                                @php
+                                    $acertos = $questoes
+                                        ->filter(fn ($q) => $porQuestao->get($q->id)?->acertou)
+                                        ->count();
+                                @endphp
                                 <td class="px-4 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">
-                                    {{ $resultado->respostas->where('acertou', true)->count() }}/{{ $resultado->respostas->count() }}
+                                    {{ $acertos }}/{{ $questoes->count() }}
                                 </td>
                             </tr>
                         @endforeach
@@ -191,5 +284,7 @@
                 </table>
             </div>
         </x-cartao>
+        @endif
+        @endif
     @endif
 </div>

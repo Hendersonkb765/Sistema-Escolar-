@@ -617,6 +617,37 @@ também a soma dos pesos de cada lado: a conta fica conferível.
 A tela mostra as notas e, abaixo, o acerto de cada questão (✓/✗) com o
 número que o aluno viu na folha.
 
+## Resultados e notas: a tela de conferir e lançar
+
+Ela serve a uma tarefa concreta — olhar as notas e lançá-las noutro
+sistema —, e é por isso que mostra nota e não análise. Quem quer saber
+onde a turma tropeçou vai à Análise de desempenho, que lê por habilidade.
+
+O recorte é turma, bimestre e prova. A prova é uma só: somar as notas de
+duas provas numa tabela não significa nada, e a escolha automática já cai
+na mais recente do recorte.
+
+### O professor abre vendo as disciplinas dele
+
+Procurar as três dele entre seis é exatamente o trabalho que esta tela
+existe para poupar, então ela abre com as disciplinas em que ele leciona
+já marcadas — o vínculo docente, que a solicitação de prova cria. As
+outras ficam a um clique, porque a nota da turma não é segredo dele: só
+não era o que ele procurava. Quem é da gestão abre com todas.
+
+São caixas, e não um select: a tarefa é olhar três de seis ao mesmo
+tempo, e um select deixa ver uma por vez ou todas. A escolha vai para o
+endereço, então quem confere sempre as mesmas guarda o link.
+
+### O acerto questão a questão fica a um clique
+
+Abrir com uma tabela de trinta colunas de ✓ e ✗ na frente atrapalha quem
+veio transcrever nota. Mas ela é a única leitura **nominal** por questão
+do sistema — a Análise lê o índice da turma, não o aluno —, então continua
+ali, fechada. Com a tabela filtrada por disciplina, o total conta só as
+questões à vista: "8/10" ao lado de três colunas é número certo para
+pergunta nenhuma.
+
 ## Análise de desempenho
 
 Onde a turma teve dificuldade, em duas leituras:
