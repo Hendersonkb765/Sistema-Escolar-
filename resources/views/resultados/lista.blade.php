@@ -66,6 +66,39 @@
             </x-vazio>
         </x-cartao>
     @else
+        {{--
+            De que prova são estas notas.
+
+            A tabela sozinha não diz, e conferir o select lá em cima é
+            trabalho de quem só queria ler a nota. O bimestre vem da
+            coluna da prova, e não do título: o título é escrito à mão na
+            montagem e pode dizer qualquer coisa.
+        --}}
+        <section data-identificacao
+                 class="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                        {{ $prova->titulo }}
+                    </h2>
+                    <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                        Turma {{ $prova->turma->nome }} · {{ $prova->turma->curso->nome }}
+                        @if ($prova->data_aplicacao)
+                            · Aplicada em {{ $prova->data_aplicacao->format('d/m/Y') }}
+                        @endif
+                    </p>
+                </div>
+
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
+                    <x-badge cor="azul" :rotulo="$prova->bimestre->rotulo()"/>
+                    <x-badge :cor="$prova->status->cor()" :rotulo="$prova->status->rotulo()"/>
+                    <span class="text-sm text-slate-500 dark:text-slate-400">
+                        {{ $resultados->count() }} {{ $resultados->count() === 1 ? 'aluno' : 'alunos' }}
+                    </span>
+                </div>
+            </div>
+        </section>
+
         <x-cartao titulo="Notas por disciplina"
                   descricao="O peso vale dentro da disciplina: cada uma é medida contra a soma dos pesos dela.">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">

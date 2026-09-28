@@ -311,6 +311,86 @@ it('mostra a nota de cada disciplina e o acerto de cada questão', function () {
         ->assertSee('2/4');
 });
 
+/**
+ * O bloco que identifica a prova, sem o resto da página.
+ *
+ * Procurar o título com `assertSee` na página inteira não prova nada: ele
+ * está escrito no `<option>` do select de provas, e o teste passaria com
+ * a tela sem identificação nenhuma. Foi o que aconteceu ao escrever
+ * estes testes antes da correção — dois passaram de cara.
+ */
+function identificacaoDaProva(string $html): string
+{
+    preg_match('/<section data-identificacao.*?<\/section>/s', $html, $achado);
+
+    return strip_tags($achado[0] ?? '');
+}
+
+/*
+ * A tabela de notas sozinha não diz de que prova ela é. Quem abre a tela,
+ * imprime ou manda um recorte precisa saber o bimestre e a prova sem ter
+ * de conferir o que está escolhido no select lá em cima.
+ */
+it('diz de que prova e de que bimestre são as notas', function () {
+    ($this->importado)();
+
+    $this->prova->update(['bimestre' => Bimestre::Terceiro, 'titulo' => 'Avaliação de recuperação']);
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->assertOk()
+        ->html();
+
+    expect(identificacaoDaProva($html))
+        ->toContain('Avaliação de recuperação')
+        ->toContain('3º bimestre')
+        ->toContain('1 A');
+});
+
+/*
+ * O bimestre vem da coluna, não do título: o título é escrito à mão na
+ * montagem e pode dizer qualquer coisa — inclusive o bimestre errado.
+ */
+it('tira o bimestre da prova, e não do que está escrito no título', function () {
+    ($this->importado)();
+
+    $this->prova->update(['bimestre' => Bimestre::Quarto, 'titulo' => 'Prova do 1º bimestre']);
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->html();
+
+    expect(identificacaoDaProva($html))->toContain('4º bimestre');
+});
+
+it('diz quando a prova foi aplicada, se a data estiver preenchida', function () {
+    ($this->importado)();
+
+    $this->prova->update(['data_aplicacao' => '2026-05-14']);
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->html();
+
+    expect(identificacaoDaProva($html))->toContain('14/05/2026');
+});
+
+it('não inventa data quando a prova não tem uma', function () {
+    ($this->importado)();
+
+    $this->prova->update(['data_aplicacao' => null]);
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->html();
+
+    expect(identificacaoDaProva($html))->not->toContain('Aplicada em');
+});
+
 it('filtra as questões por disciplina', function () {
     ($this->importado)();
 
