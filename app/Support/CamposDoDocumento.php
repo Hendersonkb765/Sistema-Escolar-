@@ -170,6 +170,127 @@ final class CamposDoDocumento
         return new HtmlString($html);
     }
 
+    /**
+     * O corpo quebrado em trechos, para quem não desenha HTML.
+     *
+     * O .docx é montado bloco a bloco — o Word não aceita o HTML da
+     * folha —, e o gerador dele precisa de trechos com `negrito` e
+     * `italico` em vez de marcação, como já acontece com o enunciado da
+     * prova.
+     *
+     * Passa pelo mesmo caminho de duas etapas do {@see render()}, e é o
+     * que faz o negrito em volta de um campo valer nos dois formatos: um
+     * `**{{ aluno.nome }}**` sai daqui como um trecho de texto já em
+     * negrito, com o nome dentro.
+     *
+     * tipo: `texto`, `quebra`, `linha`, `assinatura`, `caixa`, `espaco`
+     * ou `lista_de_alunos`.
+     *
+     * @param  array<string, mixed>  $contexto
+     * @return array<int, array{tipo: string, texto?: string, rotulo?: string, negrito?: bool, italico?: bool}>
+     */
+    public static function trechos(string $corpo, array $contexto): array
+    {
+        $corpo = str_replace([self::ABRE, self::FECHA], '', $corpo);
+
+        $campos = [];
+
+        $comMarcas = preg_replace_callback(
+            self::PADRAO,
+            function (array $achado) use (&$campos, $contexto): string {
+                $indice = count($campos);
+                $campos[$indice] = self::descritor($achado[1], $achado[2] ?? '', $contexto);
+
+                return self::ABRE.$indice.self::FECHA;
+            },
+            $corpo,
+        ) ?? $corpo;
+
+        $partes = [];
+
+        foreach (TextoDoEnunciado::segmentos($comMarcas) as $run) {
+            /*
+             * Aqui o grupo do padrão é obrigatório, então o `preg_split`
+             * alterna texto e índice sem falhas — ao contrário do padrão
+             * dos campos, cujo rótulo é opcional.
+             */
+            $pedacos = preg_split(
+                '/'.self::ABRE.'(\d+)'.self::FECHA.'/',
+                $run['texto'],
+                -1,
+                PREG_SPLIT_DELIM_CAPTURE,
+            ) ?: [];
+
+            foreach ($pedacos as $posicao => $pedaco) {
+                if ($posicao % 2 === 1) {
+                    $campo = $campos[(int) $pedaco] ?? null;
+
+                    if ($campo === null) {
+                        continue;
+                    }
+
+                    // O valor de um campo de dado herda a formatação do
+                    // trecho em que ele está; os de preencher não têm.
+                    $partes[] = $campo['tipo'] === 'texto'
+                        ? $campo + ['negrito' => $run['negrito'], 'italico' => $run['italico']]
+                        : $campo;
+
+                    continue;
+                }
+
+                foreach (self::porLinha($pedaco) as $parte) {
+                    $partes[] = $parte['tipo'] === 'texto'
+                        ? $parte + ['negrito' => $run['negrito'], 'italico' => $run['italico']]
+                        : $parte;
+                }
+            }
+        }
+
+        return $partes;
+    }
+
+    /**
+     * Texto cru em trechos e quebras de linha.
+     *
+     * @return array<int, array{tipo: string, texto?: string}>
+     */
+    protected static function porLinha(string $texto): array
+    {
+        if ($texto === '') {
+            return [];
+        }
+
+        $partes = [];
+        $linhas = explode("\n", $texto);
+
+        foreach ($linhas as $indice => $linha) {
+            if ($indice > 0) {
+                $partes[] = ['tipo' => 'quebra'];
+            }
+
+            if ($linha !== '') {
+                $partes[] = ['tipo' => 'texto', 'texto' => $linha];
+            }
+        }
+
+        return $partes;
+    }
+
+    /**
+     * O que um campo é, sem decidir como ele se desenha.
+     *
+     * @param  array<string, mixed>  $contexto
+     * @return array{tipo: string, texto?: string, rotulo?: string}
+     */
+    protected static function descritor(string $campo, string $rotulo, array $contexto): array
+    {
+        return match ($campo) {
+            'linha', 'assinatura', 'caixa' => ['tipo' => $campo, 'rotulo' => $rotulo],
+            'espaco', 'lista_de_alunos' => ['tipo' => $campo],
+            default => ['tipo' => 'texto', 'texto' => self::valor($campo, $contexto)],
+        };
+    }
+
     /** @param  array<string, mixed>  $contexto */
     protected static function campoEmHtml(string $campo, string $rotulo, array $contexto): string
     {

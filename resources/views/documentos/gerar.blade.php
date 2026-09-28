@@ -80,13 +80,25 @@
     <x-cartao>
         <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
             <p class="text-sm text-slate-500 dark:text-slate-400">
-                {{ $impedimento !== '' ? $impedimento : 'O PDF é baixado na hora.' }}
+                {{ $impedimento !== ''
+                    ? $impedimento
+                    : 'O arquivo é baixado na hora. O Word serve para mexer no texto antes de imprimir.' }}
             </p>
 
-            <x-botao wire:click="gerar" :desabilitado="$impedimento !== ''"
-                     title="{{ $impedimento !== '' ? $impedimento : 'Gerar e baixar o PDF.' }}">
-                Criar documento
-            </x-botao>
+            <div class="flex shrink-0 gap-2">
+                <x-botao variante="secundario" wire:click="gerar('word')"
+                         :desabilitado="$impedimento !== ''"
+                         title="{{ $impedimento !== ''
+                            ? $impedimento
+                            : 'Gerar e baixar em Word (.docx), para editar antes de imprimir.' }}">
+                    Criar em Word
+                </x-botao>
+
+                <x-botao wire:click="gerar('pdf')" :desabilitado="$impedimento !== ''"
+                         title="{{ $impedimento !== '' ? $impedimento : 'Gerar e baixar o PDF, pronto para imprimir.' }}">
+                    Criar em PDF
+                </x-botao>
+            </div>
         </div>
     </x-cartao>
 </div>

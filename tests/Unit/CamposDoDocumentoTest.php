@@ -174,3 +174,80 @@ it('desenha a linha com espaço rígido e a caixa com caractere', function () {
         ->and(CamposDoDocumento::render('{{ caixa }}', [])->toHtml())
         ->toContain('&#9744;');
 });
+
+/*
+ * `trechos()` alimenta o gerador do .docx, que monta o documento bloco a
+ * bloco — o Word não aceita o HTML da folha. Ele passa pelo mesmo caminho
+ * de duas etapas do `render()`, e é isso que faz o negrito em volta de um
+ * campo valer nos dois formatos.
+ */
+it('devolve o texto e o campo como trechos', function () {
+    expect(CamposDoDocumento::trechos('Aluno: {{ aluno.nome }}.', ['aluno.nome' => 'Marina']))
+        ->toBe([
+            ['tipo' => 'texto', 'texto' => 'Aluno: ', 'negrito' => false, 'italico' => false],
+            ['tipo' => 'texto', 'texto' => 'Marina', 'negrito' => false, 'italico' => false],
+            ['tipo' => 'texto', 'texto' => '.', 'negrito' => false, 'italico' => false],
+        ]);
+});
+
+it('marca em negrito o campo envolvido pelas marcas', function () {
+    $trechos = CamposDoDocumento::trechos('**{{ aluno.nome }}**', ['aluno.nome' => 'Marina']);
+
+    expect($trechos)->toBe([
+        ['tipo' => 'texto', 'texto' => 'Marina', 'negrito' => true, 'italico' => false],
+    ]);
+});
+
+it('não dá formatação aos campos de preencher', function () {
+    $trechos = CamposDoDocumento::trechos('**{{ linha: nome }}**', []);
+
+    expect($trechos)->toBe([['tipo' => 'linha', 'rotulo' => 'nome']]);
+});
+
+it('transforma a quebra de linha em trecho próprio', function () {
+    expect(CamposDoDocumento::trechos("um\ndois", []))
+        ->toBe([
+            ['tipo' => 'texto', 'texto' => 'um', 'negrito' => false, 'italico' => false],
+            ['tipo' => 'quebra'],
+            ['tipo' => 'texto', 'texto' => 'dois', 'negrito' => false, 'italico' => false],
+        ]);
+});
+
+it('conta cada campo de bloco uma vez', function () {
+    $tipos = array_column(
+        CamposDoDocumento::trechos('{{ espaco }}{{ assinatura: X }}{{ caixa }}{{ lista_de_alunos }}', []),
+        'tipo',
+    );
+
+    expect($tipos)->toBe(['espaco', 'assinatura', 'caixa', 'lista_de_alunos']);
+});
+
+/*
+ * Os dois caminhos saem do mesmo corpo, então precisam concordar sobre o
+ * que está escrito. Se um deles perder um campo, o Word e o PDF passam a
+ * entregar documentos diferentes com o mesmo nome.
+ */
+it('diz a mesma coisa que o HTML sobre o que o corpo contém', function () {
+    $corpo = "Eu, {{ linha: responsável }}, autorizo **{{ aluno.nome }}**\n"
+        .'da turma {{ turma.nome }}. {{ caixa: Sim }} {{ assinatura: Assinatura }}';
+
+    $contexto = ['aluno.nome' => 'Marina Alves', 'turma.nome' => '1 A'];
+
+    $html = CamposDoDocumento::render($corpo, $contexto)->toHtml();
+    $trechos = CamposDoDocumento::trechos($corpo, $contexto);
+
+    $texto = implode('', array_column(
+        array_filter($trechos, fn (array $t) => $t['tipo'] === 'texto'),
+        'texto',
+    ));
+
+    expect($texto)->toContain('Marina Alves')
+        ->and($texto)->toContain('1 A')
+        ->and($html)->toContain('Marina Alves')
+        ->and($html)->toContain('1 A')
+        // Os campos de preencher aparecem nos dois, cada um do seu jeito.
+        ->and(array_column($trechos, 'tipo'))->toContain('linha', 'caixa', 'assinatura')
+        ->and($html)->toContain('campo-linha')
+        ->and($html)->toContain('campo-caixa')
+        ->and($html)->toContain('campo-assinatura');
+});

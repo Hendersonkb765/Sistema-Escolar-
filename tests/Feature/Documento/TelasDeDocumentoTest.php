@@ -85,7 +85,7 @@ it('baixa o PDF dos alunos marcados', function () {
         ->set('modelo_id', $this->modelo->id)
         ->set('turma_id', $this->turma->id)
         ->set('escolhidos', Aluno::query()->where('turma_id', $this->turma->id)->pluck('id')->take(2)->all())
-        ->call('gerar')
+        ->call('gerar', 'pdf')
         ->assertFileDownloaded('autorizacao-de-visita-1-a.pdf');
 
     expect($resposta)->not->toBeNull();
@@ -109,9 +109,27 @@ it('não gera quando ninguém está marcado', function () {
         ->set('modelo_id', $this->modelo->id)
         ->set('turma_id', $this->turma->id)
         ->call('desmarcarTodos')
-        ->call('gerar')
+        ->call('gerar', 'pdf')
         ->assertNoFileDownloaded()
         ->assertDispatched('notificar');
+});
+
+it('baixa o Word dos mesmos alunos', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class)
+        ->set('modelo_id', $this->modelo->id)
+        ->set('turma_id', $this->turma->id)
+        ->call('gerar', 'word')
+        ->assertFileDownloaded('autorizacao-de-visita-1-a.docx');
+});
+
+it('não gera em formato que não existe', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class)
+        ->set('modelo_id', $this->modelo->id)
+        ->set('turma_id', $this->turma->id)
+        ->call('gerar', 'planilha')
+        ->assertNoFileDownloaded();
 });
 
 it('salva um modelo novo pelo formulário', function () {

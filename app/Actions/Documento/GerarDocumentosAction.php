@@ -36,20 +36,7 @@ class GerarDocumentosAction
         array $alunoIds,
         User $autor,
     ): string {
-        Gate::forUser($autor)->authorize('gerar', $modelo);
-        Gate::forUser($autor)->authorize('view', $turma);
-
-        $alunos = $this->alunosEscolhidos($turma, $alunoIds, $autor);
-
-        $invalidos = $modelo->camposInvalidos();
-
-        if ($invalidos !== []) {
-            throw RegraDeNegocioException::porque(
-                'O modelo usa campo que não existe neste tipo de documento: '
-                .implode(', ', array_map(fn (string $campo) => "{{ {$campo} }}", $invalidos))
-                .'. Corrija o modelo antes de gerar.'
-            );
-        }
+        $alunos = $this->prepararGeracao($modelo, $turma, $alunoIds, $autor);
 
         $mpdf = new Mpdf([
             'format' => 'A4',
@@ -65,8 +52,8 @@ class GerarDocumentosAction
             'turma' => $turma,
             'vias' => $this->vias($modelo, $turma, $alunos),
             'porPagina' => $modelo->viasPorPagina(),
-            'logos' => $this->logos($turma),
-            'instituicao' => $this->instituicao($turma),
+            'logos' => $this->logosDaTurma($turma),
+            'instituicao' => $this->instituicaoDaTurma($turma),
         ])->render());
 
         return (string) $mpdf->Output('', 'S');
@@ -75,6 +62,41 @@ class GerarDocumentosAction
     public function nomeDoArquivo(ModeloDocumento $modelo, Turma $turma): string
     {
         return Str::slug($modelo->nome.'-'.$turma->nome).'.pdf';
+    }
+
+    /**
+     * O que vale para qualquer formato: quem pode, quem recebe e se o
+     * modelo está em condições de gerar.
+     *
+     * Mora aqui e não em cada gerador porque PDF e Word precisam das
+     * mesmas três respostas — e porque uma delas esquecida num dos dois
+     * seria uma brecha que só aparece no formato menos usado.
+     *
+     * @param  array<int, int|string>  $alunoIds
+     * @return Collection<int, Aluno>
+     */
+    public function prepararGeracao(
+        ModeloDocumento $modelo,
+        Turma $turma,
+        array $alunoIds,
+        User $autor,
+    ): Collection {
+        Gate::forUser($autor)->authorize('gerar', $modelo);
+        Gate::forUser($autor)->authorize('view', $turma);
+
+        $alunos = $this->alunosEscolhidos($turma, $alunoIds, $autor);
+
+        $invalidos = $modelo->camposInvalidos();
+
+        if ($invalidos !== []) {
+            throw RegraDeNegocioException::porque(
+                'O modelo usa campo que não existe neste tipo de documento: '
+                .implode(', ', array_map(fn (string $campo) => "{{ {$campo} }}", $invalidos))
+                .'. Corrija o modelo antes de gerar.'
+            );
+        }
+
+        return $alunos;
     }
 
     /**
@@ -124,7 +146,7 @@ class GerarDocumentosAction
      */
     protected function vias(ModeloDocumento $modelo, Turma $turma, Collection $alunos): array
     {
-        $comum = $this->dadosComuns($turma);
+        $comum = $this->dadosDaTurma($turma);
 
         if (! $modelo->ehIndividual()) {
             return [CamposDoDocumento::render($modelo->corpo, array_merge(
@@ -143,7 +165,7 @@ class GerarDocumentosAction
     }
 
     /** @return array<string, string|int> */
-    protected function dadosComuns(Turma $turma): array
+    public function dadosDaTurma(Turma $turma): array
     {
         $turma->loadMissing('curso.eixo');
 
@@ -153,7 +175,7 @@ class GerarDocumentosAction
             'periodoLetivo' => (string) $turma->periodo_letivo,
             'curso' => (string) $turma->curso->nome,
             'eixo' => (string) $turma->curso->eixo->nome,
-            'instituicao' => $this->instituicao($turma),
+            'instituicao' => $this->instituicaoDaTurma($turma),
         ];
     }
 
@@ -164,7 +186,7 @@ class GerarDocumentosAction
     }
 
     /** O nome da escola vem do modelo de prova do Eixo, como no boletim. */
-    protected function instituicao(Turma $turma): string
+    public function instituicaoDaTurma(Turma $turma): string
     {
         return $this->modeloDaTurma($turma)?->instituicao
             ?: (string) config('instituicao.nome');
@@ -180,7 +202,7 @@ class GerarDocumentosAction
     }
 
     /** @return array{esquerda: ?string, direita: ?string} */
-    protected function logos(Turma $turma): array
+    public function logosDaTurma(Turma $turma): array
     {
         $modelo = $this->modeloDaTurma($turma);
 

@@ -3,6 +3,7 @@
 namespace App\Livewire\Documentos;
 
 use App\Actions\Documento\GerarDocumentosAction;
+use App\Actions\Documento\GerarDocxDoDocumentoAction;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
 use App\Models\Aluno;
@@ -124,8 +125,20 @@ class GerarDocumentos extends Component
         return '';
     }
 
-    public function gerar(GerarDocumentosAction $acao): ?StreamedResponse
-    {
+    /**
+     * O PDF serve para imprimir; o Word, para mexer antes de imprimir —
+     * trocar uma data, acrescentar um parágrafo. A escolha é de quem gera,
+     * na hora, e não uma propriedade do modelo.
+     */
+    public function gerar(
+        string $formato,
+        GerarDocumentosAction $emPdf,
+        GerarDocxDoDocumentoAction $emWord,
+    ): ?StreamedResponse {
+        if (! in_array($formato, ['pdf', 'word'], true)) {
+            return null;
+        }
+
         if ($this->impedimento() !== '') {
             $this->notificarAtencao($this->impedimento());
 
@@ -135,6 +148,8 @@ class GerarDocumentos extends Component
         $modelo = ModeloDocumento::query()->findOrFail($this->modelo_id);
         $turma = Turma::query()->findOrFail($this->turma_id);
 
+        $acao = $formato === 'word' ? $emWord : $emPdf;
+
         try {
             $conteudo = $acao->conteudo($modelo, $turma, $this->escolhidos, auth()->user());
         } catch (RegraDeNegocioException $erro) {
@@ -143,12 +158,12 @@ class GerarDocumentos extends Component
             return null;
         }
 
-        $nome = $acao->nomeDoArquivo($modelo, $turma);
-
         return response()->streamDownload(
             fn () => print $conteudo,
-            $nome,
-            ['Content-Type' => 'application/pdf'],
+            $acao->nomeDoArquivo($modelo, $turma),
+            ['Content-Type' => $formato === 'word'
+                ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                : 'application/pdf'],
         );
     }
 

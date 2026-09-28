@@ -170,7 +170,7 @@ em `professor_disciplina` e independe do perfil.
 | 6 | Importação XLS em dois passos e notas por disciplina | ✅ concluído |
 | 7 | Cálculo de notas por disciplina | ✅ concluído (junto com o 6) |
 | 8 | Dashboards, auditoria e refino de UI | parcial |
-| 9 | Documentos do aluno: modelos, geração em PDF e compartilhamento | ✅ concluído |
+| 9 | Documentos do aluno: modelos, geração em PDF e Word, compartilhamento | ✅ concluído |
 
 Todas as 24 tabelas de domínio existem com chaves estrangeiras, índices e
 constraints, e **todos os módulos têm tela** — o
@@ -725,6 +725,26 @@ O mPDF impôs três decisões que só o papel revelou:
 - **o tamanho da fonte não se restaura** depois de um trecho menor dentro
   de um parágrafo: o rótulo em linha muda de cor, não de tamanho.
 
+### PDF para imprimir, Word para mexer antes
+
+Os dois formatos saem da mesma tela e do mesmo modelo. O PDF é o papel
+pronto; o .docx existe porque a secretaria quase sempre precisa trocar
+uma data ou acrescentar um parágrafo antes de imprimir.
+
+O Word não aceita o HTML da folha, então é montado bloco a bloco a partir
+de `CamposDoDocumento::trechos()` — a mesma conversão de duas etapas que o
+HTML usa, para os dois formatos não divergirem no que dizem. É isso que
+faz o negrito em volta de um campo valer nos dois.
+
+O que o Word impôs, e o teste cobra:
+
+- **a linha de preencher é um traço de sublinhados**, não espaços
+  sublinhados: o Word come espaço no fim de um trecho, e a linha encurtava
+  conforme o que vinha depois;
+- **as larguras das colunas vão na primeira linha da tabela** — é ela que
+  define a grade no OOXML. Declaradas só nas linhas de baixo, são
+  ignoradas, e o nome do aluno ficava espremido em duas linhas.
+
 ### Quem recebe o documento
 
 A turma vem toda marcada, porque é o caso comum, e desmarcar dois é menos
@@ -788,6 +808,19 @@ O que o projeto escreve à mão — a barra de rolagem e o gráfico de
 evolução — acompanha a mesma classe, e não uma `@media` própria: duas
 fontes de verdade divergiriam no dia em que alguém escolhesse o claro
 num aparelho escuro.
+
+## Um item do menu aceso por vez
+
+A regra antiga marcava o item pelo prefixo da rota (`documentos.*`) e
+servia enquanto cada seção tinha um item por prefixo: "Provas" segue aceso
+em `/provas/criar`, que é o que se espera de um item-pai. Com três itens
+irmãos sob `documentos.`, os três acendiam juntos e o menu deixava de
+dizer onde a pessoa está.
+
+Agora quem tem a rota exata ganha, e só quando nenhum item é a rota atual
+— telas de criar e editar, que não têm item próprio — o destaque volta
+para a listagem daquele prefixo. A decisão precisa ver a lista inteira,
+então saiu de dentro do item e virou um passo depois de montá-la.
 
 ## A barra lateral se recolhe
 

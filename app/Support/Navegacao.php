@@ -114,29 +114,74 @@ class Navegacao
             ],
         ];
 
-        return array_values(array_filter(
+        return self::marcarOAtivo(array_values(array_filter(
             array_map(
                 fn (array $grupo) => [...$grupo, 'itens' => array_values($grupo['itens'])],
                 $grupos
             ),
             fn (array $grupo) => $grupo['itens'] !== []
-        ));
+        )));
     }
 
-    /** @return array{rotulo: string, url: string, icone: string, ativo: bool, contador: ?array{valor: int, cor: string, titulo: string}} */
+    /**
+     * Acende um item só, e é preciso ver todos para saber qual.
+     *
+     * A regra antiga marcava pelo prefixo da rota (`documentos.*`) e
+     * funcionava enquanto cada seção tinha um item por prefixo: "Provas"
+     * segue aceso em `/provas/criar`, que é o que se espera de um
+     * item-pai. Com três itens irmãos sob `documentos.`, os três acendiam
+     * juntos e o menu parava de dizer onde a pessoa está.
+     *
+     * Agora quem tem a rota exata ganha. Só quando nenhum item é a rota
+     * atual — telas de criar e editar, que não têm item próprio — o
+     * destaque volta para a listagem daquele prefixo.
+     *
+     * @param  array<int, array{titulo: ?string, itens: array<int, array<string, mixed>>}>  $grupos
+     * @return array<int, array{titulo: ?string, itens: array<int, array<string, mixed>>}>
+     */
+    protected static function marcarOAtivo(array $grupos): array
+    {
+        $atual = (string) Route::currentRouteName();
+
+        $rotas = [];
+
+        foreach ($grupos as $grupo) {
+            foreach ($grupo['itens'] as $item) {
+                $rotas[] = $item['rota'];
+            }
+        }
+
+        $temExata = in_array($atual, $rotas, true);
+        $prefixoAtual = Str::before($atual, '.');
+
+        return array_map(fn (array $grupo) => [...$grupo, 'itens' => array_map(
+            fn (array $item) => [...$item, 'ativo' => $temExata
+                ? $item['rota'] === $atual
+                : Str::before($item['rota'], '.') === $prefixoAtual
+                    && Str::afterLast($item['rota'], '.') === 'index'],
+            $grupo['itens'],
+        )], $grupos);
+    }
+
+    /**
+     * `ativo` nasce falso: quem decide é {@see marcarOAtivo()}, depois de
+     * ver a lista inteira. Um item sozinho não tem como saber se outro
+     * item casa melhor com a rota atual.
+     *
+     * @return array{rotulo: string, rota: string, url: string, icone: string, ativo: bool, contador: ?array{valor: int, cor: string, titulo: string}}
+     */
     protected static function item(
         string $rotulo,
         string $rota,
         string $icone,
         ?array $contador = null,
     ): array {
-        $prefixo = Str::before($rota, '.');
-
         return [
             'rotulo' => $rotulo,
+            'rota' => $rota,
             'url' => Route::has($rota) ? route($rota) : '#',
             'icone' => $icone,
-            'ativo' => request()->routeIs($prefixo.'*'),
+            'ativo' => false,
             'contador' => $contador,
         ];
     }
