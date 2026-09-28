@@ -25,10 +25,40 @@ use App\Models\ModeloProva;
 use App\Models\ResultadoAluno;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
+use Illuminate\Support\Facades\Route;
+
+/*
+ * Telas sem parâmetro que a varredura cobre.
+ *
+ * Os formulários de criar entram por um motivo específico: é neles que
+ * vivem `@disabled`, `@checked` e `@readonly`, as diretivas que o Blade
+ * não compila dentro da tag de um componente. Uma listagem raramente tem
+ * campo de formulário; um formulário só tem isso.
+ */
+const TELAS_VARRIDAS = [
+    'painel', 'eixos.index', 'eixos.criar', 'cursos.index', 'cursos.criar',
+    'disciplinas.index', 'disciplinas.criar', 'grades.index',
+    'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar',
+    'usuarios.index', 'usuarios.criar', 'auditoria.index',
+    'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
+    'provas.index', 'provas.criar', 'modelos-prova.index', 'modelos-prova.criar',
+    'importacoes.index', 'importacoes.criar', 'resultados.index', 'analises.index',
+];
+
+/*
+ * Telas de fora da varredura, e por quê. Toda entrada é uma decisão.
+ */
+const TELAS_FORA_DA_VARREDURA = [
+    // Redireciona para o painel ou para o login; não tem HTML próprio.
+    'inicio',
+    // Devolve PDF, não HTML — não há Blade para varrer.
+    'resultados.boletim',
+    // Telas de autenticação: varridas em DiretivasNasTelasPublicasTest,
+    // porque exigem estar deslogado ou com a senha ainda provisória.
+    'login', 'password.request', 'primeira-senha', 'two-factor.login',
+];
 
 /** As diretivas que se costuma escrever dentro de uma tag por engano. */
-const DIRETIVAS = ['js', 'class', 'disabled', 'checked', 'selected', 'readonly', 'required', 'style', 'can', 'if', 'foreach'];
-
 beforeEach(function () {
     $this->eixo = Eixo::factory()->create(['codigo' => 'TEC']);
     $this->admin = paeetAdmin($this->eixo);
@@ -98,27 +128,41 @@ beforeEach(function () {
         $calcular->executar($resultado->refresh());
     }
 
-    /** Diretivas cruas que sobraram no HTML. */
-    $this->sobras = function (string $html): array {
-        $padrao = '/@('.implode('|', DIRETIVAS).')\s*\(/';
-
-        preg_match_all($padrao, $html, $achados);
-
-        return array_values(array_unique($achados[0]));
-    };
+    /** Diretivas cruas que sobraram no HTML. A varredura mora em tests/Pest.php. */
+    $this->sobras = fn (string $html): array => sobrasDeDiretiva($html);
 });
 
 it('não deixa diretiva crua no HTML de tela nenhuma', function (string $rota) {
     $html = $this->actingAs($this->admin)->get(route($rota))->assertOk()->getContent();
 
     expect(($this->sobras)($html))->toBe([]);
-})->with([
-    'painel', 'eixos.index', 'cursos.index', 'disciplinas.index', 'grades.index',
-    'turmas.index', 'alunos.index', 'usuarios.index', 'auditoria.index',
-    'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
-    'provas.index', 'provas.criar', 'modelos-prova.index', 'modelos-prova.criar',
-    'importacoes.index', 'importacoes.criar', 'resultados.index', 'analises.index',
-]);
+})->with(TELAS_VARRIDAS);
+
+/*
+ * A lista acima é escrita à mão, para poder levar comentário. O preço
+ * disso é envelhecer calada: quem cria uma tela nova não é avisado de que
+ * ela ficou fora. Este teste cobra.
+ */
+it('não deixa tela nenhuma fora da varredura', function () {
+    $doRoteador = collect(Route::getRoutes())
+        ->filter(fn ($rota) => in_array('GET', $rota->methods(), true))
+        ->reject(fn ($rota) => str_contains($rota->uri(), '{'))
+        ->reject(fn ($rota) => str_starts_with($rota->uri(), 'livewire/'))
+        ->reject(fn ($rota) => str_starts_with($rota->uri(), 'storage/'))
+        ->reject(fn ($rota) => str_starts_with($rota->uri(), 'user/'))
+        ->map(fn ($rota) => $rota->getName())
+        ->filter()
+        ->values()
+        ->all();
+
+    $classificadas = array_merge(TELAS_VARRIDAS, TELAS_FORA_DA_VARREDURA);
+    $esquecidas = array_diff($doRoteador, $classificadas);
+
+    expect($esquecidas)->toBeEmpty(
+        'Tela fora da varredura de diretivas: '.implode(', ', $esquecidas).
+        '. Acrescente em TELAS_VARRIDAS, ou em TELAS_FORA_DA_VARREDURA com o motivo.'
+    );
+});
 
 it('não deixa diretiva crua nas telas com parâmetro', function () {
     $como = fn (string $rota, $parametro) => $this->actingAs($this->admin)

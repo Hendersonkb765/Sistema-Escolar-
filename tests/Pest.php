@@ -199,3 +199,34 @@ function enviarParte(SolicitacaoParte $parte, User $professor, array $habilidade
 
     return app(EnviarParteAction::class)->executar($parte->refresh(), $professor);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Diretiva crua no HTML
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Diretivas que o Blade NÃO compila dentro da tag de um componente.
+ *
+ * Quando isso acontece a diretiva sai literal no HTML, o atributo não
+ * existe e nada reclama: o botão fica na tela com a aparência certa e não
+ * faz nada ao ser clicado. Nenhum `assertSee` pega, porque o rótulo
+ * continua lá.
+ */
+const DIRETIVAS = ['js', 'class', 'disabled', 'checked', 'selected', 'readonly', 'required', 'style', 'can', 'if', 'foreach'];
+
+/**
+ * As diretivas cruas que sobraram no HTML entregue.
+ *
+ * Mora aqui, e não num dos arquivos de teste, porque a varredura vale
+ * tanto para as telas de dentro do sistema quanto para as públicas.
+ *
+ * @return array<int, string>
+ */
+function sobrasDeDiretiva(string $html): array
+{
+    preg_match_all('/@('.implode('|', DIRETIVAS).')\s*\(/', $html, $achados);
+
+    return array_values(array_unique($achados[0]));
+}
