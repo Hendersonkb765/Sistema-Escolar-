@@ -214,8 +214,15 @@
             </div>
         </x-cartao>
 
-        <x-cartao titulo="Questão a questão"
-                  descricao="A mesma leitura pelo número, com a habilidade ao lado.">
+        {{--
+            "Índice de acerto por questão", e não "Questão a questão": a
+            outra tabela desta página, logo abaixo, é o ✓ e o ✗ de cada
+            aluno. Duas tabelas com o mesmo nome e leituras diferentes —
+            uma da turma, outra nominal — é o tipo de coisa que faz
+            alguém ler o número errado em reunião.
+        --}}
+        <x-cartao titulo="Índice de acerto por questão"
+                  descricao="A mesma leitura pelo número, com a habilidade ao lado. É a turma, não o aluno.">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                     <thead>
@@ -253,6 +260,88 @@
                     </tbody>
                 </table>
             </div>
+        </x-cartao>
+
+        {{--
+            O ✓ e o ✗ de cada aluno.
+
+            Veio da tela de notas, onde atrapalhava quem só queria
+            transcrever a nota, e aqui fica junto das outras leituras por
+            questão. É a única nominal das três: as de cima contam a
+            turma.
+
+            Exige uma prova, e não um recorte — o número da questão só
+            quer dizer alguma coisa dentro da prova em que ela saiu. Duas
+            provas lado a lado teriam duas questões "1" diferentes na
+            mesma coluna.
+        --}}
+        <x-cartao titulo="Acerto de cada aluno">
+            <x-slot:descricao>
+                @if ($provaDoRecorte)
+                    ✓ acertou · ✗ errou, em {{ $provaDoRecorte->titulo }}.
+                    O número é o mesmo que o aluno viu na folha.
+                @else
+                    Escolha uma prova no recorte: o número da questão só vale dentro de uma prova.
+                @endif
+            </x-slot:descricao>
+
+            @if ($acertoNominal === null)
+                <div class="p-4 sm:p-6">
+                    <x-vazio titulo="Uma prova por vez"
+                             descricao="Esta leitura é aluno a aluno, questão a questão. Escolha uma prova no recorte acima para vê-la."/>
+                </div>
+            @elseif ($acertoNominal['alunos'] === [])
+                <div class="p-4 sm:p-6">
+                    <x-vazio titulo="Nenhum resultado neste recorte"
+                             descricao="Ajuste a disciplina ou importe a planilha do leitor de folhas."/>
+                </div>
+            @else
+                <div class="-mx-4 overflow-x-auto sm:-mx-6">
+                    {{-- `data-nominal` marca a tabela para os testes: "1/2"
+                         aparece em mais de um lugar desta página. --}}
+                    <table data-nominal class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                        <thead>
+                            <tr class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                <th class="px-4 py-2 text-left sm:px-6">Aluno</th>
+                                @foreach ($acertoNominal['questoes'] as $questao)
+                                    <th class="px-1 py-2 text-center font-normal"
+                                        title="{{ $questao['disciplina'] }} · {{ $questao['habilidade'] ?: 'sem habilidade' }} · peso {{ number_format($questao['peso'], 2, ',', '.') }}">
+                                        {{ $questao['numero'] }}
+                                    </th>
+                                @endforeach
+                                <th class="px-4 py-2 text-center">Acertos</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($acertoNominal['alunos'] as $linha)
+                                <tr wire:key="nominal-{{ $loop->index }}">
+                                    <td class="px-4 py-2 sm:px-6">
+                                        <span class="text-slate-900 dark:text-slate-100">{{ $linha['aluno'] }}</span>
+                                        <span class="block text-xs text-slate-400">RA {{ $linha['ra'] }}</span>
+                                    </td>
+                                    @foreach ($acertoNominal['questoes'] as $questao)
+                                        @php $acertou = $linha['acertou'][$questao['id']] ?? null; @endphp
+                                        <td class="px-1 py-2 text-center">
+                                            @if ($acertou === null)
+                                                <span class="text-slate-300" title="Sem resposta importada">·</span>
+                                            @elseif ($acertou)
+                                                <span class="font-semibold text-emerald-600 dark:text-emerald-400"
+                                                      title="Questão {{ $questao['numero'] }} — acertou">✓</span>
+                                            @else
+                                                <span class="font-semibold text-rose-500"
+                                                      title="Questão {{ $questao['numero'] }} — errou">✗</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                    <td class="px-4 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">
+                                        {{ $linha['acertos'] }}/{{ $linha['total'] }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </x-cartao>
     @endif
 </div>

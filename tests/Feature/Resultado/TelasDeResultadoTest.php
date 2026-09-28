@@ -397,45 +397,22 @@ it('mostra a nota de cada aluno em cada disciplina', function () {
 });
 
 /*
- * A tarefa da tela é a nota, e é ela que aparece de saída. O acerto
- * questão a questão continua existindo — é a única leitura nominal por
- * questão do sistema, já que a Análise lê o índice da turma —, mas atrás
- * de um clique.
+ * O acerto questão a questão saiu daqui: atrapalhava quem veio
+ * transcrever nota, e agora mora na Análise de desempenho, junto das
+ * outras leituras por questão. Este teste guarda a porta — a tabela não
+ * volta sem alguém decidir que ela volta.
  */
-it('deixa o acerto questão a questão fechado, e abre quando pedem', function () {
+it('não mostra mais o acerto questão a questão', function () {
     ($this->importado)();
-
-    $componente = Livewire::actingAs($this->paeet)
-        ->test(ListaResultados::class)
-        ->set('prova_id', (string) $this->prova->id)
-        ->assertSet('mostrarQuestoes', false)
-        ->assertDontSee('✓');
-
-    $componente->set('mostrarQuestoes', true)
-        ->assertSee('✓')
-        ->assertSee('✗')
-        ->assertSee('2/4');
-});
-
-/*
- * Com a tabela filtrada por disciplina, o total de acertos precisa contar
- * só o que está à vista. "8/10" ao lado de três colunas é número certo
- * para pergunta nenhuma.
- */
-it('conta os acertos só das questões mostradas', function () {
-    ($this->importado)();
-
-    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
 
     Livewire::actingAs($this->paeet)
         ->test(ListaResultados::class)
         ->set('prova_id', (string) $this->prova->id)
-        ->set('mostrarQuestoes', true)
-        ->set('disciplinasEscolhidas', [(string) $logica])
-        // Lógica tem 2 questões: a Marina acertou as duas, o Caio uma.
-        ->assertSee('2/2')
-        ->assertSee('1/2')
-        ->assertDontSee('/4');
+        ->assertOk()
+        ->assertSee('Marina Alves')
+        ->assertDontSee('✓')
+        ->assertDontSee('✗')
+        ->assertDontSee('Questão a questão');
 });
 
 /*

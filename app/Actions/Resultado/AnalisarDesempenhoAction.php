@@ -5,8 +5,10 @@ namespace App\Actions\Resultado;
 use App\Enums\Bimestre;
 use App\Models\NotaDisciplina;
 use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\RespostaAluno;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection as ColecaoDeModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
@@ -182,6 +184,58 @@ class AnalisarDesempenhoAction
             // Quem mais precisa de ajuda primeiro.
             ->sortBy([['percentual', 'asc'], ['aluno', 'asc']])
             ->values();
+    }
+
+    /**
+     * O ✓ e o ✗ de cada aluno, questão a questão.
+     *
+     * É a única leitura **nominal** por questão do sistema: as outras
+     * daqui contam a turma. Serve para conferir a leitura da folha e para
+     * ver, de um aluno só, onde ele tropeçou.
+     *
+     * Exige uma prova, e não um recorte: o número da questão só quer
+     * dizer alguma coisa dentro da prova em que ela saiu. Duas provas
+     * lado a lado teriam duas questões "1" diferentes na mesma coluna.
+     *
+     * @return array{questoes: array<int, array<string, mixed>>, alunos: array<int, array<string, mixed>>}
+     */
+    public function acertoDeCadaAluno(Prova $prova, User $leitor, ?int $disciplinaId = null): array
+    {
+        // Coleção do Eloquent, e não `collect()`: o filtro interno usa
+        // `modelKeys()`, que só existe nela.
+        $respostas = $this->respostas(new ColecaoDeModels([$prova]), $leitor, $disciplinaId);
+
+        $questoes = $respostas
+            ->map(fn (RespostaAluno $r) => $r->provaQuestao)
+            ->unique('id')
+            ->sortBy('numero')
+            ->map(fn (ProvaQuestao $q) => [
+                'id' => $q->id,
+                'numero' => $q->numero,
+                'disciplina' => $q->disciplina->nome,
+                'peso' => (float) $q->peso,
+                'habilidade' => $q->habilidade_snapshot,
+            ])
+            ->values();
+
+        $alunos = $respostas
+            ->groupBy(fn (RespostaAluno $r) => $r->resultado->aluno_id)
+            ->map(function (Collection $doAluno) {
+                $aluno = $doAluno->first()->resultado->aluno;
+                $porQuestao = $doAluno->keyBy(fn (RespostaAluno $r) => $r->provaQuestao->id);
+
+                return [
+                    'aluno' => $aluno->nome,
+                    'ra' => $aluno->ra,
+                    'acertou' => $porQuestao->map(fn (RespostaAluno $r) => (bool) $r->acertou)->all(),
+                    'acertos' => $doAluno->where('acertou', true)->count(),
+                    'total' => $doAluno->count(),
+                ];
+            })
+            ->sortBy('aluno')
+            ->values();
+
+        return ['questoes' => $questoes->all(), 'alunos' => $alunos->all()];
     }
 
     /**

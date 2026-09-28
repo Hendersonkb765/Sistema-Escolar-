@@ -80,6 +80,19 @@ class Desempenho extends Component
         $this->habilidadeAberta = $this->habilidadeAberta === $habilidade ? '' : $habilidade;
     }
 
+    /**
+     * A prova do recorte, quando ele aponta para uma só.
+     *
+     * O acerto nominal depende disso: o número da questão só quer dizer
+     * alguma coisa dentro da prova em que ela saiu.
+     */
+    public function provaDoRecorte(): ?Prova
+    {
+        $provas = $this->provasAnalisadas();
+
+        return $provas->count() === 1 ? $provas->first() : null;
+    }
+
     /** A turma do recorte, quando ele aponta para uma só. */
     public function turmaDoRecorte(): ?Turma
     {
@@ -129,6 +142,10 @@ class Desempenho extends Component
             'disciplinas' => $disciplinas,
             'porHabilidade' => $analisar->porHabilidade($provas, auth()->user(), $disciplina),
             'porQuestao' => $analisar->porQuestao($provas, auth()->user(), $disciplina),
+            'provaDoRecorte' => $provaUnica = $this->provaDoRecorte(),
+            'acertoNominal' => $provaUnica === null
+                ? null
+                : $analisar->acertoDeCadaAluno($provaUnica, auth()->user(), $disciplina),
             'limite' => AnalisarDesempenhoAction::LIMITE_DE_ATENCAO,
         ])->layout('components.layouts.app', [
             'titulo' => 'Análise de desempenho',

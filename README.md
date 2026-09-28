@@ -639,16 +639,35 @@ São caixas, e não um select: a tarefa é olhar três de seis ao mesmo
 tempo, e um select deixa ver uma por vez ou todas. A escolha vai para o
 endereço, então quem confere sempre as mesmas guarda o link.
 
-### O acerto questão a questão fica a um clique
+### Nota aqui, questão na Análise
 
-Abrir com uma tabela de trinta colunas de ✓ e ✗ na frente atrapalha quem
-veio transcrever nota. Mas ela é a única leitura **nominal** por questão
-do sistema — a Análise lê o índice da turma, não o aluno —, então continua
-ali, fechada. Com a tabela filtrada por disciplina, o total conta só as
-questões à vista: "8/10" ao lado de três colunas é número certo para
-pergunta nenhuma.
+O acerto questão a questão saiu desta tela: quem veio transcrever nota não
+precisa passar por trinta colunas de ✓ e ✗. Ele mora na Análise de
+desempenho, junto das outras leituras por questão.
 
 ## Análise de desempenho
+
+### Três leituras, e nenhuma com o nome da outra
+
+- **Por habilidade avaliada** — a que permite intervir: "interpretar
+  estruturas de repetição" diz o que ensinar de novo, "questão 7" não diz
+  nada.
+- **Índice de acerto por questão** — a mesma leitura pelo número. Conta a
+  turma.
+- **Acerto de cada aluno** — o ✓ e o ✗ de cada um, questão a questão. É a
+  única **nominal** das três, e veio da tela de notas, onde atrapalhava
+  quem só queria transcrever.
+
+A terceira exige **uma prova**, e não um recorte: o número da questão só
+quer dizer alguma coisa dentro da prova em que ela saiu, e duas provas
+lado a lado teriam duas questões "1" diferentes na mesma coluna. Quando o
+recorte junta mais de uma, a tela diz isso em vez de somar coisas
+diferentes.
+
+O cartão do meio chamava-se "Questão a questão", igual ao que veio das
+notas. Duas tabelas com o mesmo nome e leituras diferentes — uma da
+turma, outra nominal — é o tipo de coisa que faz alguém ler o número
+errado em reunião.
 
 Onde a turma teve dificuldade, em duas leituras:
 

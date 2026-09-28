@@ -18,8 +18,8 @@ use Livewire\Component;
  * As notas dos alunos, disciplina a disciplina.
  *
  * A tela serve a uma tarefa concreta: olhar as notas e lançá-las noutro
- * sistema. Por isso mostra nota, e não análise — quem quer saber onde a
- * turma tropeçou vai à Análise de desempenho, que lê por habilidade.
+ * sistema. Por isso mostra nota, e só nota — o acerto questão a questão
+ * mora na Análise de desempenho, junto das outras leituras por questão.
  *
  * Cada disciplina tem a sua nota de 0 a 10, calculada contra a soma dos
  * pesos dela — somar questões de disciplinas diferentes numa nota só
@@ -48,9 +48,6 @@ class ListaResultados extends Component
      */
     #[Url(as: 'disciplinas', except: [])]
     public array $disciplinasEscolhidas = [];
-
-    /** O acerto questão a questão fica fechado: a tarefa aqui é a nota. */
-    public bool $mostrarQuestoes = false;
 
     public function mount(): void
     {
@@ -256,14 +253,6 @@ class ListaResultados extends Component
             fn (string $nome, int $id) => in_array((string) $id, $this->disciplinasEscolhidas, true)
         );
 
-        $questoes = $prova === null
-            ? collect()
-            : $prova->questoes()
-                ->with('disciplina:id,nome')
-                ->whereIn('disciplina_id', $mostradas->keys()->all())
-                ->orderBy('numero')
-                ->get();
-
         $resultados = $prova === null
             ? collect()
             : ResultadoAluno::query()
@@ -271,7 +260,6 @@ class ListaResultados extends Component
                 ->visivelPara(auth()->user())
                 ->with([
                     'aluno:id,nome,ra,turma_id',
-                    'respostas:id,resultado_aluno_id,prova_questao_id,acertou,peso',
                     'notas:id,resultado_aluno_id,disciplina_id,nota,soma_pesos_acertos,soma_pesos_total',
                     'notas.disciplina:id,nome',
                 ])
@@ -287,7 +275,6 @@ class ListaResultados extends Component
             'disciplinasDaProva' => $disciplinasDaProva,
             'disciplinas' => $mostradas,
             'minhasDisciplinas' => $this->minhasDisciplinas(),
-            'questoes' => $questoes,
             'resultados' => $resultados,
             'bimestreEscolhido' => $this->filtroBimestre === ''
                 ? null

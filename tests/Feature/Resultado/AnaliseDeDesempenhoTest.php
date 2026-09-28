@@ -18,6 +18,7 @@ use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Livewire\Analises\Desempenho;
 use App\Models\Aluno;
+use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
@@ -228,8 +229,108 @@ it('mostra as duas leituras na tela', function () {
         ->assertSee('Interpretar estruturas de repetição')
         ->assertSee('Calcular endereçamento IP')
         ->assertSee('Precisa de atenção')
-        ->assertSee('Questão a questão');
+        // Três leituras: duas da turma e uma nominal.
+        ->assertSee('Índice de acerto por questão')
+        ->assertSee('Acerto de cada aluno');
 });
+
+/*
+|--------------------------------------------------------------------------
+| O acerto de cada aluno, questão a questão
+|--------------------------------------------------------------------------
+|
+| Veio da tela de notas, onde atrapalhava quem só queria transcrever. É a
+| única leitura nominal da página: as outras duas contam a turma.
+*/
+
+it('mostra o ✓ e o ✗ de cada aluno quando o recorte é de uma prova só', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->assertOk()
+        ->assertSee('✓')
+        ->assertSee('✗')
+        ->assertSee('2/3')
+        ->assertSee('1/3');
+});
+
+/*
+ * O número da questão só quer dizer alguma coisa dentro da prova em que
+ * ela saiu: duas provas lado a lado teriam duas questões "1" diferentes
+ * na mesma coluna.
+ */
+it('pede uma prova quando o recorte junta mais de uma', function () {
+    ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+    ($this->provaCom)(Bimestre::Segundo, 'Segunda', [
+        0 => [1 => false, 2 => false, 3 => false],
+        1 => [1 => false, 2 => false, 3 => false],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSee('Uma prova por vez')
+        ->assertDontSee('✓');
+});
+
+it('volta a mostrar assim que o recorte aponta para uma prova', function () {
+    ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+    ($this->provaCom)(Bimestre::Segundo, 'Segunda', [
+        0 => [1 => false, 2 => false, 3 => false],
+        1 => [1 => false, 2 => false, 3 => false],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSee('Uma prova por vez')
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->assertDontSee('Uma prova por vez')
+        ->assertSee('✗');
+});
+
+/*
+ * Filtrar por disciplina tira colunas da tabela. O total precisa contar
+ * só o que ficou à vista: "3/5" ao lado de duas colunas é número certo
+ * para pergunta nenhuma.
+ */
+it('conta os acertos só das questões mostradas', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => true, 2 => true, 3 => false],
+    ]);
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->set('filtroDisciplina', (string) $logica)
+        ->html();
+
+    // Lógica tem 2 das 3 questões: os totais são sobre 2, não sobre 3.
+    expect(tabelaNominal($html))
+        ->toContain('1/2')
+        ->toContain('2/2')
+        ->not->toContain('/3');
+});
+
+/** A tabela nominal, sem o resto da página: "1/2" aparece em mais de um lugar. */
+function tabelaNominal(string $html): string
+{
+    preg_match('/<table data-nominal.*?<\\/table>/s', $html, $achado);
+
+    return strip_tags($achado[0] ?? '');
+}
 
 it('avisa quando o recorte não tem o que analisar', function () {
     Livewire::actingAs($this->paeet)
