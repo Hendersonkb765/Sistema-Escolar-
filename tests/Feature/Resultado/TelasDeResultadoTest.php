@@ -9,6 +9,7 @@ use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Resultado\ConferirImportacaoAction;
 use App\Actions\Resultado\ConfirmarImportacaoAction;
+use App\Enums\Bimestre;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Livewire\Importacoes\ListaImportacoes;
@@ -230,6 +231,65 @@ it('lista as importações com duas linhas', function () {
 | A tela de resultados
 |--------------------------------------------------------------------------
 */
+
+/*
+ * A tela abria sem prova escolhida e sem mostrar nada — "Escolha uma
+ * prova", com um recado dizendo que as notas aparecem depois da
+ * importação, que é exatamente o contrário do que estava acontecendo:
+ * havia notas, e elas não apareciam.
+ *
+ * Nenhum teste pegou porque todos faziam `set('prova_id', ...)` antes de
+ * olhar, pulando o estado em que a pessoa chega na tela.
+ */
+it('abre já mostrando a prova mais recente que tem resultado', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertOk()
+        ->assertSet('prova_id', (string) $this->prova->id)
+        ->assertSee('Marina Alves')
+        ->assertSee('Caio Prado')
+        ->assertDontSee('Escolha uma prova');
+});
+
+it('respeita a prova escolhida no endereço', function () {
+    ($this->importado)();
+
+    Livewire::withQueryParams(['prova' => (string) $this->segundaProva->id])
+        ->actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertSet('prova_id', (string) $this->segundaProva->id);
+});
+
+/*
+ * Filtrar por um bimestre que não tem a prova escolhida deixava a tela
+ * em branco de novo: o select mudava de opções e a escolha ficava
+ * apontando para fora da lista.
+ */
+it('troca de prova quando o bimestre filtrado deixa a escolhida de fora', function () {
+    ($this->importado)();
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertSet('prova_id', (string) $this->prova->id);
+
+    $outro = $this->prova->bimestre === Bimestre::Primeiro
+        ? Bimestre::Segundo
+        : Bimestre::Primeiro;
+
+    $componente->set('filtroBimestre', (string) $outro->value)
+        ->assertSet('prova_id', '')
+        ->assertSee('Nenhuma prova com resultado');
+});
+
+it('diz que não há prova com resultado quando de fato não há', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->assertOk()
+        ->assertSet('prova_id', '')
+        ->assertSee('Nenhuma prova com resultado');
+});
 
 it('mostra a nota de cada disciplina e o acerto de cada questão', function () {
     ($this->importado)();

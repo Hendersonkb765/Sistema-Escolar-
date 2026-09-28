@@ -37,8 +37,20 @@
 
     @if ($prova === null)
         <x-cartao>
-            <x-vazio titulo="Escolha uma prova"
-                     descricao="As notas aparecem depois que a importação dos resultados é confirmada."/>
+            {{--
+                Chegar aqui agora só acontece quando não há prova nenhuma
+                com resultado no recorte — o componente escolhe sozinho
+                quando há. Por isso o texto fala do que falta, e não manda
+                escolher algo que não está na lista.
+            --}}
+            <x-vazio titulo="Nenhuma prova com resultado{{ $bimestreEscolhido ? ' no '.$bimestreEscolhido : '' }}"
+                     descricao="As notas aparecem depois que a importação dos resultados é confirmada.">
+                <x-slot:acoes>
+                    @can('create', App\Models\Importacao::class)
+                        <x-botao href="{{ route('importacoes.criar') }}" wire:navigate>Importar resultados</x-botao>
+                    @endcan
+                </x-slot:acoes>
+            </x-vazio>
         </x-cartao>
     @elseif ($resultados->isEmpty())
         <x-cartao>

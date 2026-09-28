@@ -34,6 +34,43 @@ class ListaResultados extends Component
     public function mount(): void
     {
         $this->authorize('viewAny', ResultadoAluno::class);
+
+        /*
+         * A tela abre já mostrando alguma coisa.
+         *
+         * Sem isto ela abria em "Escolha uma prova" com um recado dizendo
+         * que as notas aparecem depois da importação — o contrário do que
+         * estava acontecendo, porque havia notas e elas não apareciam.
+         * Quem chega aqui quer ver a última prova; escolher outra é o
+         * caso menos comum.
+         *
+         * Só quando ninguém escolheu: uma prova no endereço é decisão de
+         * quem montou o link, mesmo que ela ainda não tenha resultado —
+         * aí a tela diz isso, que é a informação certa.
+         */
+        if ($this->prova_id === '') {
+            $this->prova_id = (string) ($this->provasDisponiveis()->first()?->id ?? '');
+        }
+    }
+
+    /**
+     * Filtrar por bimestre muda as opções do select.
+     *
+     * A escolha anterior pode ter ficado de fora, e uma escolha que
+     * aponta para fora da lista deixa a tela em branco sem dizer por quê.
+     * Nesse caso vale a primeira do novo recorte.
+     */
+    public function updatedFiltroBimestre(): void
+    {
+        $this->reset('filtroDisciplina');
+
+        $disponiveis = $this->provasDisponiveis();
+
+        if ($this->prova_id !== '' && $disponiveis->contains('id', (int) $this->prova_id)) {
+            return;
+        }
+
+        $this->prova_id = (string) ($disponiveis->first()?->id ?? '');
     }
 
     public function provaSelecionada(): ?Prova
@@ -94,6 +131,9 @@ class ListaResultados extends Component
                 : $questoes->where('disciplina_id', (int) $this->filtroDisciplina)->values(),
             'disciplinas' => $disciplinas,
             'resultados' => $resultados,
+            'bimestreEscolhido' => $this->filtroBimestre === ''
+                ? null
+                : Bimestre::tryFrom((int) $this->filtroBimestre)?->rotulo(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Resultados e notas',
             'subtitulo' => 'Uma nota por disciplina, e o acerto de cada questão',
