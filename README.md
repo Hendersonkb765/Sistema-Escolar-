@@ -588,7 +588,7 @@ mais firme para a mais frouxa:
 
 | critério | quando |
 |---|---|
-| matrícula | `External Id` bate com a matrícula de um aluno da turma |
+| RA | `External Id` bate com o RA de um aluno da turma |
 | nome idêntico | ignorando acento, caixa e espaço sobrando |
 | primeiro e último nome | o leitor costuma encurtar "Ana Paula Souza" para "Ana Souza" |
 

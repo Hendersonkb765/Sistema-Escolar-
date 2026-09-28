@@ -119,7 +119,7 @@
                            class="block truncate text-sm font-medium text-marca-600 hover:underline dark:text-marca-400">
                             {{ $aluno->nome }}
                         </a>
-                        <span class="text-xs text-slate-400">{{ $aluno->matricula }}</span>
+                        <span class="text-xs text-slate-400">RA {{ $aluno->ra }}</span>
                     </div>
                     <x-badge :cor="$aluno->status->cor()" :rotulo="$aluno->status->rotulo()"/>
                 </div>

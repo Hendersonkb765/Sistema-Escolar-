@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
  */
 final class ConciliadorDeAlunos
 {
-    public const POR_MATRICULA = 'matricula';
+    public const POR_RA = 'ra';
 
     public const POR_NOME = 'nome';
 
@@ -43,14 +43,14 @@ final class ConciliadorDeAlunos
      */
     public function conciliar(LinhaDeResultado $linha): array
     {
-        // A matrícula, quando vem preenchida, é mais firme que o nome.
+        // O RA, quando vem preenchido, é mais firme que o nome.
         if ($linha->identificacao !== null) {
-            $porMatricula = $this->alunos->firstWhere(
-                fn (Aluno $aluno) => self::comparavel($aluno->matricula) === self::comparavel($linha->identificacao)
+            $porRa = $this->alunos->firstWhere(
+                fn (Aluno $aluno) => self::comparavel($aluno->ra) === self::comparavel($linha->identificacao)
             );
 
-            if ($porMatricula !== null) {
-                return $this->achado($porMatricula, self::POR_MATRICULA);
+            if ($porRa !== null) {
+                return $this->achado($porRa, self::POR_RA);
             }
         }
 
@@ -97,7 +97,7 @@ final class ConciliadorDeAlunos
             'aluno' => null,
             'criterio' => self::AMBIGUO,
             'candidatos' => $candidatos
-                ->map(fn (Aluno $aluno) => $aluno->nome.' ('.$aluno->matricula.')')
+                ->map(fn (Aluno $aluno) => $aluno->nome.' ('.$aluno->ra.')')
                 ->values()
                 ->all(),
         ];

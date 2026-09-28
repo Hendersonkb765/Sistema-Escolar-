@@ -60,7 +60,7 @@
         </table>
     </div>
 
-    @php $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data']; @endphp
+    @php $campos = $modelo->campos_identificacao ?: ['aluno', 'ra', 'turma', 'data']; @endphp
 
     @if ($campos !== [])
         {{--
@@ -76,10 +76,10 @@
                 </tr>
             @endif
 
-            @if (in_array('matricula', $campos, true) || in_array('turma', $campos, true))
+            @if (in_array('ra', $campos, true) || in_array('turma', $campos, true))
                 <tr>
-                    @if (in_array('matricula', $campos, true))
-                        <td class="rotulo">Matrícula:</td>
+                    @if (in_array('ra', $campos, true))
+                        <td class="rotulo">RA:</td>
                         <td class="risco">&nbsp;</td>
                     @endif
                     @if (in_array('turma', $campos, true))

@@ -43,8 +43,8 @@ beforeEach(function () {
     $this->turma = Turma::factory()->doCurso($montagem['curso'], $montagem['grade'])
         ->create(['periodo' => 1, 'nome' => '1 A']);
 
-    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002']] as [$nome, $matricula]) {
-        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'matricula' => $matricula]);
+    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002']] as [$nome, $ra]) {
+        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'ra' => $ra]);
     }
 
     $solicitacao = solicitacaoCom($this->admin, $this->turma, [

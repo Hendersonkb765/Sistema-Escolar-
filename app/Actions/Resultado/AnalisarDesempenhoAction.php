@@ -113,7 +113,7 @@ class AnalisarDesempenhoAction
             )
             ->with(['provaQuestao:id,prova_id,numero,disciplina_id,habilidade_snapshot,peso,enunciado_snapshot,professor_id',
                 'provaQuestao.disciplina:id,nome', 'provaQuestao.prova:id,titulo,turma_id',
-                'resultado:id,prova_id,aluno_id', 'resultado.aluno:id,nome,matricula'])
+                'resultado:id,prova_id,aluno_id', 'resultado.aluno:id,nome,ra'])
             ->get();
     }
 
@@ -166,7 +166,7 @@ class AnalisarDesempenhoAction
 
                 return [
                     'aluno' => $aluno->nome,
-                    'matricula' => $aluno->matricula,
+                    'ra' => $aluno->ra,
                     'questoes' => $respostas
                         ->sortBy(fn (RespostaAluno $r) => $r->provaQuestao->numero)
                         ->map(fn (RespostaAluno $r) => [

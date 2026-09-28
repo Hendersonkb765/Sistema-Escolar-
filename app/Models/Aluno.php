@@ -22,7 +22,7 @@ class Aluno extends Model
 
     protected $table = 'alunos';
 
-    protected $fillable = ['turma_id', 'nome', 'matricula', 'status'];
+    protected $fillable = ['turma_id', 'nome', 'ra', 'status'];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
     protected $attributes = ['status' => 'ativo'];

@@ -28,7 +28,7 @@ class FormularioAluno extends Component
 
     public string $nome = '';
 
-    public string $matricula = '';
+    public string $ra = '';
 
     public string $status = 'ativo';
 
@@ -51,7 +51,7 @@ class FormularioAluno extends Component
             $this->turma_id = $aluno->turma_id;
             $this->turmaOriginal = $aluno->turma_id;
             $this->nome = $aluno->nome;
-            $this->matricula = $aluno->matricula;
+            $this->ra = $aluno->ra;
             $this->status = $aluno->status->value;
 
             return;
@@ -71,10 +71,10 @@ class FormularioAluno extends Component
         return [
             'turma_id' => ['required', Rule::in($turmasVisiveis)],
             'nome' => ['required', 'string', 'max:255'],
-            // A matrícula é única dentro da turma.
-            'matricula' => [
+            // O RA é único dentro da turma.
+            'ra' => [
                 'required', 'string', 'max:40',
-                Rule::unique('alunos', 'matricula')
+                Rule::unique('alunos', 'ra')
                     ->where(fn ($consulta) => $consulta->where('turma_id', $this->turma_id))
                     ->ignore($this->aluno?->getKey()),
             ],
@@ -89,7 +89,7 @@ class FormularioAluno extends Component
         return [
             'turma_id' => 'turma',
             'nome' => 'nome',
-            'matricula' => 'matrícula',
+            'ra' => 'RA',
             'status' => 'status',
             'motivoMovimentacao' => 'motivo',
         ];
@@ -99,7 +99,7 @@ class FormularioAluno extends Component
     protected function messages(): array
     {
         return [
-            'matricula.unique' => 'Esta matrícula já existe nesta turma.',
+            'ra.unique' => 'Este RA já existe nesta turma.',
             'turma_id.in' => 'Selecione uma turma dentro do seu escopo.',
         ];
     }
@@ -118,7 +118,7 @@ class FormularioAluno extends Component
                     $this->aluno = Aluno::create([
                         'turma_id' => $dados['turma_id'],
                         'nome' => $dados['nome'],
-                        'matricula' => $dados['matricula'],
+                        'ra' => $dados['ra'],
                         'status' => $dados['status'],
                     ]);
 
@@ -138,7 +138,7 @@ class FormularioAluno extends Component
 
                 $this->aluno->update([
                     'nome' => $dados['nome'],
-                    'matricula' => $dados['matricula'],
+                    'ra' => $dados['ra'],
                     'status' => $dados['status'],
                 ]);
 

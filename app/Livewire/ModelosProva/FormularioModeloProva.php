@@ -47,7 +47,7 @@ class FormularioModeloProva extends Component
     public string $rodape = '';
 
     /** @var array<int, string> */
-    public array $campos_identificacao = ['aluno', 'matricula', 'turma', 'data'];
+    public array $campos_identificacao = ['aluno', 'ra', 'turma', 'data'];
 
     public bool $ativo = true;
 

@@ -244,7 +244,7 @@ class GerarDocxDaProvaAction
      */
     protected function identificacao(Section $secao, Prova $prova, ModeloProva $modelo, LayoutDaFolha $layout): void
     {
-        $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data'];
+        $campos = $modelo->campos_identificacao ?: ['aluno', 'ra', 'turma', 'data'];
         $turma = $prova->turma;
 
         $util = 21 - ($layout->margens['esquerda'] + $layout->margens['direita']) / 10;
@@ -253,7 +253,7 @@ class GerarDocxDaProvaAction
         $linhas = array_values(array_filter([
             in_array('aluno', $campos, true) ? [['Aluno(a):', null]] : null,
             array_values(array_filter([
-                in_array('matricula', $campos, true) ? ['Matrícula:', null] : null,
+                in_array('ra', $campos, true) ? ['RA:', null] : null,
                 in_array('turma', $campos, true) ? ['Turma:', $turma->nome] : null,
             ])) ?: null,
             array_values(array_filter([

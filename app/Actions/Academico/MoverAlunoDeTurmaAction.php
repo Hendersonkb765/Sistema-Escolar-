@@ -27,14 +27,14 @@ class MoverAlunoDeTurmaAction
             throw RegraDeNegocioException::porque('O aluno já está nesta turma.');
         }
 
-        $matriculaEmUso = Aluno::query()
+        $raEmUso = Aluno::query()
             ->where('turma_id', $destino->getKey())
-            ->where('matricula', $aluno->matricula)
+            ->where('ra', $aluno->ra)
             ->exists();
 
-        if ($matriculaEmUso) {
+        if ($raEmUso) {
             throw RegraDeNegocioException::porque(
-                "A matrícula {$aluno->matricula} já existe na turma de destino."
+                "O RA {$aluno->ra} já existe na turma de destino."
             );
         }
 

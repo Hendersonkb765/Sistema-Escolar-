@@ -84,8 +84,8 @@
         <tr>
             <td class="rotulo">Aluno(a):</td>
             <td>{{ $dados['aluno']->nome }}</td>
-            <td class="rotulo">Matrícula:</td>
-            <td>{{ $dados['aluno']->matricula }}</td>
+            <td class="rotulo">RA:</td>
+            <td>{{ $dados['aluno']->ra }}</td>
         </tr>
     </table>
 

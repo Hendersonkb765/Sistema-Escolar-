@@ -44,14 +44,14 @@ beforeEach(function () {
         ->create(['periodo' => 1, 'nome' => '1 A']);
 
     $this->marina = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Marina Alves', 'matricula' => '1001']);
+        ->create(['nome' => 'Marina Alves', 'ra' => '1001']);
     $this->caio = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Caio Prado', 'matricula' => '1002']);
+        ->create(['nome' => 'Caio Prado', 'ra' => '1002']);
 
     /**
      * Uma prova do bimestre pedido, com acertos por aluno.
      *
-     * @param  array<string, array<int, bool>>  $acertos  matrícula => numero => acertou
+     * @param  array<string, array<int, bool>>  $acertos  RA => numero => acertou
      */
     $this->provaCom = function (Bimestre $bimestre, string $titulo, array $acertos) {
         $solicitacao = solicitacaoCom($this->paeet, $this->turma, [
@@ -95,7 +95,7 @@ beforeEach(function () {
             ]);
 
             foreach ($questoes as $questao) {
-                $acertou = $acertos[$aluno->matricula][$questao->numero] ?? false;
+                $acertou = $acertos[$aluno->ra][$questao->numero] ?? false;
 
                 $resultado->respostas()->create([
                     'prova_questao_id' => $questao->id, 'acertou' => $acertou,

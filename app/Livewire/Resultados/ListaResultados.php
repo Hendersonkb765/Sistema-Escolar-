@@ -74,7 +74,7 @@ class ListaResultados extends Component
                 ->where('prova_id', $prova->getKey())
                 ->visivelPara(auth()->user())
                 ->with([
-                    'aluno:id,nome,matricula,turma_id',
+                    'aluno:id,nome,ra,turma_id',
                     'respostas:id,resultado_aluno_id,prova_questao_id,acertou,peso',
                     'notas:id,resultado_aluno_id,disciplina_id,nota,soma_pesos_acertos,soma_pesos_total',
                     'notas.disciplina:id,nome',

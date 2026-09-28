@@ -92,7 +92,7 @@ return [
         'perfil' => 'perfil',
         'codigo' => 'código',
         'status' => 'status',
-        'matricula' => 'matrícula',
+        'ra' => 'RA',
         'prazo' => 'prazo',
         'peso' => 'peso',
         'enunciado' => 'enunciado',

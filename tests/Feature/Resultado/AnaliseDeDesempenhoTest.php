@@ -44,7 +44,7 @@ beforeEach(function () {
 
     $this->alunos = collect(['Marina Alves', 'Caio Prado'])->map(
         fn (string $nome, int $i) => Aluno::factory()->naTurma($this->turma)
-            ->create(['nome' => $nome, 'matricula' => '100'.$i])
+            ->create(['nome' => $nome, 'ra' => '100'.$i])
     );
 
     /**

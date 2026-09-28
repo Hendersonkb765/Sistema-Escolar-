@@ -43,9 +43,9 @@ beforeEach(function () {
         ->create(['periodo' => 1, 'nome' => '1 A']);
 
     $this->marina = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Marina Alves', 'matricula' => '1001']);
+        ->create(['nome' => 'Marina Alves', 'ra' => '1001']);
     $this->caio = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Caio Prado', 'matricula' => '1002']);
+        ->create(['nome' => 'Caio Prado', 'ra' => '1002']);
 
     $solicitacao = solicitacaoCom($this->paeet, $this->turma, [
         ['disciplina' => $montagem['disciplinas']['Lógica'], 'professor' => $this->profLogica, 'questoes' => 2],

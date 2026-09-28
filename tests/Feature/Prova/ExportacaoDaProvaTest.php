@@ -168,7 +168,7 @@ it('o DOCX traz o conteúdo da prova e as duas colunas', function () {
         ->toContain('Lógica')
         // Quadro de identificação, com os mesmos campos da folha.
         ->toContain('Aluno(a):')
-        ->toContain('Matrícula:')
+        ->toContain('RA:')
         ->toContain('Turma:')
         // Linha para preencher é borda de célula, e não fileira de `_`,
         // que quebraria no fim da célula. (A máscara da data segue com

@@ -71,7 +71,7 @@
                             <tr wire:key="nota-{{ $resultado->id }}">
                                 <td class="px-4 py-3 sm:px-6">
                                     <span class="font-medium text-slate-900 dark:text-slate-100">{{ $resultado->aluno->nome }}</span>
-                                    <span class="block text-xs text-slate-400">{{ $resultado->aluno->matricula }}</span>
+                                    <span class="block text-xs text-slate-400">RA {{ $resultado->aluno->ra }}</span>
                                 </td>
                                 @foreach ($disciplinas as $disciplinaId => $nome)
                                     @php $nota = $resultado->notas->firstWhere('disciplina_id', $disciplinaId); @endphp

@@ -127,7 +127,7 @@
                                         <span class="font-medium text-slate-900 dark:text-slate-100">{{ $linha['aluno'] }}</span>
                                         <span class="block text-xs text-slate-400">
                                             @switch($linha['criterio'])
-                                                @case(ConciliadorDeAlunos::POR_MATRICULA) reconhecido pela matrícula @break
+                                                @case(ConciliadorDeAlunos::POR_RA) reconhecido pelo RA @break
                                                 @case(ConciliadorDeAlunos::POR_NOME) nome idêntico @break
                                                 @default primeiro e último nome
                                             @endswitch

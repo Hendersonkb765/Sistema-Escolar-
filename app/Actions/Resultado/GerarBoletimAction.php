@@ -102,7 +102,7 @@ class GerarBoletimAction
             ->with([
                 'disciplina:id,nome',
                 'resultado:id,prova_id,aluno_id',
-                'resultado.aluno:id,nome,matricula,turma_id',
+                'resultado.aluno:id,nome,ra,turma_id',
                 'resultado.prova:id,titulo,bimestre',
             ])
             ->get();

@@ -50,7 +50,7 @@ class ConferirImportacaoAction
             Aluno::query()
                 ->where('turma_id', $prova->turma_id)
                 ->orderBy('nome')
-                ->get(['id', 'nome', 'matricula', 'turma_id'])
+                ->get(['id', 'nome', 'ra', 'turma_id'])
         );
 
         $relatorio = [];
@@ -114,7 +114,7 @@ class ConferirImportacaoAction
 
         if ($aluno === null) {
             $registro['erro'] = $achado['criterio'] === ConciliadorDeAlunos::AMBIGUO
-                ? 'Mais de um aluno da turma tem este nome. Ajuste o nome na planilha ou use a matrícula.'
+                ? 'Mais de um aluno da turma tem este nome. Ajuste o nome na planilha ou use o RA.'
                 : 'Nenhum aluno desta turma corresponde a este nome.';
 
             return $registro;

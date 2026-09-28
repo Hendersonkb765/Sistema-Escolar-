@@ -72,13 +72,13 @@ beforeEach(function () {
         'periodo_letivo' => '2026',
     ]);
 
-    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002'], ['Rita Souza', '1003']] as [$nome, $matricula]) {
-        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'matricula' => $matricula]);
+    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002'], ['Rita Souza', '1003']] as [$nome, $ra]) {
+        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'ra' => $ra]);
     }
 
     Aluno::factory()->naTurma($this->outraTurma)->create([
         'nome' => 'Ivo Nunes',
-        'matricula' => '2001',
+        'ra' => '2001',
         'status' => StatusAluno::Transferido,
     ]);
 
@@ -121,7 +121,7 @@ it('abre o detalhe da turma com histórico, alunos e disciplinas', function () {
 });
 
 it('abre o detalhe do aluno com várias movimentações no histórico', function () {
-    $aluno = Aluno::query()->where('matricula', '1001')->first();
+    $aluno = Aluno::query()->where('ra', '1001')->first();
 
     $destinoA = Turma::factory()->doCurso($this->curso, $this->grade)->create([
         'periodo' => 3, 'nome' => '3 B', 'periodo_letivo' => '2026',
@@ -204,7 +204,7 @@ it('abre o painel com indicadores preenchidos', function () {
 });
 
 it('abre os formulários de edição com dados carregados', function () {
-    $aluno = Aluno::query()->where('matricula', '1002')->first();
+    $aluno = Aluno::query()->where('ra', '1002')->first();
     $disciplina = Disciplina::query()->first();
 
     $como = fn (string $rota, $parametro) => $this->actingAs($this->admin)
@@ -395,4 +395,29 @@ it('abre a análise de desempenho com duas habilidades e mais de uma prova', fun
     $como('analises.index', ['bimestre' => Bimestre::Segundo->value]);
     $como('resultados.index', ['prova' => $prova->id]);
     $como('importacoes.index');
+});
+
+/*
+ * O número do aluno chama-se RA. Ele aparece em telas que nenhum teste de
+ * fluxo toca — rótulo do formulário, cabeçalho da lista, placeholder da
+ * busca — e um renomeio que esquece uma delas não quebra nada: a tela
+ * continua abrindo, só com dois nomes para a mesma coisa.
+ */
+it('chama o número do aluno de RA em todas as telas que o mostram', function () {
+    $aluno = Aluno::query()->where('ra', '1001')->first();
+
+    $telas = [
+        route('alunos.index'),
+        route('alunos.criar'),
+        route('alunos.editar', $aluno),
+        route('turmas.show', $this->turma),
+    ];
+
+    foreach ($telas as $url) {
+        $this->actingAs($this->admin)->get($url)
+            ->assertOk()
+            ->assertSee('RA')
+            ->assertDontSee('Matrícula')
+            ->assertDontSee('matrícula');
+    }
 });

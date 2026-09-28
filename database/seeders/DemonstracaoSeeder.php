@@ -99,7 +99,7 @@ class DemonstracaoSeeder extends Seeder
                     Aluno::query()->create([
                         'turma_id' => $turma->id,
                         'nome' => fake('pt_BR')->name(),
-                        'matricula' => now()->format('Y').$periodo.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
+                        'ra' => now()->format('Y').$periodo.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
                     ]);
                 }
             }
@@ -197,7 +197,7 @@ class DemonstracaoSeeder extends Seeder
                 'instrucoes' => 'Leia cada questão com atenção e marque apenas uma alternativa. '
                     .'Não é permitido consulta.',
                 'rodape' => 'Boa prova!',
-                'campos_identificacao' => ['aluno', 'matricula', 'turma', 'data'],
+                'campos_identificacao' => ['aluno', 'ra', 'turma', 'data'],
                 // Sob a ABNT o resto da tipografia é da norma, não do modelo.
                 'layout' => ['norma' => 'abnt', 'fonte' => 'sans'],
                 'ativo' => true,
@@ -324,7 +324,7 @@ class DemonstracaoSeeder extends Seeder
                 Aluno::query()->create([
                     'turma_id' => $turma->id,
                     'nome' => fake('pt_BR')->name(),
-                    'matricula' => now()->format('Y').'9'.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
+                    'ra' => now()->format('Y').'9'.str_pad((string) $indice, 3, '0', STR_PAD_LEFT),
                 ]);
             }
         }

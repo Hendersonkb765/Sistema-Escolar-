@@ -181,7 +181,7 @@
                                                         <tr wire:key="aluno-{{ $loop->index }}">
                                                             <td class="py-1.5 pr-4">
                                                                 <span class="text-slate-900 dark:text-slate-100">{{ $aluno['aluno'] }}</span>
-                                                                <span class="block text-xs text-slate-400">{{ $aluno['matricula'] }}</span>
+                                                                <span class="block text-xs text-slate-400">RA {{ $aluno['ra'] }}</span>
                                                             </td>
                                                             <td class="py-1.5 pr-4">
                                                                 @foreach ($aluno['questoes'] as $questao)

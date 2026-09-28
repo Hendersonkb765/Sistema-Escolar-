@@ -46,9 +46,9 @@ beforeEach(function () {
 
     // Dois alunos, para as coleções da tela nunca terem uma linha só.
     $this->marina = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Marina Alves Coutinho', 'matricula' => '1001']);
+        ->create(['nome' => 'Marina Alves Coutinho', 'ra' => '1001']);
     $this->caio = Aluno::factory()->naTurma($this->turma)
-        ->create(['nome' => 'Caio Prado', 'matricula' => '1002']);
+        ->create(['nome' => 'Caio Prado', 'ra' => '1002']);
 
     $solicitacao = solicitacaoCom($this->paeet, $this->turma, [
         ['disciplina' => $this->disciplinas['Lógica'], 'professor' => $this->profLogica, 'questoes' => 2],
@@ -140,10 +140,10 @@ it('reconhece os alunos sem gravar resultado nenhum', function () {
     expect($linhas->pluck('aluno')->all())
         ->toBe(['Marina Alves Coutinho', 'Caio Prado'])
         ->and($linhas->pluck('criterio')->all())
-        ->toBe([ConciliadorDeAlunos::POR_MATRICULA, ConciliadorDeAlunos::POR_MATRICULA]);
+        ->toBe([ConciliadorDeAlunos::POR_RA, ConciliadorDeAlunos::POR_RA]);
 });
 
-it('reconhece pelo nome quando não há matrícula na planilha', function () {
+it('reconhece pelo nome quando não há RA na planilha', function () {
     $importacao = ($this->importar)(($this->planilha)([
         ['Prova', '1 A', '5001', '', 'Marina Alves', 'Coutinho', 4, 4, 100, 'A', 1, 1, 1, 1],
         ['Prova', '1 A', '5002', '', 'Caio', 'Prado', 4, 2, 50, 'A', 1, 0, 1, 0],
@@ -173,7 +173,7 @@ it('reconhece pelo primeiro e último nome quando falta o do meio', function () 
 });
 
 it('ignora acento e caixa ao comparar os nomes', function () {
-    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Inês Gonçalves', 'matricula' => '1003']);
+    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Inês Gonçalves', 'ra' => '1003']);
 
     $importacao = ($this->importar)(($this->planilha)([
         ['Prova', '1 A', '5003', '', 'INES', 'GONCALVES', 4, 1, 25, 'A', 1, 0, 0, 0],
@@ -200,7 +200,7 @@ it('recusa a linha de quem não está na turma, dizendo por quê', function () {
 });
 
 it('recusa quando dois alunos da turma têm o mesmo nome', function () {
-    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Caio Prado', 'matricula' => '1009']);
+    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Caio Prado', 'ra' => '1009']);
 
     $importacao = ($this->importar)(($this->planilha)([
         ['Prova', '1 A', '5002', '', 'Caio', 'Prado', 4, 2, 50, 'A', 1, 0, 1, 0],
@@ -334,7 +334,7 @@ it('respeita o peso dentro da disciplina, e não na prova inteira', function () 
 });
 
 it('não altera o cadastro do aluno', function () {
-    $antes = $this->marina->only(['nome', 'matricula', 'turma_id', 'status']);
+    $antes = $this->marina->only(['nome', 'ra', 'turma_id', 'status']);
 
     $importacao = ($this->importar)(($this->planilha)([
         // Nome encurtado na planilha: o do sistema não muda por isso.
@@ -344,7 +344,7 @@ it('não altera o cadastro do aluno', function () {
     app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
     app(ConfirmarImportacaoAction::class)->executar($importacao->refresh(), $this->paeet);
 
-    expect($this->marina->refresh()->only(['nome', 'matricula', 'turma_id', 'status']))->toBe($antes);
+    expect($this->marina->refresh()->only(['nome', 'ra', 'turma_id', 'status']))->toBe($antes);
 });
 
 it('deixa de fora as linhas recusadas', function () {
