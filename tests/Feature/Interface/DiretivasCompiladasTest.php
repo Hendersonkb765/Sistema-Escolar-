@@ -43,6 +43,7 @@ const TELAS_VARRIDAS = [
     'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
     'provas.index', 'provas.criar', 'modelos-prova.index', 'modelos-prova.criar',
     'importacoes.index', 'importacoes.criar', 'resultados.index', 'analises.index',
+    'documentos.index', 'documentos.criar', 'documentos.gerar', 'documentos.compartilhados',
 ];
 
 /*

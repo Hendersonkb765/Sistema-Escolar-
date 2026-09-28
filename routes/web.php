@@ -11,6 +11,10 @@ use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
 use App\Livewire\Disciplinas\FormularioDisciplina;
 use App\Livewire\Disciplinas\ListaDisciplinas;
+use App\Livewire\Documentos\FormularioModeloDocumento;
+use App\Livewire\Documentos\GerarDocumentos;
+use App\Livewire\Documentos\ListaCompartilhamentos;
+use App\Livewire\Documentos\ListaModelosDocumento;
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
@@ -107,6 +111,17 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/modelos-prova', ListaModelosProva::class)->name('modelos-prova.index');
     Route::get('/modelos-prova/criar', FormularioModeloProva::class)->name('modelos-prova.criar');
     Route::get('/modelos-prova/{modelo}/editar', FormularioModeloProva::class)->name('modelos-prova.editar');
+
+    /*
+     * Documentos do aluno. `documentos.gerar` fica antes de
+     * `documentos/{modelo}/editar` porque um dia alguém troca a ordem e
+     * "gerar" vira o id de um modelo inexistente.
+     */
+    Route::get('/documentos', ListaModelosDocumento::class)->name('documentos.index');
+    Route::get('/documentos/gerar', GerarDocumentos::class)->name('documentos.gerar');
+    Route::get('/documentos/criar', FormularioModeloDocumento::class)->name('documentos.criar');
+    Route::get('/documentos/compartilhados', ListaCompartilhamentos::class)->name('documentos.compartilhados');
+    Route::get('/documentos/{modelo}/editar', FormularioModeloDocumento::class)->name('documentos.editar');
 
     // A importação tem dois passos: conferir não grava nada, confirmar
     // grava o que a conferência aprovou.

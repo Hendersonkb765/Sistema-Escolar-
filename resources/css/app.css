@@ -71,3 +71,64 @@
         }
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Campos de preencher à mão, na pré-visualização
+|--------------------------------------------------------------------------
+|
+| O HTML vem de App\Support\CamposDoDocumento, que desenha para o mPDF.
+| Na tela o navegador honra largura e altura, então aqui as regras podem
+| ser as naturais — e o resultado fica parecido com o do papel sem ter de
+| imitar as limitações dele.
+*/
+@layer components {
+    .previa-do-documento .campo-linha {
+        display: inline-block;
+        min-width: 12rem;
+        border-bottom: 1px solid theme('colors.slate.400');
+    }
+
+    .dark .previa-do-documento .campo-linha {
+        border-bottom-color: theme('colors.slate.500');
+    }
+
+    .previa-do-documento .rotulo-do-campo {
+        color: theme('colors.slate.500');
+        font-size: 0.75rem;
+    }
+
+    .previa-do-documento .campo-caixa {
+        font-size: 1.1em;
+    }
+
+    .previa-do-documento .campo-assinatura {
+        /* Numa coluna estreita, 18rem passa da borda do quadro. */
+        width: min(18rem, 100%);
+        border-collapse: collapse;
+        margin: 1.25rem 0 0.25rem;
+    }
+
+    .previa-do-documento .campo-assinatura td {
+        border-top: 1px solid theme('colors.slate.400');
+        text-align: center;
+        padding-top: 0.125rem;
+        font-size: 0.7rem;
+        color: theme('colors.slate.500');
+    }
+
+    .previa-do-documento .espaco-para-escrever {
+        height: 4rem;
+        border: 1px solid theme('colors.slate.300');
+        margin: 0.5rem 0;
+    }
+
+    .dark .previa-do-documento .espaco-para-escrever {
+        border-color: theme('colors.slate.700');
+    }
+
+    .previa-do-documento .alunos th,
+    .previa-do-documento .alunos td {
+        text-align: left;
+    }
+}

@@ -170,6 +170,7 @@ em `professor_disciplina` e independe do perfil.
 | 6 | Importação XLS em dois passos e notas por disciplina | ✅ concluído |
 | 7 | Cálculo de notas por disciplina | ✅ concluído (junto com o 6) |
 | 8 | Dashboards, auditoria e refino de UI | parcial |
+| 9 | Documentos do aluno: modelos, geração em PDF e compartilhamento | ✅ concluído |
 
 Todas as 24 tabelas de domínio existem com chaves estrangeiras, índices e
 constraints, e **todos os módulos têm tela** — o
@@ -670,6 +671,86 @@ os afasta o mínimo e a view traça um fio ligando cada nome à sua ponta.
 pesos que a produziu. Um documento único com a turma inteira seria mais
 simples de gerar e impossível de entregar sem mostrar a nota de um aluno
 para o outro.
+
+## Documentos do aluno
+
+Autorização dos pais, declaração de frequência, lista de entrega de
+material: papel que a escola imprime com os dados de cada aluno já
+preenchidos e linhas em branco para alguém assinar à mão.
+
+### O modelo é texto, não HTML
+
+O corpo do modelo é texto com campos entre chaves — `{{ aluno.nome }}`,
+`{{ turma.nome }}`, `{{ data }}` — mais os campos de preencher:
+`{{ linha: nome }}`, `{{ assinatura: Responsável }}`, `{{ caixa: Autorizo }}`
+e `{{ espaco }}`.
+
+Guardar HTML resolveria menos e custaria mais: o corpo vem de um
+formulário, e o mesmo texto é exibido na tela, no PDF e na
+pré-visualização de quem o recebeu compartilhado. Com texto, não há
+superfície de XSS em lugar nenhum. Negrito e itálico reaproveitam as
+marcas do enunciado (`**assim**`, `*assim*`), já testadas.
+
+**A troca do campo vem antes da formatação**, e a ordem não é detalhe:
+formatando primeiro, `**{{ aluno.nome }}**` tem cada `**` num pedaço de
+texto diferente, separado pelo campo no meio, nenhum encontra o seu par,
+e o documento sai com os asteriscos impressos. Foi o que o primeiro PDF
+mostrou.
+
+### O tipo decide quais campos existem
+
+`Uma via por aluno` repete o documento para cada aluno escolhido.
+`Uma via com a lista de alunos` sai uma vez, com a turma numa tabela.
+Num, `{{ aluno.nome }}` faz sentido; no outro, `{{ lista_de_alunos }}`.
+Usar o campo do tipo errado não dá erro de sintaxe — dá um campo vazio no
+meio do papel, descoberto na hora de entregar. Por isso o editor recusa e
+diz qual campo é, e se ele não existe ou só existe no outro tipo.
+
+### Três vias por folha
+
+Quando o texto é curto, cabem duas ou três vias na mesma folha, com linha
+de corte entre elas: noventa autorizações em trinta folhas em vez de
+noventa. Cada via repete o cabeçalho com o nome da escola, porque a folha
+vai ser recortada e cada pedaço vai para uma família diferente.
+
+O mPDF impôs três decisões que só o papel revelou:
+
+- **altura fixa na via não funciona** — ele soma a altura declarada ao que
+  o conteúdo já ocupa, e três vias de 90 mm passavam a ocupar 280 mm;
+  quem separa as folhas é o `<pagebreak/>` a cada N vias;
+- **largura de elemento em linha é ignorada** — `inline-block` com
+  `min-width` vira um tracinho de dois milímetros. A linha de preencher é
+  feita de espaços rígidos com borda embaixo, e o quadradinho é o
+  caractere `☐`;
+- **o tamanho da fonte não se restaura** depois de um trecho menor dentro
+  de um parágrafo: o rótulo em linha muda de cor, não de tamanho.
+
+### Quem recebe o documento
+
+A turma vem toda marcada, porque é o caso comum, e desmarcar dois é menos
+trabalho que marcar trinta. Os ids vêm da tela, então são cruzados com a
+turma e com o escopo de quem gera: id de aluno de outra turma não entra.
+
+### Compartilhar um modelo com outro PAEET
+
+O que se manda é uma **oferta**. Nada entra na lista de quem recebeu antes
+de ele responder, e ele vê o texto antes de decidir — aceitar às cegas um
+documento que vai para a família de um aluno não é decisão nenhuma.
+
+**Aceitar copia.** O destinatário vira dono de um modelo no Eixo dele, que
+pode editar e apagar sem tocar no original. É isso que deixa o escopo por
+Eixo intacto: nenhum modelo é visto de fora do Eixo em que nasceu, e a
+rota do original continua dando 403 para quem recebeu a cópia. A cópia
+guarda de qual modelo veio, então a lista diz "cópia de um modelo de
+Fulano".
+
+**Recusar não cria nada** — e a linha do compartilhamento fica. Apagá-la
+faria o remetente reenviar sem entender, e tiraria do histórico uma
+resposta que foi dada. Recusar também não é para sempre: quem recusou
+pode receber de novo, com uma explicação melhor.
+
+O registro guarda com quem cada modelo foi compartilhado e o status de
+cada um, e a lista mostra "1 de 2 aceitaram".
 
 ## O nome da escola não é o nome do sistema
 

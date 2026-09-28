@@ -17,6 +17,7 @@ use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Models\Aluno;
 use App\Models\Eixo;
+use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
 use App\Models\Turma;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +57,10 @@ beforeEach(function () {
         'criado_por' => $dono->id,
     ]);
 
+    $documento = ModeloDocumento::factory()->noEixo($this->administracao)->create([
+        'criado_por' => $dono->id,
+    ]);
+
     $solicitacao = solicitacaoCom($dono, $turma, [
         ['disciplina' => $montagem['disciplinas']['Contabilidade'], 'professor' => $professor, 'questoes' => 2],
     ]);
@@ -85,6 +90,7 @@ beforeEach(function () {
         'eixos.editar' => $this->administracao,
         'grades.show' => $montagem['grade'],
         'modelos-prova.editar' => $modelo,
+        'documentos.editar' => $documento,
         'provas.show' => $prova,
         'provas.pdf' => $prova,
         'provas.docx' => $prova,

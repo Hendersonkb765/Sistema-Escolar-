@@ -8,18 +8,24 @@ use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
+use App\Actions\Documento\CompartilharModeloAction;
+use App\Actions\Documento\ResponderCompartilhamentoAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Resultado\CalcularNotasAction;
 use App\Enums\Bimestre;
 use App\Enums\EventoHistorico;
 use App\Enums\PerfilUsuario;
+use App\Enums\StatusCompartilhamento;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
+use App\Enums\TipoDeDocumento;
 use App\Models\Aluno;
+use App\Models\CompartilhamentoDeModelo;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
+use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
@@ -182,7 +188,97 @@ class DemonstracaoSeeder extends Seeder
             );
         }
 
+        $this->modelosDeDocumento($tecnologia, $gestao, $admin, $paeetTecnologia, $paeetGestao);
+
         $this->command?->info('Demonstração pronta. Senha de todos: senha-forte-123');
+    }
+
+    /**
+     * Modelos de documento nos dois Eixos, e um compartilhamento de cada
+     * desfecho — pendente, aceito e recusado.
+     *
+     * Sem os três a tela de compartilhados abre vazia, e quem for mexer
+     * nela não vê como cada estado se parece.
+     */
+    protected function modelosDeDocumento(
+        Eixo $tecnologia,
+        Eixo $gestao,
+        User $admin,
+        User $paeetTecnologia,
+        User $paeetGestao,
+    ): void {
+        $autorizacao = ModeloDocumento::query()->firstOrCreate(
+            ['eixo_id' => $tecnologia->id, 'nome' => 'Autorização de visita técnica'],
+            [
+                'descricao' => 'Para saídas com a turma fora da escola',
+                'tipo' => TipoDeDocumento::Individual,
+                'por_pagina' => 3,
+                'criado_por' => $paeetTecnologia->id,
+                'corpo' => 'Eu, {{ linha: nome do responsável }}, responsável pelo(a) aluno(a) '
+                    .'**{{ aluno.nome }}**, RA {{ aluno.ra }}, da turma {{ turma.nome }} do curso de '
+                    ."{{ curso.nome }}, declaro estar ciente da visita técnica e:\n\n"
+                    ."{{ caixa: Autorizo }}    {{ caixa: Não autorizo }}\n\n"
+                    ."a participação do(a) estudante.\n\n"
+                    .'{{ assinatura: Assinatura do responsável }}',
+            ],
+        );
+
+        ModeloDocumento::query()->firstOrCreate(
+            ['eixo_id' => $tecnologia->id, 'nome' => 'Lista de entrega de material'],
+            [
+                'descricao' => 'Circula na sala para assinatura',
+                'tipo' => TipoDeDocumento::Coletivo,
+                'criado_por' => $admin->id,
+                'corpo' => "**{{ instituicao }}**\n"
+                    ."Entrega de material — turma {{ turma.nome }} ({{ curso.nome }})\n"
+                    ."Data: {{ data_curta }}\n\n"
+                    .'{{ lista_de_alunos }}',
+            ],
+        );
+
+        $declaracao = ModeloDocumento::query()->firstOrCreate(
+            ['eixo_id' => $gestao->id, 'nome' => 'Declaração de frequência'],
+            [
+                'descricao' => 'Para apresentar no estágio',
+                'tipo' => TipoDeDocumento::Individual,
+                'por_pagina' => 2,
+                'criado_por' => $paeetGestao->id,
+                'corpo' => 'Declaramos que **{{ aluno.nome }}**, RA {{ aluno.ra }}, está regularmente '
+                    .'matriculado(a) na turma {{ turma.nome }} do curso de {{ curso.nome }}, '
+                    ."no ano letivo de {{ turma.periodo_letivo }}.\n\n"
+                    ."{{ instituicao }}, {{ data }}.\n\n"
+                    .'{{ assinatura: Coordenação PAEET }}',
+            ],
+        );
+
+        $ofertas = [
+            [$autorizacao, $paeetTecnologia, $paeetGestao, StatusCompartilhamento::Pendente],
+            [$declaracao, $paeetGestao, $paeetTecnologia, StatusCompartilhamento::Aceito],
+            [$declaracao, $paeetGestao, $admin, StatusCompartilhamento::Recusado],
+        ];
+
+        foreach ($ofertas as [$modelo, $remetente, $destinatario, $status]) {
+            $jaExiste = CompartilhamentoDeModelo::query()
+                ->where('modelo_documento_id', $modelo->id)
+                ->where('destinatario_id', $destinatario->id)
+                ->exists();
+
+            if ($jaExiste) {
+                continue;
+            }
+
+            $oferta = app(CompartilharModeloAction::class)->executar(
+                $modelo, $remetente, $destinatario, 'Se servir para o seu Eixo, é só aceitar.'
+            );
+
+            if ($status === StatusCompartilhamento::Aceito) {
+                app(ResponderCompartilhamentoAction::class)->aceitar($oferta, $destinatario);
+            }
+
+            if ($status === StatusCompartilhamento::Recusado) {
+                app(ResponderCompartilhamentoAction::class)->recusar($oferta, $destinatario);
+            }
+        }
     }
 
     /** Sem ao menos um modelo não há como montar prova; cada Eixo tem o seu. */
