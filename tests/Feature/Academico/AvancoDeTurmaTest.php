@@ -130,9 +130,9 @@ it('move os alunos e grava histórico quando há turma de destino', function () 
         'periodo_letivo' => '2027',
     ]);
 
-    $ativo = Aluno::factory()->naTurma($this->turma)->create(['matricula' => '1001']);
+    $ativo = Aluno::factory()->naTurma($this->turma)->create(['ra' => '1001']);
     $transferido = Aluno::factory()->naTurma($this->turma)->create([
-        'matricula' => '1002',
+        'ra' => '1002',
         'status' => StatusAluno::Transferido,
     ]);
 

@@ -12,6 +12,7 @@ use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Models\Eixo;
 use App\Models\ModeloProva;
+use App\Models\Prova;
 use App\Models\Turma;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Storage;
@@ -168,7 +169,7 @@ it('o DOCX traz o conteúdo da prova e as duas colunas', function () {
         ->toContain('Lógica')
         // Quadro de identificação, com os mesmos campos da folha.
         ->toContain('Aluno(a):')
-        ->toContain('Matrícula:')
+        ->toContain('RA:')
         ->toContain('Turma:')
         // Linha para preencher é borda de célula, e não fileira de `_`,
         // que quebraria no fim da célula. (A máscara da data segue com
@@ -253,10 +254,15 @@ it('nega a exportação a quem não pode ver a prova', function () {
         ->toThrow(AuthorizationException::class);
 });
 
-it('o professor autor de uma questão pode ver a prova', function () {
-    expect($this->professor->can('view', $this->provaMontada))->toBeTrue();
-
-    $semQuestao = professor($this->eixo);
-
-    expect($semQuestao->can('view', $this->provaMontada))->toBeFalse();
+/*
+ * Nem o autor de uma questão abre a prova montada: ela é a folha que a
+ * coordenação imprime, e nela estão as questões dos colegas na ordem que
+ * a coordenação escolheu. O professor acompanha o que é dele pelas
+ * questões, pelas notas e pela análise.
+ */
+it('nega a prova montada ao professor, inclusive ao autor de uma questão', function () {
+    expect($this->provaMontada->questoes()->where('professor_id', $this->professor->id)->exists())
+        ->toBeTrue()
+        ->and($this->professor->can('view', $this->provaMontada))->toBeFalse()
+        ->and($this->professor->can('viewAny', Prova::class))->toBeFalse();
 });

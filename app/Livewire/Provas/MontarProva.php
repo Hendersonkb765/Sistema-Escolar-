@@ -3,12 +3,14 @@
 namespace App\Livewire\Provas;
 
 use App\Actions\Prova\MontarProvaAction;
+use App\Enums\Bimestre;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
 use App\Models\Turma;
+use App\Support\LayoutDaFolha;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -30,6 +32,8 @@ class MontarProva extends Component
 
     public string $titulo = '';
 
+    public int $bimestre = 1;
+
     public string $data_aplicacao = '';
 
     public int $colunas = 2;
@@ -37,6 +41,14 @@ class MontarProva extends Component
     public bool $mostrar_pesos = false;
 
     public string $instrucoes = '';
+
+    /** Cabeçalho próprio desta prova; em branco vale o do modelo. */
+    public string $instituicao = '';
+
+    public string $nome_avaliacao = '';
+
+    /** Vazio usa o tamanho do modelo. */
+    public string $tamanho_instituicao = '';
 
     /** Questões marcadas para entrar. @var array<int, int> */
     public array $questoesEscolhidas = [];
@@ -49,12 +61,14 @@ class MontarProva extends Component
         $this->data_aplicacao = now()->addWeek()->format('Y-m-d');
 
         $this->sincronizarEscolhas();
+        $this->sugerirBimestre();
         $this->sugerirModelo();
     }
 
     public function updatedTurmaId(): void
     {
         $this->sincronizarEscolhas();
+        $this->sugerirBimestre();
         $this->sugerirModelo();
     }
 
@@ -65,6 +79,16 @@ class MontarProva extends Component
 
         if ($this->titulo === '' && $this->turmaSelecionada() !== null) {
             $this->titulo = 'Avaliação — '.$this->turmaSelecionada()->nome;
+        }
+    }
+
+    /** O bimestre vem das solicitações que produziram as questões. */
+    protected function sugerirBimestre(): void
+    {
+        $aprovadas = $this->questoesAprovadas();
+
+        if ($aprovadas->isNotEmpty()) {
+            $this->bimestre = app(MontarProvaAction::class)->bimestreDasQuestoes($aprovadas)->value;
         }
     }
 
@@ -115,9 +139,17 @@ class MontarProva extends Component
             'turma_id' => ['required', Rule::in($this->turmasDisponiveis()->pluck('id')->all())],
             'modelo_prova_id' => ['required', Rule::in($this->modelosDisponiveis()->pluck('id')->all())],
             'titulo' => ['required', 'string', 'max:255'],
+            'bimestre' => ['required', Rule::in(Bimestre::valores())],
             'data_aplicacao' => ['nullable', 'date'],
             'colunas' => ['required', 'integer', Rule::in([1, 2])],
             'instrucoes' => ['nullable', 'string', 'max:2000'],
+            'instituicao' => ['nullable', 'string', 'max:255'],
+            'nome_avaliacao' => ['nullable', 'string', 'max:255'],
+            'tamanho_instituicao' => [
+                'nullable', 'integer',
+                'min:'.LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO,
+                'max:'.LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO,
+            ],
             'questoesEscolhidas' => ['array', 'min:1'],
         ];
     }
@@ -129,8 +161,12 @@ class MontarProva extends Component
             'turma_id' => 'turma',
             'modelo_prova_id' => 'modelo de prova',
             'titulo' => 'título',
+            'bimestre' => 'bimestre',
             'data_aplicacao' => 'data de aplicação',
             'questoesEscolhidas' => 'questões',
+            'instituicao' => 'nome no topo da folha',
+            'nome_avaliacao' => 'nome da avaliação',
+            'tamanho_instituicao' => 'tamanho do nome',
         ];
     }
 
@@ -155,6 +191,7 @@ class MontarProva extends Component
                 turma: Turma::query()->findOrFail($dados['turma_id']),
                 modelo: ModeloProva::query()->findOrFail($dados['modelo_prova_id']),
                 titulo: $dados['titulo'],
+                bimestre: Bimestre::from($dados['bimestre']),
                 dataAplicacao: $dados['data_aplicacao'] ? now()->parse($dados['data_aplicacao']) : null,
                 questoesEscolhidas: $this->escolhidas(),
                 configuracao: [
@@ -162,6 +199,9 @@ class MontarProva extends Component
                     'mostrar_pesos' => $this->mostrar_pesos,
                 ],
                 instrucoes: $dados['instrucoes'] ?: null,
+                instituicao: $dados['instituicao'] ?: null,
+                nomeAvaliacao: $dados['nome_avaliacao'] ?: null,
+                tamanhoInstituicao: $dados['tamanho_instituicao'] === '' ? null : (int) $dados['tamanho_instituicao'],
             );
         } catch (RegraDeNegocioException $excecao) {
             $this->notificarErro($excecao->getMessage());
@@ -194,6 +234,13 @@ class MontarProva extends Component
             ->where('ativo', true)
             ->orderBy('nome')
             ->get();
+    }
+
+    public function modeloEscolhido(): ?ModeloProva
+    {
+        return $this->modelo_prova_id === null
+            ? null
+            : $this->modelosDisponiveis()->firstWhere('id', $this->modelo_prova_id);
     }
 
     /** @return Collection<int, Questao> */
@@ -229,7 +276,12 @@ class MontarProva extends Component
         return view('provas.montar', [
             'turmas' => $this->turmasDisponiveis(),
             'modelos' => $this->modelosDisponiveis(),
+            'bimestres' => Bimestre::opcoes(),
             'turmaSelecionada' => $this->turmaSelecionada(),
+            // O que o modelo diria, para o campo mostrar como marca-d'água
+            // em vez de vir preenchido: em branco o modelo é que vale.
+            'modeloEscolhido' => $this->modeloEscolhido(),
+            'tamanhoDoModelo' => $this->modeloEscolhido()?->layoutDaFolha()->tamanhoDaInstituicao(),
             'porDisciplina' => $aprovadas->groupBy(fn (Questao $q) => $q->disciplina->nome),
             'totalEscolhido' => $escolhidas->count(),
             'somaDosPesos' => (float) $escolhidas->sum('peso'),

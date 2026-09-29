@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Provas;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Livewire\Concerns\ComTabela;
 use App\Models\Prova;
@@ -22,6 +23,9 @@ class ListaProvas extends Component
 
     #[Url(as: 'situacao', except: '')]
     public string $filtroStatus = '';
+
+    #[Url(as: 'bimestre', except: '')]
+    public string $filtroBimestre = '';
 
     public function mount(): void
     {
@@ -48,6 +52,11 @@ class ListaProvas extends Component
         $this->resetPage();
     }
 
+    public function updatedFiltroBimestre(): void
+    {
+        $this->resetPage();
+    }
+
     public function render(): View
     {
         $usuario = auth()->user();
@@ -68,12 +77,14 @@ class ListaProvas extends Component
                     ->orWhereHas('turma', fn (Builder $t) => $t->where('nome', 'like', $termo)));
             })
             ->when($this->filtroTurma !== '', fn (Builder $q) => $q->where('turma_id', $this->filtroTurma))
-            ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus));
+            ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
+            ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre));
 
         return view('provas.lista', [
             'provas' => $this->aplicarOrdenacao($consulta)->paginate($this->porPagina),
             'turmas' => Turma::query()->visivelPara($usuario)->orderBy('nome')->pluck('nome', 'id'),
             'situacoes' => StatusProva::opcoes(),
+            'bimestres' => Bimestre::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Provas',
             'subtitulo' => 'Montadas a partir das questões aprovadas, com snapshot imutável',

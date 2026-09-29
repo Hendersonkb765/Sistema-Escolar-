@@ -4,6 +4,7 @@ use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Avaliacao\CriarSolicitacaoAction;
 use App\Actions\Avaliacao\EnviarParteAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
+use App\Enums\Bimestre;
 use App\Enums\PerfilUsuario;
 use App\Models\Curso;
 use App\Models\Disciplina;
@@ -136,6 +137,7 @@ function solicitacaoCom(
     int $alternativas = 4,
     ?DateTimeInterface $prazo = null,
     ?string $titulo = null,
+    ?Bimestre $bimestre = null,
 ): SolicitacaoProva {
     return app(CriarSolicitacaoAction::class)->executar(
         autor: $autor,
@@ -148,6 +150,7 @@ function solicitacaoCom(
         ], $partes),
         quantidadeAlternativas: $alternativas,
         prazo: $prazo ?? now()->addWeek(),
+        bimestre: $bimestre ?? Bimestre::Primeiro,
         titulo: $titulo,
     );
 }
@@ -158,6 +161,7 @@ function completarQuestao(
     User $professor,
     ?string $enunciado = null,
     float $peso = 1,
+    ?string $habilidade = null,
 ): Questao {
     $quantidade = (int) $questao->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
 
@@ -175,15 +179,54 @@ function completarQuestao(
         enunciado: $enunciado ?? "Enunciado da questão {$questao->ordem}",
         alternativas: $alternativas,
         peso: $peso,
+        habilidade: $habilidade ?? "Habilidade da questão {$questao->ordem}",
     );
 }
 
-/** Preenche e envia uma parte inteira. */
-function enviarParte(SolicitacaoParte $parte, User $professor): SolicitacaoParte
+/**
+ * Preenche e envia uma parte inteira.
+ *
+ * `$habilidades` permite dar a mesma habilidade a questões diferentes,
+ * que é o caso que a análise por habilidade precisa exercitar.
+ *
+ * @param  array<int, string>  $habilidades  ordem da questão => habilidade
+ */
+function enviarParte(SolicitacaoParte $parte, User $professor, array $habilidades = []): SolicitacaoParte
 {
     foreach ($parte->questoes()->get() as $questao) {
-        completarQuestao($questao, $professor);
+        completarQuestao($questao, $professor, habilidade: $habilidades[$questao->ordem] ?? null);
     }
 
     return app(EnviarParteAction::class)->executar($parte->refresh(), $professor);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Diretiva crua no HTML
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Diretivas que o Blade NÃO compila dentro da tag de um componente.
+ *
+ * Quando isso acontece a diretiva sai literal no HTML, o atributo não
+ * existe e nada reclama: o botão fica na tela com a aparência certa e não
+ * faz nada ao ser clicado. Nenhum `assertSee` pega, porque o rótulo
+ * continua lá.
+ */
+const DIRETIVAS = ['js', 'class', 'disabled', 'checked', 'selected', 'readonly', 'required', 'style', 'can', 'if', 'foreach'];
+
+/**
+ * As diretivas cruas que sobraram no HTML entregue.
+ *
+ * Mora aqui, e não num dos arquivos de teste, porque a varredura vale
+ * tanto para as telas de dentro do sistema quanto para as públicas.
+ *
+ * @return array<int, string>
+ */
+function sobrasDeDiretiva(string $html): array
+{
+    preg_match_all('/@('.implode('|', DIRETIVAS).')\s*\(/', $html, $achados);
+
+    return array_values(array_unique($achados[0]));
 }

@@ -31,6 +31,7 @@ final class LayoutDaFolha
         public readonly int $tamanho,
         public readonly float $espacamento,
         public readonly array $margens,
+        public readonly ?int $tamanhoDaInstituicaoNoModelo = null,
     ) {}
 
     public static function doModelo(?ModeloProva $modelo): self
@@ -47,8 +48,14 @@ final class LayoutDaFolha
             ? $layout['fonte']
             : 'sans';
 
+        // O tamanho do nome não é matéria da norma: ela fala do corpo
+        // do texto, não do timbre.
+        $daInstituicao = isset($layout['tamanho_instituicao'])
+            ? (int) $layout['tamanho_instituicao']
+            : null;
+
         if ($norma->fixaAFormatacao()) {
-            return new self($norma, $fonte, 12, 1.5, self::margensDaAbnt());
+            return new self($norma, $fonte, 12, 1.5, self::margensDaAbnt(), $daInstituicao);
         }
 
         return new self(
@@ -62,6 +69,7 @@ final class LayoutDaFolha
                 'esquerda' => (float) ($layout['margens']['esquerda'] ?? 14),
                 'direita' => (float) ($layout['margens']['direita'] ?? 14),
             ],
+            tamanhoDaInstituicaoNoModelo: $daInstituicao,
         );
     }
 
@@ -93,6 +101,28 @@ final class LayoutDaFolha
      * Citação longa, legenda e trecho de código: 10 pt e espaçamento
      * simples é o que a norma pede para eles.
      */
+    /** Limites do corpo do nome da instituição, em pontos. */
+    public const TAMANHO_MINIMO_DA_INSTITUICAO = 8;
+
+    public const TAMANHO_MAXIMO_DA_INSTITUICAO = 28;
+
+    /**
+     * O corpo do nome da instituição.
+     *
+     * Um ponto acima do texto por padrão — o que serve a um nome curto.
+     * Nomes longos precisam descer, e é por isso que o modelo e a prova
+     * podem dizer outro valor.
+     */
+    public function tamanhoDaInstituicao(?int $escolhido = null): int
+    {
+        $valor = $escolhido ?? $this->tamanhoDaInstituicaoNoModelo ?? ($this->tamanho + 1);
+
+        return max(
+            self::TAMANHO_MINIMO_DA_INSTITUICAO,
+            min(self::TAMANHO_MAXIMO_DA_INSTITUICAO, $valor),
+        );
+    }
+
     public function tamanhoSecundario(): int
     {
         return $this->norma->fixaAFormatacao() ? 10 : max(8, $this->tamanho - 2);
@@ -124,6 +154,7 @@ final class LayoutDaFolha
             'tamanho' => $this->tamanho,
             'espacamento' => $this->espacamento,
             'margens' => $this->margens,
+            'tamanho_instituicao' => $this->tamanhoDaInstituicaoNoModelo,
         ];
     }
 }

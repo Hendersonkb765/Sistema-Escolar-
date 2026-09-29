@@ -170,6 +170,9 @@ class FormularioUsuario extends Component
                     'perfil' => $dados['perfil'],
                     'ativo' => $this->ativo,
                     'password' => $senhaFinal,
+                    // Provisória: quem entra escolhe a sua no primeiro
+                    // acesso, antes de qualquer outra tela.
+                    'senha_definida_em' => null,
                     'criado_por' => $autor->getKey(),
                 ]);
             } else {
@@ -186,8 +189,11 @@ class FormularioUsuario extends Component
                     $this->usuario->perfil = PerfilUsuario::from($dados['perfil']);
                 }
 
+                // Senha redefinida pela coordenação é provisória do
+                // mesmo jeito: o dono volta a escolher a dele.
                 if ($senhaFinal !== null) {
                     $this->usuario->password = $senhaFinal;
+                    $this->usuario->senha_definida_em = null;
                 }
 
                 $this->usuario->save();
@@ -199,7 +205,8 @@ class FormularioUsuario extends Component
         });
 
         session()->flash('sucesso', $this->senhaGerada !== null
-            ? "Usuário criado. Senha provisória: {$this->senhaGerada}"
+            ? "Usuário criado. Senha provisória: {$this->senhaGerada} — "
+                .'no primeiro acesso a pessoa escolhe a dela.'
             : 'Usuário salvo com sucesso.');
 
         $this->redirectRoute('usuarios.index', navigate: true);

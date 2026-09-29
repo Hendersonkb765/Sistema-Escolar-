@@ -30,7 +30,7 @@ class ListaAlunos extends Component
 
     protected function colunasOrdenaveis(): array
     {
-        return ['nome', 'matricula', 'status'];
+        return ['nome', 'ra', 'status'];
     }
 
     protected function colunaPadrao(): string
@@ -60,7 +60,7 @@ class ListaAlunos extends Component
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
                     ->where('nome', 'like', $termo)
-                    ->orWhere('matricula', 'like', $termo));
+                    ->orWhere('ra', 'like', $termo));
             })
             ->when($this->filtroTurma !== '', fn (Builder $q) => $q->where('turma_id', $this->filtroTurma))
             ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus));
@@ -71,7 +71,7 @@ class ListaAlunos extends Component
             'situacoes' => StatusAluno::opcoes(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Alunos',
-            'subtitulo' => 'Matrículas por turma, com histórico de movimentações',
+            'subtitulo' => 'Alunos por turma, com histórico de movimentações',
         ]);
     }
 }

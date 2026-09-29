@@ -6,26 +6,21 @@ use App\Models\Prova;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * A prova montada é documento da coordenação.
+ *
+ * O professor escreve as questões dele, acompanha a análise e vê os
+ * resultados — mas não abre a folha pronta. Ela existe para ser impressa
+ * e aplicada, e nela estão as questões dos colegas, na ordem e no recorte
+ * que a coordenação escolheu.
+ *
+ * O escopo de consulta (`Prova::visivelPara`) continua devolvendo ao
+ * professor as provas com questões dele: é por ele que as telas de notas
+ * e de desempenho sabem o que mostrar a quem. Uma coisa é "esta prova me
+ * diz respeito"; outra é "posso abrir o documento dela".
+ */
 class ProvaPolicy extends PolicyBase
 {
-    /** A listagem do professor já vem filtrada pelas questões dele. */
-    public function viewAny(User $usuario): bool
-    {
-        return true;
-    }
-
-    /** O professor consulta as provas que contêm questões dele. */
-    public function view(User $usuario, Model $registro): bool
-    {
-        if ($usuario->ehGestao()) {
-            return $this->noEscopo($usuario, $registro);
-        }
-
-        return $registro->questoes()
-            ->where('professor_id', $usuario->getKey())
-            ->exists();
-    }
-
     /** Prova já gerada tem snapshot imutável: não se remonta nem se edita. */
     public function update(User $usuario, Model $registro): bool
     {

@@ -21,16 +21,22 @@ use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Actions\Academico\RegistrarHistoricoDeTurma;
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
+use App\Actions\Resultado\CalcularNotasAction;
+use App\Enums\Bimestre;
 use App\Enums\EventoHistorico;
 use App\Enums\StatusAluno;
+use App\Enums\StatusImportacao;
+use App\Enums\StatusProva;
 use App\Livewire\Turmas\DetalheTurma;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\GradeCurricular;
+use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
+use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use App\Models\User;
 use Spatie\Activitylog\Models\Activity;
@@ -66,13 +72,13 @@ beforeEach(function () {
         'periodo_letivo' => '2026',
     ]);
 
-    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002'], ['Rita Souza', '1003']] as [$nome, $matricula]) {
-        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'matricula' => $matricula]);
+    foreach ([['Marina Alves', '1001'], ['Caio Prado', '1002'], ['Rita Souza', '1003']] as [$nome, $ra]) {
+        Aluno::factory()->naTurma($this->turma)->create(['nome' => $nome, 'ra' => $ra]);
     }
 
     Aluno::factory()->naTurma($this->outraTurma)->create([
         'nome' => 'Ivo Nunes',
-        'matricula' => '2001',
+        'ra' => '2001',
         'status' => StatusAluno::Transferido,
     ]);
 
@@ -115,7 +121,7 @@ it('abre o detalhe da turma com histórico, alunos e disciplinas', function () {
 });
 
 it('abre o detalhe do aluno com várias movimentações no histórico', function () {
-    $aluno = Aluno::query()->where('matricula', '1001')->first();
+    $aluno = Aluno::query()->where('ra', '1001')->first();
 
     $destinoA = Turma::factory()->doCurso($this->curso, $this->grade)->create([
         'periodo' => 3, 'nome' => '3 B', 'periodo_letivo' => '2026',
@@ -198,7 +204,7 @@ it('abre o painel com indicadores preenchidos', function () {
 });
 
 it('abre os formulários de edição com dados carregados', function () {
-    $aluno = Aluno::query()->where('matricula', '1002')->first();
+    $aluno = Aluno::query()->where('ra', '1002')->first();
     $disciplina = Disciplina::query()->first();
 
     $como = fn (string $rota, $parametro) => $this->actingAs($this->admin)
@@ -319,4 +325,99 @@ it('abre as telas de prova com duas provas, dois modelos e duas disciplinas', fu
     $como('modelos-prova.index');
     $como('modelos-prova.criar');
     $como('modelos-prova.editar', $modelo);
+});
+
+it('abre a análise de desempenho com duas habilidades e mais de uma prova', function () {
+    $professorLogica = professor($this->eixo);
+    $professorRedes = professor($this->eixo);
+
+    $logica = Disciplina::query()->where('nome', 'Lógica de Programação')->sole();
+    $redes = Disciplina::query()->where('nome', 'Redes de Computadores')->sole();
+
+    $solicitacao = solicitacaoCom($this->admin, $this->outraTurma, [
+        ['disciplina' => $logica, 'professor' => $professorLogica, 'questoes' => 2],
+        ['disciplina' => $redes, 'professor' => $professorRedes, 'questoes' => 2],
+    ], titulo: 'Avaliação bimestral', bimestre: Bimestre::Segundo);
+
+    $partes = $solicitacao->partes()->orderBy('ordem')->get();
+
+    enviarParte($partes[0], $professorLogica, [1 => 'Aplicar condicionais', 2 => 'Aplicar condicionais']);
+    enviarParte($partes[1], $professorRedes, [1 => 'Calcular endereçamento IP', 2 => 'Identificar camadas do OSI']);
+
+    $analisar = app(AnalisarQuestaoAction::class);
+
+    foreach ($solicitacao->questoes()->get() as $questao) {
+        $analisar->aprovar($questao, $this->admin);
+    }
+
+    $modelo = ModeloProva::factory()->create([
+        'eixo_id' => $this->eixo->id,
+        'criado_por' => $this->admin->id,
+    ]);
+
+    $prova = app(MontarProvaAction::class)->executar(
+        autor: $this->admin, turma: $this->outraTurma, modelo: $modelo,
+        titulo: 'Avaliação bimestral',
+    );
+    $prova->update(['status' => StatusProva::Aplicada]);
+
+    $importacao = Importacao::create([
+        'prova_id' => $prova->id, 'usuario_id' => $this->admin->id,
+        'arquivo' => 'importacoes/x.xlsx', 'hash' => hash('sha256', 'x'),
+        'status' => StatusImportacao::Confirmada, 'confirmada_em' => now(),
+    ]);
+
+    // Dois alunos com resultado: nenhuma coleção da tela fica com uma linha.
+    $calcular = app(CalcularNotasAction::class);
+
+    foreach ($this->outraTurma->alunos()->get()->take(2) as $indice => $aluno) {
+        $resultado = ResultadoAluno::create([
+            'prova_id' => $prova->id, 'aluno_id' => $aluno->id, 'importacao_id' => $importacao->id,
+        ]);
+
+        foreach ($prova->questoes()->orderBy('numero')->get() as $questao) {
+            $acertou = ($questao->numero + $indice) % 2 === 0;
+
+            $resultado->respostas()->create([
+                'prova_questao_id' => $questao->id, 'acertou' => $acertou,
+                'peso' => $questao->peso, 'pontuacao' => $acertou ? $questao->peso : 0,
+            ]);
+        }
+
+        $calcular->executar($resultado->refresh());
+    }
+
+    $como = fn (string $rota, array $parametros = []) => $this->actingAs($this->admin)
+        ->get(route($rota, $parametros))
+        ->assertOk();
+
+    $como('analises.index');
+    $como('analises.index', ['bimestre' => Bimestre::Segundo->value]);
+    $como('resultados.index', ['prova' => $prova->id]);
+    $como('importacoes.index');
+});
+
+/*
+ * O número do aluno chama-se RA. Ele aparece em telas que nenhum teste de
+ * fluxo toca — rótulo do formulário, cabeçalho da lista, placeholder da
+ * busca — e um renomeio que esquece uma delas não quebra nada: a tela
+ * continua abrindo, só com dois nomes para a mesma coisa.
+ */
+it('chama o número do aluno de RA em todas as telas que o mostram', function () {
+    $aluno = Aluno::query()->where('ra', '1001')->first();
+
+    $telas = [
+        route('alunos.index'),
+        route('alunos.criar'),
+        route('alunos.editar', $aluno),
+        route('turmas.show', $this->turma),
+    ];
+
+    foreach ($telas as $url) {
+        $this->actingAs($this->admin)->get($url)
+            ->assertOk()
+            ->assertSee('RA')
+            ->assertDontSee('Matrícula')
+            ->assertDontSee('matrícula');
+    }
 });

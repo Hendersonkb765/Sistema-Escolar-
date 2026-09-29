@@ -33,6 +33,7 @@ class Questao extends Model
         'disciplina_id',
         'professor_id',
         'enunciado',
+        'habilidade',
         'peso',
         'status',
         'versao',
@@ -127,6 +128,24 @@ class Questao extends Model
      *
      * @return array<int, string>
      */
+    /**
+     * Habilidades já usadas nesta disciplina, para o professor reusar a
+     * mesma escrita em vez de inventar uma variação a cada questão — é
+     * disso que depende a análise por habilidade fazer sentido.
+     *
+     * @return array<int, string>
+     */
+    public static function habilidadesDaDisciplina(int $disciplinaId): array
+    {
+        return self::query()
+            ->where('disciplina_id', $disciplinaId)
+            ->whereNotNull('habilidade')
+            ->distinct()
+            ->orderBy('habilidade')
+            ->pluck('habilidade')
+            ->all();
+    }
+
     public function pendencias(?int $quantidadeEsperada = null): array
     {
         $quantidadeEsperada ??= $this->loadMissing('solicitacao')->solicitacao->quantidade_alternativas;
@@ -139,6 +158,10 @@ class Questao extends Model
 
         if (blank($this->enunciado)) {
             $pendencias[] = 'escreva o enunciado';
+        }
+
+        if (blank($this->habilidade)) {
+            $pendencias[] = 'informe a habilidade avaliada';
         }
 
         if ((float) $this->peso <= 0) {

@@ -100,7 +100,7 @@ class ModeloProva extends Model
     /** Campos que a folha imprime no quadro de identificação do aluno. */
     public const CAMPOS_DE_IDENTIFICACAO = [
         'aluno' => 'Nome do aluno',
-        'matricula' => 'Matrícula',
+        'ra' => 'RA',
         'turma' => 'Turma',
         'curso' => 'Curso',
         'data' => 'Data',

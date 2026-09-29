@@ -22,7 +22,7 @@ class ModeloProvaFactory extends Factory
             'instituicao' => 'Escola Técnica',
             'cabecalho' => null,
             'instrucoes' => 'Leia com atenção. Marque apenas uma alternativa por questão.',
-            'campos_identificacao' => ['aluno', 'matricula', 'turma', 'curso', 'data'],
+            'campos_identificacao' => ['aluno', 'ra', 'turma', 'curso', 'data'],
             'layout' => ['norma' => 'abnt', 'fonte' => 'sans'],
             'rodape' => 'Boa prova!',
             'versao' => 1,

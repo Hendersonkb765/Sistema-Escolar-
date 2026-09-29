@@ -29,9 +29,9 @@
                 </x-campo>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <x-campo rotulo="Matrícula" para="matricula" obrigatorio :erro="$errors->first('matricula')"
+                    <x-campo rotulo="RA" para="ra" obrigatorio :erro="$errors->first('ra')"
                              ajuda="Única dentro da turma.">
-                        <x-input id="matricula" wire:model="matricula" required/>
+                        <x-input id="ra" wire:model="ra" required/>
                     </x-campo>
 
                     <x-campo rotulo="Status" para="status" obrigatorio :erro="$errors->first('status')">

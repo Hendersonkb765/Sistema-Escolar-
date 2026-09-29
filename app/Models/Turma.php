@@ -56,8 +56,16 @@ class Turma extends Model
     /** O professor vê as turmas para as quais recebeu solicitações. */
     protected function aplicarEscopoDeProfessor(Builder $query, User $usuario): Builder
     {
+        /*
+         * Pelas PARTES da solicitação, e não pela solicitação: quem responde
+         * uma disciplina é a parte, e `solicitacoes_prova` não tem
+         * `professor_id`. O erro não aparecia — no SQLite um identificador
+         * entre aspas que não resolve para coluna nenhuma vira texto
+         * literal, e `'professor_id' = 5` é apenas falso. No MySQL seria
+         * "Unknown column".
+         */
         return $query->whereHas(
-            'solicitacoes',
+            'solicitacoes.partes',
             fn (Builder $q) => $q->where('professor_id', $usuario->getKey())
         );
     }

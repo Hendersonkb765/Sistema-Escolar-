@@ -4,11 +4,13 @@ namespace App\Support;
 
 use App\Enums\StatusQuestao;
 use App\Models\Aluno;
+use App\Models\CompartilhamentoDeModelo;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\GradeCurricular;
 use App\Models\Importacao;
+use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\Questao;
@@ -80,6 +82,25 @@ class Navegacao
                         ? self::item('Importar resultados', 'importacoes.index', self::icone('importacao')) : null,
                     Gate::forUser($usuario)->allows('viewAny', ResultadoAluno::class)
                         ? self::item('Resultados e notas', 'resultados.index', self::icone('resultado')) : null,
+                    Gate::forUser($usuario)->allows('viewAny', ResultadoAluno::class)
+                        ? self::item('Análise de desempenho', 'analises.index', self::icone('analise')) : null,
+                ]),
+            ],
+            [
+                'titulo' => 'Documentos do aluno',
+                'itens' => array_filter([
+                    Gate::forUser($usuario)->allows('viewAny', ModeloDocumento::class)
+                        ? self::item('Modelos de documento', 'documentos.index', self::icone('documento')) : null,
+                    Gate::forUser($usuario)->allows('viewAny', ModeloDocumento::class)
+                        ? self::item('Gerar documentos', 'documentos.gerar', self::icone('gerar')) : null,
+                    Gate::forUser($usuario)->allows('viewAny', CompartilhamentoDeModelo::class)
+                        ? self::item(
+                            'Modelos compartilhados',
+                            'documentos.compartilhados',
+                            self::icone('compartilhar'),
+                            // Uma oferta parada é alguém esperando resposta.
+                            contador: self::contadorDeCompartilhamentos($usuario),
+                        ) : null,
                 ]),
             ],
             [
@@ -93,30 +114,101 @@ class Navegacao
             ],
         ];
 
-        return array_values(array_filter(
+        return self::marcarOAtivo(array_values(array_filter(
             array_map(
                 fn (array $grupo) => [...$grupo, 'itens' => array_values($grupo['itens'])],
                 $grupos
             ),
             fn (array $grupo) => $grupo['itens'] !== []
-        ));
+        )));
     }
 
-    /** @return array{rotulo: string, url: string, icone: string, ativo: bool, contador: ?array{valor: int, cor: string, titulo: string}} */
+    /**
+     * Acende um item só, e é preciso ver todos para saber qual.
+     *
+     * A regra antiga marcava pelo prefixo da rota (`documentos.*`) e
+     * funcionava enquanto cada seção tinha um item por prefixo: "Provas"
+     * segue aceso em `/provas/criar`, que é o que se espera de um
+     * item-pai. Com três itens irmãos sob `documentos.`, os três acendiam
+     * juntos e o menu parava de dizer onde a pessoa está.
+     *
+     * Agora quem tem a rota exata ganha. Só quando nenhum item é a rota
+     * atual — telas de criar e editar, que não têm item próprio — o
+     * destaque volta para a listagem daquele prefixo.
+     *
+     * @param  array<int, array{titulo: ?string, itens: array<int, array<string, mixed>>}>  $grupos
+     * @return array<int, array{titulo: ?string, itens: array<int, array<string, mixed>>}>
+     */
+    protected static function marcarOAtivo(array $grupos): array
+    {
+        $atual = (string) Route::currentRouteName();
+
+        $rotas = [];
+
+        foreach ($grupos as $grupo) {
+            foreach ($grupo['itens'] as $item) {
+                $rotas[] = $item['rota'];
+            }
+        }
+
+        $temExata = in_array($atual, $rotas, true);
+        $prefixoAtual = Str::before($atual, '.');
+
+        return array_map(fn (array $grupo) => [...$grupo, 'itens' => array_map(
+            fn (array $item) => [...$item, 'ativo' => $temExata
+                ? $item['rota'] === $atual
+                : Str::before($item['rota'], '.') === $prefixoAtual
+                    && Str::afterLast($item['rota'], '.') === 'index'],
+            $grupo['itens'],
+        )], $grupos);
+    }
+
+    /**
+     * `ativo` nasce falso: quem decide é {@see marcarOAtivo()}, depois de
+     * ver a lista inteira. Um item sozinho não tem como saber se outro
+     * item casa melhor com a rota atual.
+     *
+     * @return array{rotulo: string, rota: string, url: string, icone: string, ativo: bool, contador: ?array{valor: int, cor: string, titulo: string}}
+     */
     protected static function item(
         string $rotulo,
         string $rota,
         string $icone,
         ?array $contador = null,
     ): array {
-        $prefixo = Str::before($rota, '.');
-
         return [
             'rotulo' => $rotulo,
+            'rota' => $rota,
             'url' => Route::has($rota) ? route($rota) : '#',
             'icone' => $icone,
-            'ativo' => request()->routeIs($prefixo.'*'),
+            'ativo' => false,
             'contador' => $contador,
+        ];
+    }
+
+    /**
+     * Selo ao lado de "Modelos compartilhados": ofertas que estão
+     * paradas esperando esta pessoa responder.
+     *
+     * @return array{valor: int, cor: string, titulo: string}|null
+     */
+    protected static function contadorDeCompartilhamentos(User $usuario): ?array
+    {
+        if (! $usuario->ehGestao()) {
+            return null;
+        }
+
+        $pendentes = CompartilhamentoDeModelo::query()
+            ->recebidosPor($usuario)
+            ->pendentes()
+            ->count();
+
+        return $pendentes === 0 ? null : [
+            'valor' => $pendentes,
+            'cor' => 'amarelo',
+            'titulo' => $pendentes === 1
+                ? '1 modelo aguardando a sua resposta'
+                : "{$pendentes} modelos aguardando a sua resposta",
         ];
     }
 
@@ -172,6 +264,10 @@ class Navegacao
             'prova' => 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
             'modelo' => 'M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z',
             'importacao' => 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
+            'analise' => 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z',
+            'documento' => 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
+            'gerar' => 'M7.5 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75h-1.5m-9 0V3m9 .75V3M12 12.75v-6m0 0l-2.25 2.25M12 6.75l2.25 2.25',
+            'compartilhar' => 'M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z',
             'resultado' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
             'usuario' => 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
             'auditoria' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',

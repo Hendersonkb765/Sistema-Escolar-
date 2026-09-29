@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Models\Concerns\AplicaEscopoDeEixo;
@@ -36,6 +37,7 @@ class SolicitacaoProva extends Model
         'turma_id',
         'criado_por',
         'titulo',
+        'bimestre',
         'quantidade_alternativas',
         'prazo',
         'encerrada_em',
@@ -45,12 +47,21 @@ class SolicitacaoProva extends Model
     ];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
-    protected $attributes = ['status' => 'aberta'];
+    /**
+     * Instância nova já nasce com os mesmos padrões da tabela: sem
+     * isso, um model não persistido devolve `null` onde a view espera
+     * um enum.
+     */
+    protected $attributes = [
+        'status' => 'aberta',
+        'bimestre' => 1,
+    ];
 
     protected function casts(): array
     {
         return [
             'status' => StatusSolicitacao::class,
+            'bimestre' => Bimestre::class,
             'prazo' => 'datetime',
             'encerrada_em' => 'datetime',
             'cancelada_em' => 'datetime',

@@ -19,7 +19,7 @@ class AlunoFactory extends Factory
         return [
             'turma_id' => Turma::factory(),
             'nome' => fake()->name(),
-            'matricula' => (string) fake()->unique()->numberBetween(100000, 999999),
+            'ra' => (string) fake()->unique()->numberBetween(100000, 999999),
             'status' => StatusAluno::Ativo,
         ];
     }

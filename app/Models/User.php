@@ -35,6 +35,7 @@ class User extends Authenticatable
         'password',
         'perfil',
         'ativo',
+        'senha_definida_em',
         'telefone',
         'criado_por',
     ];
@@ -63,6 +64,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'perfil' => PerfilUsuario::class,
             'ativo' => 'boolean',
+            'senha_definida_em' => 'datetime',
         ];
     }
 
@@ -144,6 +146,17 @@ class User extends Authenticatable
     public function ehProfessor(): bool
     {
         return $this->perfil === PerfilUsuario::Professor;
+    }
+
+    /**
+     * A senha em uso ainda é a que outra pessoa definiu.
+     *
+     * Quem cria a conta entrega uma senha provisória; até o dono
+     * escolher a dele, o sistema não abre.
+     */
+    public function precisaDefinirSenha(): bool
+    {
+        return $this->senha_definida_em === null;
     }
 
     /** PAEET Admin e PAEET: equipe de gestão. */

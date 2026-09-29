@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\GarantirPerfil;
+use App\Http\Middleware\GarantirSenhaPropria;
 use App\Http\Middleware\GarantirUsuarioAtivo;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'ativo' => GarantirUsuarioAtivo::class,
+            'senha-propria' => GarantirSenhaPropria::class,
             'perfil' => GarantirPerfil::class,
         ]);
 

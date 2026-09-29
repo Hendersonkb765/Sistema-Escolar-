@@ -1,19 +1,26 @@
 <?php
 
 use App\Http\Controllers\AuditoriaController;
-use App\Http\Controllers\ModuloEmConstrucaoController;
 use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
+use App\Livewire\Analises\Desempenho;
+use App\Livewire\Autenticacao\PrimeiraSenha;
 use App\Livewire\Cursos\DetalheCurso;
 use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
 use App\Livewire\Disciplinas\FormularioDisciplina;
 use App\Livewire\Disciplinas\ListaDisciplinas;
+use App\Livewire\Documentos\FormularioModeloDocumento;
+use App\Livewire\Documentos\GerarDocumentos;
+use App\Livewire\Documentos\ListaCompartilhamentos;
+use App\Livewire\Documentos\ListaModelosDocumento;
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
+use App\Livewire\Importacoes\ListaImportacoes;
+use App\Livewire\Importacoes\NovaImportacao;
 use App\Livewire\ModelosProva\FormularioModeloProva;
 use App\Livewire\ModelosProva\ListaModelosProva;
 use App\Livewire\Painel;
@@ -22,6 +29,7 @@ use App\Livewire\Provas\ListaProvas;
 use App\Livewire\Provas\MontarProva;
 use App\Livewire\Questoes\ListaQuestoes;
 use App\Livewire\Questoes\ResponderSolicitacao;
+use App\Livewire\Resultados\ListaResultados;
 use App\Livewire\Solicitacoes\DetalheSolicitacao;
 use App\Livewire\Solicitacoes\FormularioSolicitacao;
 use App\Livewire\Solicitacoes\ListaSolicitacoes;
@@ -44,7 +52,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/painel')->name('inicio');
 
-Route::middleware(['auth', 'ativo'])->group(function () {
+/*
+ * O primeiro acesso fica fora do grupo que exige senha própria: é
+ * justamente a tela onde ela é escolhida.
+ */
+Route::middleware(['auth', 'ativo'])
+    ->get('/primeira-senha', PrimeiraSenha::class)
+    ->name('primeira-senha');
+
+Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/painel', Painel::class)->name('painel');
 
     // --- Estrutura acadêmica -------------------------------------------
@@ -96,10 +112,25 @@ Route::middleware(['auth', 'ativo'])->group(function () {
     Route::get('/modelos-prova/criar', FormularioModeloProva::class)->name('modelos-prova.criar');
     Route::get('/modelos-prova/{modelo}/editar', FormularioModeloProva::class)->name('modelos-prova.editar');
 
-    Route::get('/importacoes', ModuloEmConstrucaoController::class)->name('importacoes.index');
-    Route::get('/importacoes/criar', ModuloEmConstrucaoController::class)->name('importacoes.criar');
+    /*
+     * Documentos do aluno. `documentos.gerar` fica antes de
+     * `documentos/{modelo}/editar` porque um dia alguém troca a ordem e
+     * "gerar" vira o id de um modelo inexistente.
+     */
+    Route::get('/documentos', ListaModelosDocumento::class)->name('documentos.index');
+    Route::get('/documentos/gerar', GerarDocumentos::class)->name('documentos.gerar');
+    Route::get('/documentos/criar', FormularioModeloDocumento::class)->name('documentos.criar');
+    Route::get('/documentos/compartilhados', ListaCompartilhamentos::class)->name('documentos.compartilhados');
+    Route::get('/documentos/{modelo}/editar', FormularioModeloDocumento::class)->name('documentos.editar');
 
-    Route::get('/resultados', ModuloEmConstrucaoController::class)->name('resultados.index');
+    // A importação tem dois passos: conferir não grava nada, confirmar
+    // grava o que a conferência aprovou.
+    Route::get('/importacoes', ListaImportacoes::class)->name('importacoes.index');
+    Route::get('/importacoes/criar', NovaImportacao::class)->name('importacoes.criar');
+
+    Route::get('/resultados', ListaResultados::class)->name('resultados.index');
+    Route::get('/analises', Desempenho::class)->name('analises.index');
+    Route::get('/boletins', [ProvaArquivoController::class, 'boletim'])->name('resultados.boletim');
 
     // --- Administração ---------------------------------------------------
     Route::get('/usuarios', ListaUsuarios::class)->name('usuarios.index');

@@ -11,6 +11,7 @@
         'colunas' => $prova->colunas(),
         'layout' => $layout,
         'paraImpressao' => $paraImpressao,
+        'tamanhoDaInstituicao' => $prova->tamanhoDaInstituicao(),
     ])
 </head>
 <body>
@@ -37,11 +38,11 @@
                     @endif
                 </td>
                 <td class="titulo">
-                    <div class="instituicao">{{ $modelo->instituicao ?: config('app.name') }}</div>
-                    <div class="avaliacao">{{ $modelo->nome_avaliacao ?: 'Avaliação' }} — {{ $prova->titulo }}</div>
+                    <div class="instituicao">{{ $prova->instituicaoDaFolha() }}</div>
+                    <div class="avaliacao">{{ $prova->nomeDaAvaliacao() }} — {{ $prova->titulo }}</div>
                     <div class="meta">
                         {{ $prova->turma->curso->nome }} · Turma {{ $prova->turma->nome }} ·
-                        {{ $prova->turma->periodo }}º período
+                        {{ $prova->turma->periodo }}º período · {{ $prova->bimestre->rotulo() }}
                         @if ($prova->data_aplicacao)
                             · {{ $prova->data_aplicacao->format('d/m/Y') }}
                         @endif
@@ -59,7 +60,7 @@
         </table>
     </div>
 
-    @php $campos = $modelo->campos_identificacao ?: ['aluno', 'matricula', 'turma', 'data']; @endphp
+    @php $campos = $modelo->campos_identificacao ?: ['aluno', 'ra', 'turma', 'data']; @endphp
 
     @if ($campos !== [])
         {{--
@@ -75,10 +76,10 @@
                 </tr>
             @endif
 
-            @if (in_array('matricula', $campos, true) || in_array('turma', $campos, true))
+            @if (in_array('ra', $campos, true) || in_array('turma', $campos, true))
                 <tr>
-                    @if (in_array('matricula', $campos, true))
-                        <td class="rotulo">Matrícula:</td>
+                    @if (in_array('ra', $campos, true))
+                        <td class="rotulo">RA:</td>
                         <td class="risco">&nbsp;</td>
                     @endif
                     @if (in_array('turma', $campos, true))

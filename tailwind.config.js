@@ -2,6 +2,11 @@ import defaultTheme from 'tailwindcss/defaultTheme';
 
 /** @type {import('tailwindcss').Config} */
 export default {
+    // Por classe, e não pela preferência do sistema: o tema é uma
+    // escolha do usuário, guardada no navegador. O modo "sistema"
+    // continua existindo — é o script do layout que resolve a
+    // preferência e põe a classe.
+    darkMode: 'selector',
     content: [
         './resources/views/**/*.blade.php',
         './resources/js/**/*.js',

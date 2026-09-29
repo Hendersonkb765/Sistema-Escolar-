@@ -1,4 +1,4 @@
-# PAEET Avaliações
+# E.E Francisco Pereira
 
 Plataforma de gestão acadêmica e do ciclo completo de avaliações: estrutura
 acadêmica hierárquica, solicitação de questões aos professores, análise e
@@ -11,7 +11,7 @@ resultados via planilha e cálculo de notas por disciplina com pesos.
 |---|---|
 | Runtime | PHP 8.5 · Laravel 13.17.0 |
 | Banco | SQLite em desenvolvimento · MySQL 8 em produção (ver `.env.example`) |
-| Front | Livewire 3 · Blade · Tailwind CSS 3 · Alpine (embarcado no Livewire) |
+| Front | Livewire 3 · Blade · Tailwind CSS 3 (tema por classe) · Alpine (embarcado no Livewire) |
 | Auth | Laravel Fortify **sem registro público** |
 | PDF | `mpdf/mpdf` |
 | Planilhas | `maatwebsite/excel` |
@@ -52,6 +52,30 @@ O `ativo` é verificado em três camadas independentes:
 2. `GarantirUsuarioAtivo` — middleware `web`, derruba a sessão em curso;
 3. `Gate::before()` — nega qualquer autorização, inclusive fora do HTTP.
 
+### No primeiro acesso, a senha passa a ser do dono
+
+Quem cria a conta define uma senha provisória e a entrega por algum
+canal — conversa, mensagem, papel. Ela serve para entrar **uma vez**:
+antes de qualquer outra tela, o professor ou o PAEET escolhe a sua, e
+daí em diante ninguém mais a conhece.
+
+`usuarios.senha_definida_em` guarda quando o próprio dono escolheu.
+Nulo significa que a senha em uso é de outra pessoa, e o middleware
+`senha-propria` desvia para `/primeira-senha` **a cada request** — só
+no login não bastaria: digitar outro endereço seguiria valendo.
+
+Continuam abertas apenas a própria troca e a saída: quem não quiser
+trocar agora pode sair, mas não usar o sistema com a senha alheia. A
+tela recusa repetir a provisória, porque mantê-la deixaria a senha nas
+mãos de quem a entregou.
+
+Redefinir a senha de alguém pela coordenação zera o campo de novo:
+**senha definida por outra pessoa é sempre provisória**. Trocar a
+própria senha no perfil marca como definida.
+
+Isto não é autocadastro: a conta já existe, criada pela coordenação. O
+que muda é de quem é a senha.
+
 ## Como rodar
 
 ```bash
@@ -78,6 +102,57 @@ Em produção não há seeder de acesso. A primeira conta nasce pelo terminal:
 ```bash
 php artisan usuario:criar-admin
 ```
+
+## O que a demonstração traz
+
+`php artisan migrate:fresh --seed` monta um ano letivo em andamento, não
+uma tela vazia:
+
+- **dois Eixos com curso de verdade** — Tecnologia (8 matérias) e Gestão
+  (4), cada um com turma, alunos, professores e modelo de prova;
+- **três bimestres fechados de ponta a ponta** na turma 1 A: solicitação,
+  respostas dos professores, aprovação, prova montada e resultados
+  importados. É o que faz o gráfico de evolução ter o que comparar;
+- **duas solicitações em aberto** — uma no prazo, para o professor ter o
+  que responder, e uma vencida, porque o selo "Atrasada" precisa de um
+  caso.
+
+Cada ciclo roda **na época dele** (`Carbon::setTestNow`). Sem isso, um
+prazo no passado somado a um envio agora marcaria toda solicitação
+antiga como "Entregue em atraso", e o selo vermelho apareceria em todas
+em vez de apontar a única que interessa.
+
+Os acertos são sorteados com semente fixa e a turma melhora a cada
+bimestre: uma distribuição plana faria o gráfico de evolução ser uma
+reta e não mostrar nada.
+
+O seeder é idempotente — cada peça se guarda pelo próprio título.
+
+## O que o professor enxerga
+
+**A prova montada não.** Ela é o documento que a coordenação imprime, e
+nela estão as questões dos colegas na ordem e no recorte que a
+coordenação escolheu. O professor escreve as questões dele, acompanha a
+análise e vê as notas — mas não abre a folha, nem o PDF, nem o Word, nem
+o gabarito. Nem sendo autor de uma questão dela.
+
+Isso obrigou a separar duas perguntas que estavam coladas: *"esta prova
+me diz respeito?"* e *"posso abrir o documento dela?"*. A primeira é o
+escopo (`Prova::visivelPara`), e é por ele que as telas de notas e de
+desempenho sabem o que mostrar a quem; a segunda é a Policy. A análise
+filtrava pela Policy, e no dia em que o acesso ao documento foi fechado a
+tela do professor ficou vazia sem mensagem nenhuma.
+
+Fora do próprio Eixo ele não vê nada; dentro dele, só as turmas em que
+atua. Esse "em que atua" se lê pelas **partes** da solicitação, e não pela
+solicitação: quem responde uma disciplina é a parte.
+
+Os três escopos — turma, curso e aluno — procuravam `professor_id` em
+`solicitacoes_prova`, onde a coluna não existe. No SQLite o defeito é
+mudo: um identificador entre aspas que não resolve para coluna nenhuma
+vira **texto literal**, e `'professor_id' = 5` é apenas falso. No MySQL
+seria "Unknown column" e a tela estouraria. O professor via zero turmas,
+zero cursos e zero alunos, sem erro em lugar nenhum.
 
 ## Escopo por Eixo
 
@@ -118,15 +193,15 @@ em `professor_disciplina` e independe do perfil.
 | 3 | Solicitações de questões, área do professor, prazos | ✅ concluído |
 | 4 | Análise, feedbacks, reenvio e versionamento | ✅ concluído |
 | 5 | Montagem da prova, modelo, pré-visualização, PDF e Word | ✅ concluído |
-| 6 | Importação XLS em dois passos | schema pronto, UI pendente |
-| 7 | Cálculo de notas por disciplina | schema pronto, UI pendente |
+| 6 | Importação XLS em dois passos e notas por disciplina | ✅ concluído |
+| 7 | Cálculo de notas por disciplina | ✅ concluído (junto com o 6) |
 | 8 | Dashboards, auditoria e refino de UI | parcial |
+| 9 | Documentos do aluno: modelos, geração em PDF e Word, compartilhamento | ✅ concluído |
 
-Todas as 24 tabelas de domínio já existem com chaves estrangeiras, índices e
-constraints. Os módulos ainda sem tela respondem por
-`ModuloEmConstrucaoController`, que **já aplica a Policy correspondente** —
-um professor recebe 403 em `/importacoes/criar` desde hoje, não quando a
-tela ficar pronta.
+Todas as 24 tabelas de domínio existem com chaves estrangeiras, índices e
+constraints, e **todos os módulos têm tela** — o
+`ModuloEmConstrucaoController`, que segurava as rotas ainda sem interface,
+deixou de existir.
 
 ## Solicitação de questões
 
@@ -148,6 +223,59 @@ duas delas.
 
 Cada questão pedida nasce em rascunho, ligada à sua parte. O professor abre
 a solicitação e encontra os campos prontos — só os da parte dele.
+
+### Bimestre
+
+A solicitação declara de que **bimestre** ela é, e são quatro por ano
+letivo (`App\Enums\Bimestre`). A prova **herda** o bimestre das
+solicitações que produziram as suas questões — quem monta não precisa
+lembrar. Quando as questões vêm de bimestres diferentes não há o que
+herdar, e a tela deixa escolher. O bimestre sai no cabeçalho da folha,
+no PDF e no Word.
+
+Toda tela ligada a prova filtra por bimestre: solicitações, provas,
+importações, resultados e a análise de desempenho. O filtro entra na URL
+(`?bimestre=2`), então um recorte é um link.
+
+### Habilidade avaliada
+
+Cada questão declara **o que ela mede**, preenchido pelo professor. Sem
+isso a questão não pode ser enviada — é uma pendência como as outras
+(`Questao::pendencias()`), e não uma validação que impede salvar
+rascunho.
+
+A habilidade é **congelada na montagem** (`habilidade_snapshot`), como o
+enunciado: a análise de uma prova antiga tem de continuar dizendo o que
+aquela questão avaliava na época.
+
+O campo é texto livre com um `datalist` das habilidades já escritas
+**naquela disciplina**, para o professor reusar a mesma redação em vez
+de criar uma variação a cada questão — e a análise agrupa ignorando
+caixa e espaço sobrando. Não há catálogo fechado de habilidades; se a
+escola quiser uma lista controlada, é o próximo passo natural.
+
+### Negrito e itálico no enunciado
+
+O professor formata o enunciado e os blocos de texto com marcas no
+próprio texto: `**negrito**`, `*itálico*` e `***os dois***`. Os botões
+**B** e *I* só envolvem a seleção; quem interpreta as marcas é
+`App\Support\TextoDoEnunciado`, num lugar só, e os três destinos o
+consultam:
+
+| destino | o que recebe |
+|---|---|
+| tela e PDF | `paraHtml()` — tudo escapado, só as marcas viram `<strong>`/`<em>` |
+| Word | `segmentos()` — trechos com `bold`/`italic`, porque o .docx é montado trecho a trecho e não lê HTML |
+| onde não cabe formatar | `semMarcas()` |
+
+Guardar HTML seria o caminho óbvio e o errado: o enunciado é entrada de
+usuário e teria de ser higienizado na tela, o mPDF aceita só um
+subconjunto e o Word não aceita HTML nenhum. Com marcas, o que está no
+banco continua sendo texto, sem superfície de XSS.
+
+As marcas exigem encostar no texto (`**assim**`, nunca `** assim **`).
+É o que impede `3 * 4 * 5` de virar itálico — e numa prova de lógica
+isso aparece.
 
 ### A entrega é por disciplina
 
@@ -288,6 +416,22 @@ prova** e é lida na hora de imprimir, de propósito: corrigir um erro no
 papel timbrado vale também para a reimpressão de provas antigas.
 Desativar um modelo o esconde da montagem sem tocar nas provas que já o
 usaram.
+
+As duas primeiras linhas da folha — o nome no topo e o nome da avaliação
+— podem ser trocadas **por prova**, na montagem. Serve para uma
+recuperação, ou para uma prova aplicada numa escola parceira, sem
+obrigar a criar um modelo só para ela.
+
+O campo aparece vazio, com o texto do modelo como marca-d'água, porque
+em branco é o modelo que vale. Quem escreveu um texto próprio deixa de
+ser alcançado por correções no modelo; quem não escreveu continua
+sendo, que é o que se quer de um papel timbrado.
+
+O **corpo do nome** também se escolhe, no modelo e na prova: "E. E.
+Prof. Francisco Pereira de Souza Filho" quebra em duas linhas no
+tamanho que servia a um nome curto. Ele fica fora do bloco que a ABNT
+trava — a norma fala do corpo do texto, não do timbre — e é limitado
+entre 8 e 28 pt, para o nome não sumir nem tomar a folha.
 
 ### Duas colunas, mesma folha para tela e papel
 
@@ -437,6 +581,344 @@ ou proxy.
 
 Quem for servir os arquivos de outro domínio define
 `FILESYSTEM_PUBLIC_URL`.
+
+## Importação de resultados
+
+A planilha é a que o leitor de folhas de resposta exporta:
+
+```
+Quiz Name, Class, ZipGrade Id, External Id, First Name, Last Name,
+Num Questions, Num Correct, Percent Correct, Key Version, Q1, Q2, Q3…
+```
+
+Cada `Q` é uma questão: **1 acertou, 0 errou**. O leitor não diz qual
+alternativa o aluno marcou, só se bateu com o gabarito — por isso
+`respostas_alunos.alternativa_marcada` fica nula e o que se guarda é o
+acerto.
+
+As colunas são procuradas pelo nome, sem depender da ordem: uma coluna a
+mais no meio não quebra a leitura.
+
+### Dois passos, e o primeiro não grava nada
+
+**Conferir** lê a planilha e monta um relatório linha a linha — de qual
+aluno ela é, por qual critério foi reconhecida, e o motivo quando não
+deu. **Confirmar** grava só o que a conferência aprovou, numa transação.
+Entre os dois há uma tela para olhar: importar resultado no aluno errado
+não tem desfazer fácil.
+
+### O cadastro do aluno não é alterado
+
+A planilha serve apenas para dizer de quem é cada linha. O nome no
+sistema continua exatamente como está. `ConciliadorDeAlunos` tenta, da
+mais firme para a mais frouxa:
+
+| critério | quando |
+|---|---|
+| RA | `External Id` bate com o RA de um aluno da turma |
+| nome idêntico | ignorando acento, caixa e espaço sobrando |
+| primeiro e último nome | o leitor costuma encurtar "Ana Paula Souza" para "Ana Souza" |
+
+Dois alunos com o mesmo nome, ou nenhum, **recusa a linha** e diz por
+quê, com os candidatos. Reimportar a mesma prova substitui o resultado
+anterior do aluno: vale a última leitura da folha, não a soma.
+
+### O peso vale dentro da disciplina
+
+Este é o ponto que mais se implementa errado. Uma prova com Lógica,
+Redes e Banco de Dados produz **três notas independentes**, cada uma de
+0 a 10:
+
+```
+nota = 10 × (soma dos pesos acertados ÷ soma dos pesos da disciplina)
+```
+
+Pesos 1; 1; 0,5; 0,5; 0,75 somam 3,75. Acertando 1 + 1 + 0,5 = 2,5, a
+nota é **6,67** — é o critério de aceite 10, e tem teste com esse número.
+
+Somar questões de disciplinas diferentes numa nota só apagaria
+exatamente o que a escola quer ver, e por isso `notas_disciplina` guarda
+também a soma dos pesos de cada lado: a conta fica conferível.
+
+A tela mostra as notas e, abaixo, o acerto de cada questão (✓/✗) com o
+número que o aluno viu na folha.
+
+## Resultados e notas: a tela de conferir e lançar
+
+Ela serve a uma tarefa concreta — olhar as notas e lançá-las noutro
+sistema —, e é por isso que mostra nota e não análise. Quem quer saber
+onde a turma tropeçou vai à Análise de desempenho, que lê por habilidade.
+
+O recorte é turma, bimestre e prova. Sem prova escolhida valem todas as do
+recorte, **uma seção por prova** — ao filtrar por turma o que se quer é ver
+as notas dela prova a prova, e não escolher uma de cada vez. Cada seção
+traz o título da prova, o bimestre, a data e as disciplinas daquela prova:
+a seção de uma prova que não avaliou Redes não ganha uma coluna vazia de
+Redes por causa de outra prova da lista.
+
+Somar duas provas numa tabela só é que não acontece — a nota de cada
+disciplina vale dentro da prova em que ela saiu.
+
+### O professor abre vendo as disciplinas dele
+
+Procurar as três dele entre seis é exatamente o trabalho que esta tela
+existe para poupar, então ela abre com as disciplinas em que ele leciona
+já marcadas — o vínculo docente, que a solicitação de prova cria. As
+outras ficam a um clique, porque a nota da turma não é segredo dele: só
+não era o que ele procurava. Quem é da gestão abre com todas.
+
+São caixas, e não um select: a tarefa é olhar três de seis ao mesmo
+tempo, e um select deixa ver uma por vez ou todas. A escolha vai para o
+endereço, então quem confere sempre as mesmas guarda o link.
+
+### Nota aqui, questão na Análise
+
+O acerto questão a questão saiu desta tela: quem veio transcrever nota não
+precisa passar por trinta colunas de ✓ e ✗. Ele mora na Análise de
+desempenho, junto das outras leituras por questão.
+
+## Análise de desempenho
+
+### Três leituras, e nenhuma com o nome da outra
+
+- **Por habilidade avaliada** — a que permite intervir: "interpretar
+  estruturas de repetição" diz o que ensinar de novo, "questão 7" não diz
+  nada.
+- **Índice de acerto por questão** — a mesma leitura pelo número. Conta a
+  turma.
+- **Acerto de cada aluno** — o ✓ e o ✗ de cada um, questão a questão. É a
+  única **nominal** das três, e veio da tela de notas, onde atrapalhava
+  quem só queria transcrever.
+
+A terceira exige **uma prova**, e não um recorte: o número da questão só
+quer dizer alguma coisa dentro da prova em que ela saiu, e duas provas
+lado a lado teriam duas questões "1" diferentes na mesma coluna. Quando o
+recorte junta mais de uma, a tela diz isso em vez de somar coisas
+diferentes.
+
+O cartão do meio chamava-se "Questão a questão", igual ao que veio das
+notas. Duas tabelas com o mesmo nome e leituras diferentes — uma da
+turma, outra nominal — é o tipo de coisa que faz alguém ler o número
+errado em reunião.
+
+Onde a turma teve dificuldade, em duas leituras:
+
+- **por habilidade** — "interpretar estruturas de repetição: 50%" diz o
+  que ensinar de novo;
+- **por questão** — o número, com a habilidade ao lado.
+
+A leitura por número diz *onde* erraram; a por habilidade diz *o quê*, e
+é essa que permite intervir. Duas questões da mesma habilidade somam
+numa linha só, ainda que estejam em provas diferentes.
+
+Abaixo de 60% de acerto (`AnalisarDesempenhoAction::LIMITE_DE_ATENCAO`)
+a linha vai destacada, e a ordenação começa pela que mais precisa de
+atenção.
+
+O escopo é o de quem lê: o **professor** vê as habilidades das questões
+dele, a **coordenação** vê as do seu Eixo. Os recortes são turma,
+bimestre, prova e disciplina, todos na URL.
+
+### Quem errou a habilidade
+
+Cada linha abre aluno a aluno, ordenada de quem mais precisa de ajuda:
+a lista por habilidade diz que a turma foi mal em "aplicar
+condicionais"; esta diz **em quem**, com o acerto de cada questão.
+
+### Evolução por bimestre
+
+Uma linha por disciplina, com a nota média de cada bimestre. Bimestre
+sem avaliação **não vira zero** — a linha se interrompe, porque zero
+diria "foram mal" e o que houve foi "não houve prova".
+
+O gráfico é SVG desenhado no servidor, e não uma biblioteca no
+navegador: não entra dependência nova, o resultado é conferível pela
+mesma suíte (a geometria mora em `GraficoDeEvolucao::coordenadas()`) e a
+mesma marcação serve aos dois temas — cada série carrega o tom claro e o
+escuro, e o CSS escolhe.
+
+A paleta é categórica de ordem fixa, **nunca ciclada**: além de seis
+séries a cauda não vira um tom inventado. Ela foi validada para
+daltonismo e contraste contra as duas superfícies. Como o contraste no
+tema claro fica abaixo de 3:1, a identidade nunca depende só da cor —
+cada linha leva rótulo na ponta e há uma tabela com os mesmos números.
+
+Linhas que terminam próximas teriam os rótulos sobrepostos. Em vez de
+empurrá-los e soltá-los das suas linhas, `GraficoDeEvolucao::rotulos()`
+os afasta o mínimo e a view traça um fio ligando cada nome à sua ponta.
+
+### Boletim
+
+**Uma página por aluno**, com a nota de cada disciplina e a soma dos
+pesos que a produziu. Um documento único com a turma inteira seria mais
+simples de gerar e impossível de entregar sem mostrar a nota de um aluno
+para o outro.
+
+## Documentos do aluno
+
+Autorização dos pais, declaração de frequência, lista de entrega de
+material: papel que a escola imprime com os dados de cada aluno já
+preenchidos e linhas em branco para alguém assinar à mão.
+
+### O modelo é texto, não HTML
+
+O corpo do modelo é texto com campos entre chaves — `{{ aluno.nome }}`,
+`{{ turma.nome }}`, `{{ data }}` — mais os campos de preencher:
+`{{ linha: nome }}`, `{{ assinatura: Responsável }}`, `{{ caixa: Autorizo }}`
+e `{{ espaco }}`.
+
+Guardar HTML resolveria menos e custaria mais: o corpo vem de um
+formulário, e o mesmo texto é exibido na tela, no PDF e na
+pré-visualização de quem o recebeu compartilhado. Com texto, não há
+superfície de XSS em lugar nenhum. Negrito e itálico reaproveitam as
+marcas do enunciado (`**assim**`, `*assim*`), já testadas.
+
+**A troca do campo vem antes da formatação**, e a ordem não é detalhe:
+formatando primeiro, `**{{ aluno.nome }}**` tem cada `**` num pedaço de
+texto diferente, separado pelo campo no meio, nenhum encontra o seu par,
+e o documento sai com os asteriscos impressos. Foi o que o primeiro PDF
+mostrou.
+
+### O tipo decide quais campos existem
+
+`Uma via por aluno` repete o documento para cada aluno escolhido.
+`Uma via com a lista de alunos` sai uma vez, com a turma numa tabela.
+Num, `{{ aluno.nome }}` faz sentido; no outro, `{{ lista_de_alunos }}`.
+Usar o campo do tipo errado não dá erro de sintaxe — dá um campo vazio no
+meio do papel, descoberto na hora de entregar. Por isso o editor recusa e
+diz qual campo é, e se ele não existe ou só existe no outro tipo.
+
+### Três vias por folha
+
+Quando o texto é curto, cabem duas ou três vias na mesma folha, com linha
+de corte entre elas: noventa autorizações em trinta folhas em vez de
+noventa. Cada via repete o cabeçalho com o nome da escola, porque a folha
+vai ser recortada e cada pedaço vai para uma família diferente.
+
+O mPDF impôs três decisões que só o papel revelou:
+
+- **altura fixa na via não funciona** — ele soma a altura declarada ao que
+  o conteúdo já ocupa, e três vias de 90 mm passavam a ocupar 280 mm;
+  quem separa as folhas é o `<pagebreak/>` a cada N vias;
+- **largura de elemento em linha é ignorada** — `inline-block` com
+  `min-width` vira um tracinho de dois milímetros. A linha de preencher é
+  feita de espaços rígidos com borda embaixo, e o quadradinho é o
+  caractere `☐`;
+- **o tamanho da fonte não se restaura** depois de um trecho menor dentro
+  de um parágrafo: o rótulo em linha muda de cor, não de tamanho.
+
+### PDF para imprimir, Word para mexer antes
+
+Os dois formatos saem da mesma tela e do mesmo modelo. O PDF é o papel
+pronto; o .docx existe porque a secretaria quase sempre precisa trocar
+uma data ou acrescentar um parágrafo antes de imprimir.
+
+O Word não aceita o HTML da folha, então é montado bloco a bloco a partir
+de `CamposDoDocumento::trechos()` — a mesma conversão de duas etapas que o
+HTML usa, para os dois formatos não divergirem no que dizem. É isso que
+faz o negrito em volta de um campo valer nos dois.
+
+O que o Word impôs, e o teste cobra:
+
+- **a linha de preencher é um traço de sublinhados**, não espaços
+  sublinhados: o Word come espaço no fim de um trecho, e a linha encurtava
+  conforme o que vinha depois;
+- **as larguras das colunas vão na primeira linha da tabela** — é ela que
+  define a grade no OOXML. Declaradas só nas linhas de baixo, são
+  ignoradas, e o nome do aluno ficava espremido em duas linhas.
+
+### Quem recebe o documento
+
+A turma vem toda marcada, porque é o caso comum, e desmarcar dois é menos
+trabalho que marcar trinta. Os ids vêm da tela, então são cruzados com a
+turma e com o escopo de quem gera: id de aluno de outra turma não entra.
+
+### Compartilhar um modelo com outro PAEET
+
+O que se manda é uma **oferta**. Nada entra na lista de quem recebeu antes
+de ele responder, e ele vê o texto antes de decidir — aceitar às cegas um
+documento que vai para a família de um aluno não é decisão nenhuma.
+
+**Aceitar copia.** O destinatário vira dono de um modelo no Eixo dele, que
+pode editar e apagar sem tocar no original. É isso que deixa o escopo por
+Eixo intacto: nenhum modelo é visto de fora do Eixo em que nasceu, e a
+rota do original continua dando 403 para quem recebeu a cópia. A cópia
+guarda de qual modelo veio, então a lista diz "cópia de um modelo de
+Fulano".
+
+**Recusar não cria nada** — e a linha do compartilhamento fica. Apagá-la
+faria o remetente reenviar sem entender, e tiraria do histórico uma
+resposta que foi dada. Recusar também não é para sempre: quem recusou
+pode receber de novo, com uma explicação melhor.
+
+O registro guarda com quem cada modelo foi compartilhado e o status de
+cada um, e a lista mostra "1 de 2 aceitaram".
+
+## O nome da escola não é o nome do sistema
+
+`app.name` nomeia o **software** — é o que aparece na aba do navegador e
+no menu. `instituicao.nome` nomeia **a escola**, e é o que sai nos
+documentos: folha de prova e boletim.
+
+Os dois estavam misturados, e a prova saía assinada pelo programa. Agora
+o padrão é a escola (`INSTITUICAO_NOME` no `.env`), o modelo de prova
+pode dizer outro nome, e cada prova pode dizer outro ainda — do mais
+geral para o mais específico.
+
+## Claro, escuro ou como o aparelho
+
+O tema é escolha de quem usa, e não a preferência do sistema imposta
+pelo CSS: o Tailwind roda em `darkMode: 'selector'` e a classe `.dark`
+no `<html>` é que manda. A escolha fica no navegador e vale também na
+tela de entrada, onde o seletor também aparece.
+
+Um script no `<head>` aplica a classe **antes da primeira pintura** —
+sem ele, a página nasce clara e escurece quando o JavaScript roda, um
+lampejo branco a cada recarga. Ele é síncrono de propósito: adiar seria
+o mesmo que não fazer.
+
+Em "como o aparelho", mudar a preferência do sistema troca o tema na
+hora, sem recarregar.
+
+A classe é reaplicada em `livewire:navigated`. Numa navegação do
+Livewire o documento não recarrega: ele chama `replaceHtmlAttributes` e
+troca os atributos do `<html>` pelos do documento novo, que vem do
+servidor sem a classe. Sem reaplicar, o tema escolhido se perdia na
+primeira troca de página.
+
+O que o projeto escreve à mão — a barra de rolagem e o gráfico de
+evolução — acompanha a mesma classe, e não uma `@media` própria: duas
+fontes de verdade divergiriam no dia em que alguém escolhesse o claro
+num aparelho escuro.
+
+## Um item do menu aceso por vez
+
+A regra antiga marcava o item pelo prefixo da rota (`documentos.*`) e
+servia enquanto cada seção tinha um item por prefixo: "Provas" segue aceso
+em `/provas/criar`, que é o que se espera de um item-pai. Com três itens
+irmãos sob `documentos.`, os três acendiam juntos e o menu deixava de
+dizer onde a pessoa está.
+
+Agora quem tem a rota exata ganha, e só quando nenhum item é a rota atual
+— telas de criar e editar, que não têm item próprio — o destaque volta
+para a listagem daquele prefixo. A decisão precisa ver a lista inteira,
+então saiu de dentro do item e virou um passo depois de montá-la.
+
+## A barra lateral se recolhe
+
+O botão na barra de cima esconde o menu e devolve os 16 rem dele ao
+conteúdo — a pré-visualização da prova, as tabelas largas de resultado e
+a análise de desempenho são o motivo.
+
+A escolha fica no `localStorage` (`$persist`), então vale para as
+próximas visitas. E um véu no `<head>` lê a mesma chave **antes da
+primeira pintura**: sem ele, quem deixou a barra escondida a veria
+aparecer e sumir a cada recarga. O véu sai em `alpine:initialized`,
+porque a partir dali quem posiciona a barra são as classes do Alpine e
+as duas regras brigariam.
+
+No celular a barra já é um painel sobreposto, que não ocupa espaço —
+lá o botão não aparece.
 
 ## Estrutura acadêmica
 

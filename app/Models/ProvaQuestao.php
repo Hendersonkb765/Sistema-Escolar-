@@ -28,6 +28,7 @@ class ProvaQuestao extends Model
         'professor_id',
         'peso',
         'enunciado_snapshot',
+        'habilidade_snapshot',
         'blocos_snapshot',
         'alternativas_snapshot',
         'letra_correta',

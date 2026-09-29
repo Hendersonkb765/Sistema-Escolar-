@@ -132,6 +132,16 @@
                     </x-alerta>
                 @endif
 
+                {{-- O tamanho do nome fica fora do bloco travado: a norma
+                     fala do corpo do texto, não do timbre. --}}
+                <x-campo rotulo="Tamanho do nome da instituição (pt)" para="tamanho_instituicao"
+                         :erro="$errors->first('tamanho_instituicao')"
+                         ajuda="Nome longo pede corpo menor para não quebrar em duas linhas no cabeçalho.">
+                    <x-input tipo="number" id="tamanho_instituicao" wire:model.live="tamanho_instituicao"
+                             min="{{ App\Support\LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO }}"
+                             max="{{ App\Support\LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO }}"/>
+                </x-campo>
+
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
                     <x-campo rotulo="Corpo (pt)" para="tamanho" :erro="$errors->first('tamanho')">
                         <x-input tipo="number" id="tamanho" wire:model.live="tamanho" min="8" max="16"

@@ -25,7 +25,9 @@
                                 </a> antes de montar a prova.
                             </x-alerta>
                         @else
-                            <x-select id="modelo_prova_id" wire:model="modelo_prova_id" required>
+                            {{-- `.live` para a marca-d'água dos campos de
+                                 cabeçalho acompanhar o modelo escolhido. --}}
+                            <x-select id="modelo_prova_id" wire:model.live="modelo_prova_id" required>
                                 @foreach ($modelos as $modelo)
                                     <option value="{{ $modelo->id }}">{{ $modelo->nome }}</option>
                                 @endforeach
@@ -34,14 +36,55 @@
                     </x-campo>
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <x-campo rotulo="Título" para="titulo" obrigatorio :erro="$errors->first('titulo')">
                         <x-input id="titulo" wire:model="titulo" required placeholder="Avaliação do 2º bimestre"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Bimestre" para="bimestre" obrigatorio :erro="$errors->first('bimestre')"
+                             ajuda="Sugerido pelas solicitações que geraram as questões.">
+                        <x-select id="bimestre" wire:model="bimestre" required>
+                            @foreach ($bimestres as $valor => $rotulo)
+                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            @endforeach
+                        </x-select>
                     </x-campo>
 
                     <x-campo rotulo="Data de aplicação" para="data_aplicacao"
                              :erro="$errors->first('data_aplicacao')">
                         <x-input tipo="date" id="data_aplicacao" wire:model="data_aplicacao"/>
+                    </x-campo>
+                </div>
+
+                {{--
+                    As duas primeiras linhas da folha vêm do modelo, que
+                    é compartilhado. Aqui esta prova pode dizer outra
+                    coisa sem obrigar a criar um modelo só para ela — por
+                    isso o valor do modelo aparece como marca-d'água, e
+                    não preenchido.
+                --}}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <x-campo rotulo="Nome no topo da folha" para="instituicao"
+                             :erro="$errors->first('instituicao')"
+                             ajuda="Em branco, usa o nome do modelo.">
+                        <x-input id="instituicao" wire:model="instituicao"
+                                 :placeholder="$modeloEscolhido?->instituicao ?: config('instituicao.nome')"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Nome da avaliação" para="nome_avaliacao"
+                             :erro="$errors->first('nome_avaliacao')"
+                             ajuda="Vem antes do título. Ex.: Avaliação de Recuperação.">
+                        <x-input id="nome_avaliacao" wire:model="nome_avaliacao"
+                                 :placeholder="$modeloEscolhido?->nome_avaliacao ?: 'Avaliação'"/>
+                    </x-campo>
+
+                    <x-campo rotulo="Tamanho do nome (pt)" para="tamanho_instituicao"
+                             :erro="$errors->first('tamanho_instituicao')"
+                             ajuda="Nome longo pede corpo menor para não quebrar em duas linhas.">
+                        <x-input tipo="number" id="tamanho_instituicao" wire:model="tamanho_instituicao"
+                                 min="{{ App\Support\LayoutDaFolha::TAMANHO_MINIMO_DA_INSTITUICAO }}"
+                                 max="{{ App\Support\LayoutDaFolha::TAMANHO_MAXIMO_DA_INSTITUICAO }}"
+                                 :placeholder="$tamanhoDoModelo"/>
                     </x-campo>
                 </div>
 

@@ -27,9 +27,19 @@ class UserFactory extends Factory
             'password' => static::$senhaPadrao ??= Hash::make('senha-de-teste'),
             'perfil' => PerfilUsuario::Professor,
             'ativo' => true,
+            // Conta em uso: quem testa outra coisa não deve esbarrar na
+            // tela de primeira senha. Use `semSenhaPropria()` para o
+            // caso do primeiro acesso.
+            'senha_definida_em' => now(),
             'telefone' => null,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /** Conta recém-criada: a senha em uso é a que a coordenação definiu. */
+    public function semSenhaPropria(): static
+    {
+        return $this->state(fn () => ['senha_definida_em' => null]);
     }
 
     public function paeetAdmin(): static

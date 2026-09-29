@@ -1,3 +1,134 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+    Barra de rolagem no tom do layout.
+
+    Duas sintaxes porque nenhuma cobre tudo: `scrollbar-color` é a
+    padronizada (Firefox e Chrome novo) e `::-webkit-scrollbar` atende
+    Safari e Chrome antigo. Quando as duas valem, a padronizada ganha —
+    por isso as cores são as mesmas nas duas, e não duas aparências
+    diferentes conforme o navegador.
+
+    A folha de prova, dentro do `iframe`, é outro documento e continua
+    com a barra do sistema: ela imita papel, e uma barra escura sobre o
+    branco destoaria.
+*/
+@layer base {
+    html {
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.slate.300') transparent;
+    }
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background-color: theme('colors.slate.300');
+        border-radius: 9999px;
+        /* A borda transparente afina o polegar sem encolher a área de
+           clique, que continua com os 10px inteiros. */
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background-color: theme('colors.marca.500');
+    }
+
+    ::-webkit-scrollbar-corner {
+        background: transparent;
+    }
+
+    /* Pela classe, como o resto do tema: quem escolhe é o usuário. */
+    .dark {
+        scrollbar-color: theme('colors.slate.700') transparent;
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+        background-color: theme('colors.slate.700');
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background-color: theme('colors.marca.500');
+    }
+
+    /* No modo de alto contraste quem manda é o sistema. */
+    @media (forced-colors: active) {
+        html {
+            scrollbar-color: auto;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: ButtonBorder;
+        }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Campos de preencher à mão, na pré-visualização
+|--------------------------------------------------------------------------
+|
+| O HTML vem de App\Support\CamposDoDocumento, que desenha para o mPDF.
+| Na tela o navegador honra largura e altura, então aqui as regras podem
+| ser as naturais — e o resultado fica parecido com o do papel sem ter de
+| imitar as limitações dele.
+*/
+@layer components {
+    .previa-do-documento .campo-linha {
+        display: inline-block;
+        min-width: 12rem;
+        border-bottom: 1px solid theme('colors.slate.400');
+    }
+
+    .dark .previa-do-documento .campo-linha {
+        border-bottom-color: theme('colors.slate.500');
+    }
+
+    .previa-do-documento .rotulo-do-campo {
+        color: theme('colors.slate.500');
+        font-size: 0.75rem;
+    }
+
+    .previa-do-documento .campo-caixa {
+        font-size: 1.1em;
+    }
+
+    .previa-do-documento .campo-assinatura {
+        /* Numa coluna estreita, 18rem passa da borda do quadro. */
+        width: min(18rem, 100%);
+        border-collapse: collapse;
+        margin: 1.25rem 0 0.25rem;
+    }
+
+    .previa-do-documento .campo-assinatura td {
+        border-top: 1px solid theme('colors.slate.400');
+        text-align: center;
+        padding-top: 0.125rem;
+        font-size: 0.7rem;
+        color: theme('colors.slate.500');
+    }
+
+    .previa-do-documento .espaco-para-escrever {
+        height: 4rem;
+        border: 1px solid theme('colors.slate.300');
+        margin: 0.5rem 0;
+    }
+
+    .dark .previa-do-documento .espaco-para-escrever {
+        border-color: theme('colors.slate.700');
+    }
+
+    .previa-do-documento .alunos th,
+    .previa-do-documento .alunos td {
+        text-align: left;
+    }
+}

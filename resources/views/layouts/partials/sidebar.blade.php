@@ -1,7 +1,5 @@
 <div class="flex h-16 shrink-0 items-center gap-2 border-b border-slate-200 px-4 dark:border-slate-800">
-    <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-marca-600 text-sm font-bold text-white">
-        {{ Str::substr(config('app.name'), 0, 2) }}
-    </span>
+    <x-emblema/>
     <span class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{{ config('app.name') }}</span>
 </div>
 

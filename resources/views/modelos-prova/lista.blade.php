@@ -52,7 +52,7 @@
                                 <td class="px-4 py-3 sm:px-6">
                                     <span class="font-medium text-slate-900 dark:text-slate-100">{{ $modelo->nome }}</span>
                                     <span class="block text-xs text-slate-400">
-                                        {{ $modelo->instituicao ?: config('app.name') }}
+                                        {{ $modelo->instituicao ?: config('instituicao.nome') }}
                                     </span>
                                 </td>
                                 <td class="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">

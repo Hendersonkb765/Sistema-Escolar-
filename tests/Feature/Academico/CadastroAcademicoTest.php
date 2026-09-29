@@ -255,31 +255,31 @@ it('matricula um aluno e abre o histórico dele', function () {
         ->test(FormularioAluno::class)
         ->set('turma_id', $turma->id)
         ->set('nome', 'Marina Alves')
-        ->set('matricula', '20260001')
+        ->set('ra', '20260001')
         ->call('salvar')
         ->assertHasNoErrors();
 
-    $aluno = Aluno::query()->where('matricula', '20260001')->first();
+    $aluno = Aluno::query()->where('ra', '20260001')->first();
 
     expect($aluno->turma_id)->toBe($turma->id)
         ->and($aluno->historicos()->count())->toBe(1)
         ->and($aluno->historicos()->first()->evento)->toBe(EventoHistorico::AlunoMatriculado);
 });
 
-it('recusa matrícula repetida na mesma turma', function () {
+it('recusa RA repetido na mesma turma', function () {
     $turma = Turma::factory()
         ->doCurso(Curso::factory()->noEixo($this->eixo)->create())
         ->create();
 
-    Aluno::factory()->naTurma($turma)->create(['matricula' => '123']);
+    Aluno::factory()->naTurma($turma)->create(['ra' => '123']);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioAluno::class)
         ->set('turma_id', $turma->id)
         ->set('nome', 'Homônimo')
-        ->set('matricula', '123')
+        ->set('ra', '123')
         ->call('salvar')
-        ->assertHasErrors('matricula');
+        ->assertHasErrors('ra');
 });
 
 it('grava histórico ao trocar o aluno de turma pelo formulário', function () {
@@ -287,7 +287,7 @@ it('grava histórico ao trocar o aluno de turma pelo formulário', function () {
     $origem = Turma::factory()->doCurso($curso)->create(['nome' => '1 A']);
     $destino = Turma::factory()->doCurso($curso)->create(['nome' => '1 B']);
 
-    $aluno = Aluno::factory()->naTurma($origem)->create(['matricula' => '999']);
+    $aluno = Aluno::factory()->naTurma($origem)->create(['ra' => '999']);
 
     Livewire::actingAs($this->paeet)
         ->test(FormularioAluno::class, ['aluno' => $aluno])

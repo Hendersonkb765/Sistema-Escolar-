@@ -31,10 +31,11 @@
     <div class="space-y-4">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <x-campo rotulo="Enunciado" :para="'enunciado-'.$questao->id" obrigatorio class="sm:col-span-3">
-                <x-area-texto id="enunciado-{{ $questao->id }}" :linhas="3"
-                              wire:model.blur="formulario.{{ $questao->id }}.enunciado"
-                              :desabilitado="$bloqueado"
-                              placeholder="O comando da questão"/>
+                <x-area-texto-formatada id="enunciado-{{ $questao->id }}" :linhas="3"
+                                        wire:model.blur="formulario.{{ $questao->id }}.enunciado"
+                                        :desabilitado="$bloqueado"
+                                        :valor="$dados['enunciado'] ?? ''"
+                                        placeholder="O comando da questão"/>
             </x-campo>
 
             <x-campo rotulo="Peso da questão" :para="'peso-'.$questao->id" obrigatorio
@@ -45,6 +46,23 @@
                          :desabilitado="$bloqueado"/>
             </x-campo>
         </div>
+
+        <x-campo rotulo="Habilidade avaliada" :para="'habilidade-'.$questao->id" obrigatorio
+                 ajuda="O que esta questão mede. É por ela que a análise mostra onde a turma teve dificuldade — repita a mesma redação nas questões da mesma habilidade.">
+            {{-- `list` sugere o que já foi escrito nesta disciplina sem
+                 impedir uma habilidade nova. --}}
+            <x-input id="habilidade-{{ $questao->id }}"
+                     wire:model.blur="formulario.{{ $questao->id }}.habilidade"
+                     list="habilidades-{{ $questao->solicitacao_parte_id }}"
+                     :desabilitado="$bloqueado"
+                     placeholder="Ex.: Interpretar estruturas de repetição"/>
+
+            <datalist id="habilidades-{{ $questao->solicitacao_parte_id }}">
+                @foreach ($habilidadesPorParte[$questao->solicitacao_parte_id] ?? [] as $sugestao)
+                    <option value="{{ $sugestao }}"></option>
+                @endforeach
+            </datalist>
+        </x-campo>
 
         {{-- Blocos do enunciado: código, imagem e parágrafos --}}
         <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
@@ -136,9 +154,10 @@
                                 </div>
                             @else
                                 <x-campo rotulo="Texto" class="mt-2">
-                                    <x-area-texto :linhas="3"
-                                                  wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
-                                                  :desabilitado="$bloqueado"/>
+                                    <x-area-texto-formatada :linhas="3"
+                                                            wire:model.blur="formulario.{{ $questao->id }}.blocos.{{ $indice }}.conteudo"
+                                                            :desabilitado="$bloqueado"
+                                                            :valor="$bloco['conteudo'] ?? ''"/>
                                 </x-campo>
                             @endif
                         </div>

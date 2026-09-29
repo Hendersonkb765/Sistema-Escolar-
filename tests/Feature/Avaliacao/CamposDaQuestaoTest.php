@@ -115,6 +115,7 @@ it('libera o botão de enviar quando todas as questões estão completas', funct
                 ['letra' => 'D', 'texto' => 'D', 'correta' => false],
             ],
             peso: 1,
+            habilidade: 'Interpretar estruturas de repetição',
         );
     }
 
@@ -148,6 +149,7 @@ it('diz o que falta em cada questão, não só quantas faltam', function () {
             ['letra' => 'D', 'texto' => 'D', 'correta' => false],
         ],
         peso: 1,
+        habilidade: 'Interpretar estruturas de repetição',
     );
 
     expect($questao->refresh()->pendencias(4))->toBe(['marque qual alternativa é a correta']);
@@ -166,6 +168,7 @@ it('lista cada pendência de uma questão vazia', function () {
 
     expect($questao->refresh()->pendencias(4))->toBe([
         'escreva o enunciado',
+        'informe a habilidade avaliada',
         'informe um peso maior que zero',
         'preencha as 4 alternativa(s) que faltam',
         'marque qual alternativa é a correta',
@@ -194,6 +197,7 @@ it('mostra quando a questão fica pronta para enviar', function () {
             ['letra' => 'D', 'texto' => 'D', 'correta' => false],
         ],
         peso: 1,
+        habilidade: 'Interpretar estruturas de repetição',
     );
 
     $html = ($this->html)();

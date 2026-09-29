@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Models\Concerns\AplicaEscopoDeEixo;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,10 @@ class Prova extends Model
         'turma_id',
         'modelo_prova_id',
         'titulo',
+        'instituicao',
+        'nome_avaliacao',
+        'tamanho_instituicao',
+        'bimestre',
         'data_aplicacao',
         'versao',
         'status',
@@ -38,10 +43,22 @@ class Prova extends Model
         'gerada_em',
     ];
 
+    /**
+     * Instância nova já nasce com os mesmos padrões da tabela: sem
+     * isso, um model não persistido devolve `null` onde a view espera
+     * um enum.
+     */
+    protected $attributes = [
+        'status' => 'rascunho',
+        'bimestre' => 1,
+        'versao' => 1,
+    ];
+
     protected function casts(): array
     {
         return [
             'status' => StatusProva::class,
+            'bimestre' => Bimestre::class,
             'data_aplicacao' => 'date',
             'configuracao' => 'array',
             'gerada_em' => 'datetime',
@@ -149,6 +166,34 @@ class Prova extends Model
             ->orderBy('numero')
             ->get()
             ->mapWithKeys(fn (ProvaQuestao $questao) => [$questao->numero => $questao->letra_correta]);
+    }
+
+    /**
+     * O que sai na primeira linha da folha.
+     *
+     * A prova pode ter escolhido um texto próprio na montagem; sem
+     * isso vale o do modelo, e corrigir o modelo corrige a reimpressão
+     * de todas as provas que não escolheram.
+     */
+    public function instituicaoDaFolha(): string
+    {
+        return $this->instituicao
+            ?: ($this->loadMissing('modelo')->modelo->instituicao ?: (string) config('instituicao.nome'));
+    }
+
+    /** O corpo do nome da instituição, em pontos. */
+    public function tamanhoDaInstituicao(): int
+    {
+        return $this->loadMissing('modelo')->modelo
+            ->layoutDaFolha()
+            ->tamanhoDaInstituicao($this->tamanho_instituicao);
+    }
+
+    /** O que sai na segunda linha, antes do título da prova. */
+    public function nomeDaAvaliacao(): string
+    {
+        return $this->nome_avaliacao
+            ?: ($this->loadMissing('modelo')->modelo->nome_avaliacao ?: 'Avaliação');
     }
 
     /** Uma prova já gerada tem snapshot imutável. */

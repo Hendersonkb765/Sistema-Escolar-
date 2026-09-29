@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div class="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
                 <x-campo rotulo="Buscar" para="busca">
-                    <x-input id="busca" wire:model.live.debounce.400ms="busca" placeholder="Nome ou matrícula"/>
+                    <x-input id="busca" wire:model.live.debounce.400ms="busca" placeholder="Nome ou RA"/>
                 </x-campo>
 
                 <x-campo rotulo="Turma" para="filtro-turma">
@@ -44,7 +44,7 @@
                                 <button type="button" wire:click="ordenar('nome')" class="font-semibold">Aluno {{ $this->setaDaColuna('nome') }}</button>
                             </th>
                             <th class="px-4 py-2">
-                                <button type="button" wire:click="ordenar('matricula')" class="font-semibold">Matrícula {{ $this->setaDaColuna('matricula') }}</button>
+                                <button type="button" wire:click="ordenar('ra')" class="font-semibold">RA {{ $this->setaDaColuna('ra') }}</button>
                             </th>
                             <th class="hidden px-4 py-2 sm:table-cell">Turma</th>
                             <th class="hidden px-4 py-2 md:table-cell">Curso</th>
@@ -56,7 +56,7 @@
                         @foreach ($alunos as $aluno)
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <td class="px-4 py-3 font-medium text-slate-900 sm:px-6 dark:text-slate-100">{{ $aluno->nome }}</td>
-                                <td class="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $aluno->matricula }}</td>
+                                <td class="px-4 py-3 tabular-nums text-slate-600 dark:text-slate-300">{{ $aluno->ra }}</td>
                                 <td class="hidden px-4 py-3 sm:table-cell">
                                     <a href="{{ route('turmas.show', $aluno->turma) }}" wire:navigate
                                        class="text-marca-600 hover:underline dark:text-marca-400">{{ $aluno->turma->nome }}</a>
