@@ -22,11 +22,13 @@ use Mpdf\Mpdf;
  * Três formas, decididas pelo modelo e não por opção solta na tela:
  *
  * - **coletivo**: uma via, com a tabela dos alunos escolhidos dentro;
- * - **individual, 1 por página**: uma folha por aluno, para assinar e
- *   devolver;
- * - **individual, 2 ou 3 por página**: as vias empilhadas na mesma
- *   folha, separadas por linha de corte. É o que a escola usa quando o
- *   texto é curto — 90 autorizações em 30 folhas em vez de 90.
+ * - **individual, uma por folha**: para o documento que precisa sair
+ *   sozinho;
+ * - **individual, quantas couberem** (o padrão): as vias se empilham até
+ *   encher a folha, separadas por linha de corte. Quantas cabem é o
+ *   `page-break-inside: avoid` que decide, medindo o texto de verdade —
+ *   num documento curto cabem seis onde um teto de três mandaria gastar
+ *   duas folhas.
  */
 class GerarDocumentosAction
 {
@@ -51,7 +53,7 @@ class GerarDocumentosAction
             'modelo' => $modelo,
             'turma' => $turma,
             'vias' => $this->vias($modelo, $turma, $alunos),
-            'porPagina' => $modelo->viasPorPagina(),
+            'empilha' => $modelo->empilhaNaFolha(),
             'logos' => $this->logosDaTurma($turma),
             'instituicao' => $this->instituicaoDaTurma($turma),
         ])->render());

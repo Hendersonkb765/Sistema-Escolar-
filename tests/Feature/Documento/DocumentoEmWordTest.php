@@ -51,6 +51,29 @@ function xmlDoDocx(string $docx): string
     return $xml;
 }
 
+/**
+ * O styles.xml do .docx.
+ *
+ * Os estilos nomeados do PhpWord moram aqui, e não no document.xml — lá
+ * só fica a referência (`<w:pStyle w:val="corpo"/>`). Procurar
+ * `keepNext` no document.xml não acha nada mesmo quando ele está
+ * aplicado.
+ */
+function estilosDoDocx(string $docx): string
+{
+    $arquivo = tempnam(sys_get_temp_dir(), 'teste').'.docx';
+    file_put_contents($arquivo, $docx);
+
+    $zip = new ZipArchive;
+    $zip->open($arquivo);
+    $xml = (string) $zip->getFromName('word/styles.xml');
+    $zip->close();
+
+    @unlink($arquivo);
+
+    return $xml;
+}
+
 /** O texto corrido do .docx, sem as tags. */
 function textoDoDocx(string $docx): string
 {
@@ -78,21 +101,48 @@ it('põe uma via por aluno escolhido, com o nome de cada um', function () {
         ->not->toContain('Caio Prado');
 });
 
-it('quebra a página a cada N vias', function () {
-    $contarQuebras = fn (int $porPagina) => substr_count(
-        xmlDoDocx($this->acao->conteudo(
-            ModeloDocumento::factory()->noEixo($this->eixo)->porPagina($porPagina)->create(),
-            $this->turma,
-            ($this->todos)(),
-            $this->paeet,
-        )),
-        'w:br w:type="page"',
-    );
+it('quebra a página entre as vias quando o modelo pede uma por folha', function () {
+    $xml = xmlDoDocx($this->acao->conteudo(
+        ModeloDocumento::factory()->noEixo($this->eixo)->umaPorFolha()->create(),
+        $this->turma, ($this->todos)(), $this->paeet,
+    ));
 
-    // Três alunos: uma via por página dá duas quebras; três por página,
-    // nenhuma.
-    expect($contarQuebras(1))->toBe(2)
-        ->and($contarQuebras(3))->toBe(0);
+    // Três alunos, três folhas: duas quebras.
+    expect(substr_count($xml, 'w:br w:type="page"'))->toBe(2);
+});
+
+/*
+ * No Word não há como medir a folha de dentro do gerador. O que existe é
+ * `keepLines`/`keepNext`: cada parágrafo pede para não ser partido e para
+ * ficar colado no seguinte, e é o Word que empurra a via inteira quando
+ * ela não cabe. O último parágrafo de cada via solta o `keepNext` — sem
+ * isso o documento vira um bloco só e nada quebra em lugar nenhum.
+ */
+it('pede ao Word que não parta uma via ao meio', function () {
+    $xml = xmlDoDocx($this->acao->conteudo(
+        ModeloDocumento::factory()->noEixo($this->eixo)->create(),
+        $this->turma, ($this->todos)(), $this->paeet,
+    ));
+
+    $estilos = estilosDoDocx($this->acao->conteudo(
+        ModeloDocumento::factory()->noEixo($this->eixo)->create(),
+        $this->turma, ($this->todos)(), $this->paeet,
+    ));
+
+    expect($estilos)->toContain('keepNext')
+        ->toContain('keepLines')
+        // Empilhando, nenhuma quebra de página é imposta.
+        ->and(substr_count($xml, 'w:br w:type="page"'))->toBe(0);
+});
+
+it('não gruda tudo num bloco só: a linha de corte abre a quebra', function () {
+    $xml = xmlDoDocx($this->acao->conteudo(
+        ModeloDocumento::factory()->noEixo($this->eixo)->create(),
+        $this->turma, ($this->todos)(), $this->paeet,
+    ));
+
+    // Três vias, duas linhas de corte: são elas que abrem a quebra.
+    expect(substr_count($xml, 'fim-da-via'))->toBeGreaterThanOrEqual(2);
 });
 
 /*
@@ -141,7 +191,7 @@ it('desenha os campos de preencher', function () {
 });
 
 it('leva o nome da escola para cada via, porque a folha é recortada', function () {
-    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->porPagina(3)->create();
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->create();
 
     $texto = textoDoDocx($this->acao->conteudo($modelo, $this->turma, ($this->todos)(), $this->paeet));
 

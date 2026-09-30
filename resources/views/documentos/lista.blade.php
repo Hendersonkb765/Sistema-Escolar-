@@ -76,9 +76,9 @@
                                 </td>
                                 <td class="hidden whitespace-nowrap px-4 py-3 md:table-cell">
                                     <x-badge :cor="$modelo->tipo->cor()" :rotulo="$modelo->tipo->rotulo()"/>
-                                    @if ($modelo->ehIndividual() && $modelo->por_pagina > 1)
+                                    @if ($modelo->ehIndividual())
                                         <span class="block pt-1 text-xs text-slate-400">
-                                            {{ $modelo->por_pagina }} por página
+                                            {{ $modelo->empilhaNaFolha() ? 'quantas couberem na folha' : 'uma por folha' }}
                                         </span>
                                     @endif
                                 </td>

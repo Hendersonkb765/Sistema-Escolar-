@@ -26,7 +26,7 @@ class ModeloDocumentoFactory extends Factory
             'corpo' => 'Eu, {{ linha: Responsável }}, autorizo o aluno {{ aluno.nome }}, '
                 ."RA {{ aluno.ra }}, da turma {{ turma.nome }}, a participar da atividade.\n\n"
                 .'{{ turma.periodo_letivo }} — {{ data }}',
-            'por_pagina' => 1,
+            'por_pagina' => ModeloDocumento::AUTOMATICO,
             'ativo' => true,
         ];
     }
@@ -46,8 +46,9 @@ class ModeloDocumentoFactory extends Factory
         ]);
     }
 
-    public function porPagina(int $quantidade): static
+    /** Uma via por folha, em vez do padrão "quantas couberem". */
+    public function umaPorFolha(): static
     {
-        return $this->state(fn () => ['por_pagina' => $quantidade]);
+        return $this->state(fn () => ['por_pagina' => 1]);
     }
 }

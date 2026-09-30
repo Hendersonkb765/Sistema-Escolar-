@@ -34,7 +34,7 @@ class FormularioModeloDocumento extends Component
 
     public string $corpo = '';
 
-    public int $por_pagina = 1;
+    public int $por_pagina = ModeloDocumento::AUTOMATICO;
 
     public bool $ativo = true;
 
@@ -88,7 +88,7 @@ class FormularioModeloDocumento extends Component
             'descricao' => 'descrição',
             'tipo' => 'tipo de documento',
             'corpo' => 'texto do documento',
-            'por_pagina' => 'vias por página',
+            'por_pagina' => 'como as vias ocupam a folha',
         ];
     }
 
@@ -122,6 +122,8 @@ class FormularioModeloDocumento extends Component
             'tipo' => $this->tipo,
             'corpo' => $this->corpo,
             // Repetir a lista da turma na mesma folha não significa nada.
+            // O coletivo é sempre uma via: repetir a lista da turma na
+            // mesma folha não significa nada.
             'por_pagina' => $this->tipoEscolhido() === TipoDeDocumento::Individual ? $this->por_pagina : 1,
             'ativo' => $this->ativo,
         ];

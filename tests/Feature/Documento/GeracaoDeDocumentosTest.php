@@ -44,7 +44,7 @@ function paginasDoPdf(string $pdf): int
 }
 
 it('gera um PDF com uma via por aluno escolhido', function () {
-    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->create();
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->umaPorFolha()->create();
 
     $pdf = $this->acao->conteudo($modelo, $this->turma, $this->alunos->pluck('id')->all(), $this->paeet);
 
@@ -53,7 +53,7 @@ it('gera um PDF com uma via por aluno escolhido', function () {
 });
 
 it('gera só para os alunos escolhidos', function () {
-    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->create();
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->umaPorFolha()->create();
 
     $escolhidos = [$this->alunos[0]->id, $this->alunos[2]->id];
 
@@ -62,21 +62,42 @@ it('gera só para os alunos escolhidos', function () {
     expect(paginasDoPdf($pdf))->toBe(2);
 });
 
-it('põe três vias na mesma página quando o modelo pede', function () {
-    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->porPagina(3)->create();
+/*
+ * Contar vias por folha à mão errava sempre para menos: o número certo
+ * depende do tamanho do texto, que muda de modelo para modelo. Com
+ * `page-break-inside: avoid`, o mPDF mede a via inteira e só a empurra
+ * para a folha seguinte quando ela não cabe.
+ */
+it('empilha quantas vias couberem na folha', function () {
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->create();
 
     $pdf = $this->acao->conteudo($modelo, $this->turma, $this->alunos->pluck('id')->all(), $this->paeet);
 
+    // Três autorizações curtas cabem folgadas numa folha só.
     expect(paginasDoPdf($pdf))->toBe(1);
 });
 
-it('quebra a página a cada duas vias quando cabem duas', function () {
-    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->porPagina(2)->create();
+it('não gasta uma folha por aluno quando o documento é curto', function () {
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->create();
+
+    // Doze alunos, num documento de poucas linhas.
+    $turma = $this->turma;
+    $muitos = collect(range(1, 12))->map(fn (int $i) => Aluno::factory()->naTurma($turma)
+        ->create(['nome' => "Aluno {$i} de Teste", 'ra' => '2026'.str_pad((string) $i, 4, '0', STR_PAD_LEFT)]));
+
+    $pdf = $this->acao->conteudo($modelo, $turma, $muitos->pluck('id')->all(), $this->paeet);
+
+    // Uma por folha seriam doze; empilhando, cabem várias por folha.
+    expect(paginasDoPdf($pdf))->toBeLessThan(6)
+        ->and(paginasDoPdf($pdf))->toBeGreaterThan(0);
+});
+
+it('dá uma folha a cada aluno quando o modelo pede uma por folha', function () {
+    $modelo = ModeloDocumento::factory()->noEixo($this->eixo)->umaPorFolha()->create();
 
     $pdf = $this->acao->conteudo($modelo, $this->turma, $this->alunos->pluck('id')->all(), $this->paeet);
 
-    // Três vias, duas por página: uma folha cheia e outra com uma via.
-    expect(paginasDoPdf($pdf))->toBe(2);
+    expect(paginasDoPdf($pdf))->toBe(3);
 });
 
 it('gera uma via só no documento coletivo, com a turma inteira dentro', function () {

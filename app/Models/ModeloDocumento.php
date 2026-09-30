@@ -44,14 +44,15 @@ class ModeloDocumento extends Model
 
     protected $attributes = [
         'tipo' => 'individual',
-        'por_pagina' => 1,
+        'por_pagina' => self::AUTOMATICO,
     ];
 
-    /** Uma via ocupa a página inteira, metade dela ou um terço. */
+    /** Quantas couberem, sem cortar nenhuma ao meio. */
+    public const AUTOMATICO = 0;
+
     public const POR_PAGINA = [
-        1 => '1 por página',
-        2 => '2 por página',
-        3 => '3 por página',
+        self::AUTOMATICO => 'Quantas couberem na folha',
+        1 => 'Uma por folha',
     ];
 
     protected function casts(): array
@@ -104,13 +105,20 @@ class ModeloDocumento extends Model
     }
 
     /**
-     * Quantas vias cabem numa página. O documento coletivo é sempre uma
-     * via só: repetir a lista da turma três vezes na mesma folha não
-     * significa nada.
+     * As vias se empilham até encher a folha?
+     *
+     * O padrão é sim, e quem decide onde cortar é o próprio gerador: no
+     * PDF, `page-break-inside: avoid`; no Word, `keepLines`/`keepNext`.
+     * Contar vias por folha à mão errava sempre para menos — num
+     * documento curto cabem seis onde o teto de três mandava usar duas
+     * folhas.
+     *
+     * O documento coletivo é sempre uma via só: repetir a lista da turma
+     * na mesma folha não significa nada.
      */
-    public function viasPorPagina(): int
+    public function empilhaNaFolha(): bool
     {
-        return $this->ehIndividual() ? max(1, min(3, (int) $this->por_pagina)) : 1;
+        return $this->ehIndividual() && (int) $this->por_pagina === self::AUTOMATICO;
     }
 
     /** @return array<int, string> campos do corpo que este tipo não aceita */

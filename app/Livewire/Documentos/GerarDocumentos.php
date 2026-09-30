@@ -10,6 +10,7 @@ use App\Models\Aluno;
 use App\Models\ModeloDocumento;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
@@ -36,6 +37,16 @@ class GerarDocumentos extends Component
     /** @var array<int, int> */
     public array $escolhidos = [];
 
+    /**
+     * Filtra a lista por nome ou RA.
+     *
+     * Numa turma de quarenta e quatro, achar um aluno rolando a página é
+     * o trabalho que esta tela deveria poupar. A busca **não** desmarca
+     * ninguém: ela esconde linhas, e quem estava marcado continua
+     * marcado — senão procurar um aluno desfaria a seleção dos outros.
+     */
+    public string $busca = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', ModeloDocumento::class);
@@ -48,17 +59,36 @@ class GerarDocumentos extends Component
 
     public function updatedTurmaId(): void
     {
+        $this->busca = '';
+        $this->escolhidos = [];
         $this->marcarTodos();
     }
 
+    /**
+     * Marcar e desmarcar valem para o que está à vista.
+     *
+     * Com a busca preenchida, "marcar todos" no sentido literal marcaria
+     * gente que a pessoa não está vendo. O rótulo do botão diz quantos
+     * são, para não haver dúvida.
+     */
     public function marcarTodos(): void
     {
-        $this->escolhidos = $this->alunos()->pluck('id')->all();
+        $this->escolhidos = array_values(array_unique(array_merge(
+            $this->escolhidos,
+            $this->alunos()->pluck('id')->all(),
+        )));
     }
 
     public function desmarcarTodos(): void
     {
-        $this->escolhidos = [];
+        $visiveis = $this->alunos()->pluck('id')->all();
+
+        $this->escolhidos = array_values(array_diff($this->escolhidos, $visiveis));
+    }
+
+    public function limparBusca(): void
+    {
+        $this->busca = '';
     }
 
     /** @return Collection<int, ModeloDocumento> */
@@ -82,18 +112,42 @@ class GerarDocumentos extends Component
             ->get(['id', 'nome', 'periodo', 'periodo_letivo', 'curso_id']);
     }
 
-    /** @return Collection<int, Aluno> */
+    /**
+     * Os alunos à vista: os da turma, passados pela busca.
+     *
+     * @return Collection<int, Aluno>
+     */
     public function alunos(): Collection
     {
+        return $this->daTurma()->when($this->busca !== '', function ($consulta) {
+            $termo = '%'.str_replace('%', '\%', trim($this->busca)).'%';
+
+            // Nome ou RA: quem tem a lista de chamada na mão procura pelo
+            // número, e quem tem o bilhete na mão procura pelo nome.
+            $consulta->where(fn ($sub) => $sub
+                ->where('nome', 'like', $termo)
+                ->orWhere('ra', 'like', $termo));
+        })->get(['id', 'nome', 'ra', 'status', 'turma_id']);
+    }
+
+    /** @return Collection<int, Aluno> */
+    public function todosDaTurma(): Collection
+    {
+        return $this->daTurma()->get(['id', 'nome', 'ra', 'status', 'turma_id']);
+    }
+
+    protected function daTurma(): Builder
+    {
         if ($this->turma_id === null) {
-            return collect();
+            // Consulta que não devolve nada, para o resto do método não
+            // precisar saber que a turma pode faltar.
+            return Aluno::query()->whereRaw('1 = 0');
         }
 
         return Aluno::query()
             ->visivelPara(auth()->user())
             ->where('turma_id', $this->turma_id)
-            ->orderBy('nome')
-            ->get(['id', 'nome', 'ra', 'status', 'turma_id']);
+            ->orderBy('nome');
     }
 
     public function modeloEscolhido(): ?ModeloDocumento
@@ -118,7 +172,7 @@ class GerarDocumentos extends Component
             return 'Escolha a turma.';
         }
 
-        if ($this->escolhidos === []) {
+        if (array_intersect($this->escolhidos, $this->todosDaTurma()->pluck('id')->all()) === []) {
             return 'Marque pelo menos um aluno.';
         }
 
@@ -169,15 +223,20 @@ class GerarDocumentos extends Component
 
     public function render(): View
     {
-        $alunos = $this->alunos();
+        $visiveis = $this->alunos();
+        $daTurma = $this->todosDaTurma();
 
         return view('documentos.gerar', [
             'modelos' => $this->modelos(),
             'turmas' => $this->turmas(),
-            'alunos' => $alunos,
+            'alunos' => $visiveis,
+            'totalDaTurma' => $daTurma->count(),
             'modelo' => $this->modeloEscolhido(),
             'impedimento' => $this->impedimento(),
-            'totalEscolhidos' => count(array_intersect($this->escolhidos, $alunos->pluck('id')->all())),
+            // O que vale é o que está marcado na turma, e não só o que a
+            // busca deixou à vista: gerar leva todos os marcados.
+            'totalEscolhidos' => count(array_intersect($this->escolhidos, $daTurma->pluck('id')->all())),
+            'visiveisMarcados' => count(array_intersect($this->escolhidos, $visiveis->pluck('id')->all())),
         ])->layout('components.layouts.app', [
             'titulo' => 'Gerar documentos',
             'subtitulo' => 'Escolha o modelo, a turma e quais alunos recebem o documento',

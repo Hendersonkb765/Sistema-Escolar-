@@ -28,9 +28,9 @@
                     <x-badge :cor="$modelo->tipo->cor()" :rotulo="$modelo->tipo->rotulo()"/>
                     @if ($modelo->ehIndividual())
                         <span>
-                            {{ $modelo->por_pagina === 1
-                                ? 'Uma folha por aluno.'
-                                : $modelo->por_pagina.' vias por folha, com linha de corte entre elas.' }}
+                            {{ $modelo->empilhaNaFolha()
+                                ? 'Cabem quantas a folha permitir, com linha de corte entre elas.'
+                                : 'Uma folha por aluno.' }}
                         </span>
                     @else
                         <span>Uma folha só, com a relação dos alunos marcados.</span>
@@ -43,36 +43,63 @@
     <x-cartao>
         <x-slot:titulo>Quem recebe o documento</x-slot:titulo>
         <x-slot:descricao>
-            {{ $alunos->isEmpty()
-                ? 'Escolha uma turma para ver os alunos.'
-                : $totalEscolhidos.' de '.$alunos->count().' alunos marcados.' }}
+            @if ($totalDaTurma === 0)
+                Escolha uma turma para ver os alunos.
+            @else
+                {{ $totalEscolhidos }} de {{ $totalDaTurma }} alunos marcados.
+                @if ($busca !== '')
+                    Mostrando {{ $alunos->count() }} com “{{ $busca }}” — os marcados fora da busca continuam marcados.
+                @endif
+            @endif
         </x-slot:descricao>
 
         <x-slot:acoes>
-            @if ($alunos->isNotEmpty())
-                <x-botao variante="discreto" wire:click="marcarTodos">Marcar todos</x-botao>
-                <x-botao variante="discreto" wire:click="desmarcarTodos">Desmarcar todos</x-botao>
+            @if ($totalDaTurma > 0)
+                <x-botao variante="discreto" wire:click="marcarTodos">
+                    {{ $busca === '' ? 'Marcar todos' : 'Marcar os '.$alunos->count().' à vista' }}
+                </x-botao>
+                <x-botao variante="discreto" wire:click="desmarcarTodos">
+                    {{ $busca === '' ? 'Desmarcar todos' : 'Desmarcar os à vista' }}
+                </x-botao>
             @endif
         </x-slot:acoes>
 
-        <div class="p-4 sm:p-6">
-            @if ($alunos->isEmpty())
+        <div class="space-y-4 p-4 sm:p-6">
+            @if ($totalDaTurma === 0)
                 <x-vazio titulo="Nenhum aluno nesta turma"
                          descricao="Matricule alunos na turma para gerar documentos para eles."/>
             @else
-                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    @foreach ($alunos as $aluno)
-                        <label wire:key="aluno-{{ $aluno->id }}"
-                               class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                            <input type="checkbox" value="{{ $aluno->id }}" wire:model.live="escolhidos"
-                                   class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
-                            <span class="min-w-0">
-                                <span class="block truncate text-slate-900 dark:text-slate-100">{{ $aluno->nome }}</span>
-                                <span class="block text-xs text-slate-400">RA {{ $aluno->ra }}</span>
-                            </span>
-                        </label>
-                    @endforeach
-                </div>
+                {{--
+                    Numa turma de quarenta e quatro, achar um aluno rolando
+                    a lista é o trabalho que esta tela deveria poupar.
+                --}}
+                <x-campo rotulo="Buscar aluno" para="busca-aluno">
+                    <x-input id="busca-aluno" wire:model.live.debounce.300ms="busca"
+                             placeholder="Nome ou RA"/>
+                </x-campo>
+
+                @if ($alunos->isEmpty())
+                    <x-vazio titulo="Nenhum aluno com “{{ $busca }}”"
+                             descricao="A busca procura no nome e no RA.">
+                        <x-slot:acoes>
+                            <x-botao variante="secundario" wire:click="limparBusca">Limpar a busca</x-botao>
+                        </x-slot:acoes>
+                    </x-vazio>
+                @else
+                    <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach ($alunos as $aluno)
+                            <label wire:key="aluno-{{ $aluno->id }}"
+                                   class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                                <input type="checkbox" value="{{ $aluno->id }}" wire:model.live="escolhidos"
+                                       class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
+                                <span class="min-w-0">
+                                    <span class="block truncate text-slate-900 dark:text-slate-100">{{ $aluno->nome }}</span>
+                                    <span class="block text-xs text-slate-400">RA {{ $aluno->ra }}</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                @endif
             @endif
         </div>
     </x-cartao>

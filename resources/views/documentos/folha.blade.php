@@ -12,10 +12,8 @@
     meio.
 --}}
 @php
-    // A4 (297mm) menos as margens do mPDF (14 em cima, 12 embaixo).
-    $alturaUtil = 297 - 14 - 12;
-    $alturaDaVia = $porPagina > 1 ? ($alturaUtil / $porPagina) : null;
-    $compacto = $porPagina > 1;
+    // Empilhando, o texto sai um pouco menor: é o que faz caber mais uma.
+    $compacto = $empilha;
 @endphp
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -31,14 +29,18 @@
         }
 
         /*
-            A via não leva altura fixa. O mPDF soma a altura declarada ao
-            que o conteúdo já ocupa em vez de encaixá-lo dentro dela, e
-            três vias de 90mm passavam a ocupar 280mm — a terceira caía
-            na folha seguinte. Quem separa as folhas é o <pagebreak/> a
-            cada N vias, e o limite de altura é o aviso na tela de
-            montagem do modelo.
+            Quem decide quantas vias cabem é esta linha.
+
+            `page-break-inside: avoid` faz o mPDF medir a via inteira e,
+            se ela não couber no que resta da folha, empurrá-la para a
+            próxima — sem cortá-la ao meio. É melhor do que contar vias à
+            mão: o número certo depende do tamanho do texto, que muda de
+            modelo para modelo e até de aluno para aluno.
+
+            Altura fixa não serve: o mPDF soma a altura declarada ao que o
+            conteúdo já ocupa, em vez de encaixá-lo dentro dela.
         */
-        .via { }
+        .via { page-break-inside: avoid; }
 
         /* Linha de corte entre as vias da mesma folha. */
         .corte {
@@ -103,12 +105,8 @@
 </head>
 <body>
 @foreach ($vias as $indice => $via)
-    @if ($indice > 0)
-        @if ($indice % $porPagina === 0)
-            <pagebreak/>
-        @else
-            <div class="corte">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
-        @endif
+    @if (! $empilha && $indice > 0)
+        <pagebreak/>
     @endif
 
     <div class="via">
@@ -134,6 +132,16 @@
         </div>
 
         <div class="corpo">{!! $via !!}</div>
+
+        {{--
+            A linha de corte fica DENTRO da via, no rodapé dela, e não
+            entre duas. Solta entre uma e outra, ela é um bloco à parte:
+            quando a via seguinte não cabe e desce para a folha nova, a
+            linha fica para trás — ou pior, encabeça a folha seguinte.
+        --}}
+        @if ($empilha && ! $loop->last)
+            <div class="corte">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
+        @endif
     </div>
 @endforeach
 </body>

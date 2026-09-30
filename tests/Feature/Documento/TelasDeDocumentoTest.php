@@ -79,6 +79,116 @@ it('troca a lista de alunos ao trocar de turma', function () {
         ->assertDontSee('Marina Alves');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Buscar o aluno na lista
+|--------------------------------------------------------------------------
+|
+| Numa turma de quarenta e quatro, achar um aluno rolando a página é o
+| trabalho que esta tela deveria poupar.
+*/
+
+it('filtra a lista pelo nome', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->set('busca', 'Marina')
+        ->assertSee('Marina Alves')
+        ->assertDontSee('Caio Prado')
+        ->assertDontSee('Rita Souza');
+});
+
+it('filtra também pelo RA, que é como se procura com a chamada na mão', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->set('busca', '20261002')
+        ->assertSee('Caio Prado')
+        ->assertDontSee('Marina Alves');
+});
+
+/*
+ * Buscar esconde linhas; não desmarca ninguém. Se desmarcasse, procurar
+ * um aluno desfaria a seleção dos outros — e quem só queria conferir um
+ * nome perderia o trabalho todo.
+ */
+it('não desmarca ninguém ao buscar', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->assertCount('escolhidos', 3)
+        ->set('busca', 'Marina')
+        ->assertCount('escolhidos', 3)
+        ->set('busca', '')
+        ->assertCount('escolhidos', 3);
+});
+
+it('marca e desmarca só o que está à vista', function () {
+    $componente = Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->call('desmarcarTodos')
+        ->assertCount('escolhidos', 0);
+
+    $componente->set('busca', 'Marina')
+        ->call('marcarTodos')
+        ->assertCount('escolhidos', 1)
+        ->set('busca', '')
+        // Os outros dois seguem desmarcados.
+        ->assertCount('escolhidos', 1);
+});
+
+it('não apaga a seleção dos escondidos ao desmarcar os à vista', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->assertCount('escolhidos', 3)
+        ->set('busca', 'Marina')
+        ->call('desmarcarTodos')
+        ->set('busca', '')
+        ->assertCount('escolhidos', 2);
+});
+
+it('avisa quando a busca não acha ninguém, sem parecer turma vazia', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->set('busca', 'Fulano Que Não Existe')
+        ->assertSee('Nenhum aluno com')
+        ->assertDontSee('Nenhum aluno nesta turma');
+});
+
+it('limpa a busca pelo botão', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->set('busca', 'zzz')
+        ->call('limparBusca')
+        ->assertSet('busca', '')
+        ->assertSee('Marina Alves');
+});
+
+/*
+ * Gerar leva todos os marcados, e não só os que a busca deixou à vista:
+ * quem marcou trinta e depois procurou um nome não quer um PDF com uma
+ * via só.
+ */
+it('gera para todos os marcados, mesmo com a busca preenchida', function () {
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class)
+        ->set('modelo_id', $this->modelo->id)
+        ->set('turma_id', $this->turma->id)
+        ->set('busca', 'Marina')
+        ->call('gerar', 'pdf')
+        ->assertFileDownloaded('autorizacao-de-visita-1-a.pdf');
+});
+
+it('esquece a busca e a seleção ao trocar de turma', function () {
+    $outra = Turma::query()->where('nome', '1 B')->sole();
+    Aluno::factory()->naTurma($outra)->create(['nome' => 'Bruno Lima']);
+
+    Livewire::actingAs($this->admin)
+        ->test(GerarDocumentos::class, ['turma' => $this->turma->id])
+        ->set('busca', 'Marina')
+        ->set('turma_id', $outra->id)
+        ->assertSet('busca', '')
+        ->assertCount('escolhidos', 1)
+        ->assertSee('Bruno Lima');
+});
+
 it('baixa o PDF dos alunos marcados', function () {
     $resposta = Livewire::actingAs($this->admin)
         ->test(GerarDocumentos::class)
@@ -138,13 +248,13 @@ it('salva um modelo novo pelo formulário', function () {
         ->set('nome', 'Declaração de matrícula')
         ->set('tipo', 'individual')
         ->set('corpo', 'Declaro que {{ aluno.nome }}, RA {{ aluno.ra }}, está matriculado.')
-        ->set('por_pagina', 3)
+        ->set('por_pagina', 1)
         ->call('salvar')
         ->assertRedirect(route('documentos.index'));
 
     $salvo = ModeloDocumento::query()->where('nome', 'Declaração de matrícula')->sole();
 
-    expect($salvo->por_pagina)->toBe(3)
+    expect($salvo->por_pagina)->toBe(1)
         ->and($salvo->criado_por)->toBe($this->admin->id)
         ->and($salvo->tipo)->toBe(TipoDeDocumento::Individual);
 });
@@ -170,16 +280,19 @@ it('recusa salvar o campo do aluno num documento coletivo', function () {
         ->assertHasErrors('corpo');
 });
 
-it('força uma via por página no documento coletivo', function () {
+it('não empilha o documento coletivo, que é uma via só', function () {
     Livewire::actingAs($this->admin)
         ->test(FormularioModeloDocumento::class)
         ->set('nome', 'Coletivo certo')
         ->set('tipo', 'coletivo')
-        ->set('por_pagina', 3)
+        ->set('por_pagina', ModeloDocumento::AUTOMATICO)
         ->set('corpo', 'Turma {{ turma.nome }}: {{ lista_de_alunos }}')
         ->call('salvar');
 
-    expect(ModeloDocumento::query()->where('nome', 'Coletivo certo')->sole()->por_pagina)->toBe(1);
+    $salvo = ModeloDocumento::query()->where('nome', 'Coletivo certo')->sole();
+
+    expect($salvo->por_pagina)->toBe(1)
+        ->and($salvo->empilhaNaFolha())->toBeFalse();
 });
 
 it('mostra a prévia com os campos já trocados', function () {

@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\CamposDoDocumento;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use PhpOffice\PhpWord\Element\AbstractContainer;
 use PhpOffice\PhpWord\Element\Cell;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\Element\TextRun;
@@ -63,7 +64,8 @@ class GerarDocxDoDocumentoAction
     /** @param  Collection<int, Aluno>  $alunos */
     protected function montar(ModeloDocumento $modelo, Turma $turma, Collection $alunos): PhpWord
     {
-        $compacto = $modelo->viasPorPagina() > 1;
+        $empilha = $modelo->empilhaNaFolha();
+        $compacto = $empilha;
         $tamanho = $compacto ? 9 : 11;
 
         $documento = new PhpWord;
@@ -75,31 +77,58 @@ class GerarDocxDoDocumentoAction
             'lineHeight' => $compacto ? 1.15 : 1.3,
         ]);
 
+        /*
+         * `keepNext` e `keepLines` são o que o Word tem no lugar do
+         * `page-break-inside: avoid`: cada parágrafo pede para não ser
+         * partido e para ficar colado no seguinte, e o Word empurra a via
+         * inteira para a folha nova quando ela não cabe. O último
+         * parágrafo de cada via solta o `keepNext` — senão o documento
+         * inteiro vira um bloco só e nada quebra em lugar nenhum.
+         */
+        $juntos = $empilha ? ['keepNext' => true, 'keepLines' => true] : [];
+
         $documento->addParagraphStyle('corpo', [
             'alignment' => Jc::BOTH,
-            'spaceAfter' => $compacto ? 40 : 90,
+            // Empilhando, o respiro entre parágrafos sai do orçamento da
+            // folha: quem o dá são as linhas em branco do próprio texto.
+            'spaceAfter' => $compacto ? 0 : 90,
+            ...$juntos,
         ]);
         $documento->addParagraphStyle('centrado', [
             'alignment' => Jc::CENTER,
             'spaceAfter' => 0,
+            ...$juntos,
+        ]);
+        // Fecha a via: daqui o Word pode quebrar.
+        $documento->addParagraphStyle('fim-da-via', [
+            'alignment' => Jc::CENTER,
+            'spaceBefore' => 120,
+            'spaceAfter' => 120,
+            'keepLines' => true,
         ]);
         $documento->addFontStyle('discreto', ['size' => $tamanho - 2, 'color' => '555555']);
 
         $secao = $documento->addSection($this->pagina());
 
-        $porPagina = $modelo->viasPorPagina();
         $instituicao = $this->base->instituicaoDaTurma($turma);
         $logos = $this->base->logosDaTurma($turma);
 
-        foreach ($this->vias($modelo, $turma, $alunos) as $indice => $trechos) {
-            if ($indice > 0) {
-                $indice % $porPagina === 0
-                    ? $secao->addPageBreak()
-                    : $this->corte($secao);
+        $vias = $this->vias($modelo, $turma, $alunos);
+        $ultima = count($vias) - 1;
+
+        foreach ($vias as $indice => $trechos) {
+            if (! $empilha && $indice > 0) {
+                $secao->addPageBreak();
             }
 
-            $this->cabecalho($secao, $modelo, $instituicao, $logos, $compacto);
-            $this->corpo($secao, $trechos, $alunos, $compacto);
+            $onde = $empilha ? $this->envelope($secao) : $secao;
+
+            $this->cabecalho($onde, $modelo, $instituicao, $logos, $compacto, $empilha);
+            $this->corpo($onde, $trechos, $alunos, $compacto);
+
+            if ($empilha && $indice < $ultima) {
+                $this->corte($secao);
+            }
         }
 
         return $documento;
@@ -137,7 +166,7 @@ class GerarDocxDoDocumentoAction
      * @param  array<int, array<string, mixed>>  $trechos
      * @param  Collection<int, Aluno>  $alunos
      */
-    protected function corpo(Section $secao, array $trechos, Collection $alunos, bool $compacto): void
+    protected function corpo(AbstractContainer $secao, array $trechos, Collection $alunos, bool $compacto): void
     {
         $paragrafo = $secao->addTextRun('corpo');
 
@@ -208,14 +237,14 @@ class GerarDocxDoDocumentoAction
     }
 
     /** Linha centrada com o rótulo embaixo, como num formulário de papel. */
-    protected function assinatura(Section $secao, string $rotulo): void
+    protected function assinatura(AbstractContainer $secao, string $rotulo): void
     {
         $secao->addText(str_repeat('_', 40), null, 'centrado');
         $secao->addText($rotulo === '' ? ' ' : $rotulo, 'discreto', 'centrado');
     }
 
     /** Quadro em branco para escrever à mão. */
-    protected function espaco(Section $secao, bool $compacto): void
+    protected function espaco(AbstractContainer $secao, bool $compacto): void
     {
         $tabela = $secao->addTable([
             'borderSize' => 6,
@@ -229,7 +258,7 @@ class GerarDocxDoDocumentoAction
     }
 
     /** @param  Collection<int, Aluno>  $alunos */
-    protected function listaDeAlunos(Section $secao, Collection $alunos, bool $compacto): void
+    protected function listaDeAlunos(AbstractContainer $secao, Collection $alunos, bool $compacto): void
     {
         $tabela = $secao->addTable([
             'borderSize' => 6,
@@ -264,26 +293,54 @@ class GerarDocxDoDocumentoAction
         }
     }
 
-    /** A linha de corte entre duas vias da mesma folha. */
+    /**
+     * A via inteira dentro de uma linha de tabela que não se parte.
+     *
+     * `cantSplit` é o que o Word tem de mais próximo do
+     * `page-break-inside: avoid`: uma linha que não cabe no que resta da
+     * folha desce inteira para a próxima. Só o `keepNext` dos parágrafos
+     * não bastava — a tabela do cabeçalho ficava no pé de uma folha e o
+     * corpo da via começava na outra, e o pedaço recortado saía sem o
+     * nome da escola.
+     *
+     * A tabela não tem borda nem margem: ela existe só para segurar.
+     */
+    protected function envelope(Section $secao): Cell
+    {
+        $tabela = $secao->addTable(['cellMargin' => 0, 'width' => 100 * 50, 'unit' => 'pct']);
+
+        $tabela->addRow(null, ['cantSplit' => true]);
+
+        return $tabela->addCell($this->twips(17.8));
+    }
+
+    /** A linha de corte fecha a via: é dela que o Word pode quebrar. */
     protected function corte(Section $secao): void
     {
-        $secao->addText(
-            str_repeat('- ', 45),
-            ['size' => 8, 'color' => '999999'],
-            ['alignment' => Jc::CENTER, 'spaceBefore' => 120, 'spaceAfter' => 120],
-        );
+        $secao->addText(str_repeat('- ', 45), ['size' => 8, 'color' => '999999'], 'fim-da-via');
     }
 
     /**
      * @param  array{esquerda: ?string, direita: ?string}  $logos
      */
     protected function cabecalho(
-        Section $secao,
+        AbstractContainer $secao,
         ModeloDocumento $modelo,
         string $instituicao,
         array $logos,
         bool $compacto,
+        bool $empilha = false,
     ): void {
+        /*
+         * O cabeçalho também pede para não se separar do que vem
+         * depois. Sem isso ele pode ficar sozinho no pé de uma folha,
+         * com o corpo da via na seguinte — o pedaço recortado sai sem
+         * texto e o outro sem o nome da escola.
+         */
+        $colado = $empilha
+            ? ['alignment' => Jc::CENTER, 'spaceAfter' => 0, 'keepNext' => true, 'keepLines' => true]
+            : ['alignment' => Jc::CENTER, 'spaceAfter' => 0];
+
         $util = 21 - 3.2;
         $ladoDaLogo = $compacto ? 1.6 : 2.4;
 
@@ -294,16 +351,8 @@ class GerarDocxDoDocumentoAction
 
         $centro = $tabela->addCell($this->twips($util - 2 * $ladoDaLogo));
 
-        $centro->addText(
-            $instituicao,
-            ['bold' => true, 'size' => $compacto ? 9 : 12],
-            ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
-        );
-        $centro->addText(
-            $modelo->nome,
-            ['size' => $compacto ? 8 : 10],
-            ['alignment' => Jc::CENTER, 'spaceAfter' => 0],
-        );
+        $centro->addText($instituicao, ['bold' => true, 'size' => $compacto ? 9 : 12], $colado);
+        $centro->addText($modelo->nome, ['size' => $compacto ? 8 : 10], $colado);
 
         $this->logo($tabela->addCell($this->twips($ladoDaLogo)), $logos['direita'], Jc::END, $compacto);
     }

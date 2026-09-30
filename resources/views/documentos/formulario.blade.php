@@ -59,8 +59,8 @@
                     </fieldset>
 
                     @if ($this->tipoEscolhido() === App\Enums\TipoDeDocumento::Individual)
-                        <x-campo rotulo="Vias por página" para="por_pagina" :erro="$errors->first('por_pagina')"
-                                 ajuda="Com texto curto, três vias na mesma folha economizam papel — e a folha sai com linha de corte entre elas.">
+                        <x-campo rotulo="Como as vias ocupam a folha" para="por_pagina" :erro="$errors->first('por_pagina')"
+                                 ajuda="No automático, cabem quantas o texto permitir, com linha de corte entre elas — e nenhuma é partida ao meio.">
                             <x-select id="por_pagina" wire:model.live="por_pagina">
                                 @foreach (App\Models\ModeloDocumento::POR_PAGINA as $valor => $rotulo)
                                     <option value="{{ $valor }}">{{ $rotulo }}</option>

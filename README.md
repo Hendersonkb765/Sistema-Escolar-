@@ -788,18 +788,34 @@ Usar o campo do tipo errado não dá erro de sintaxe — dá um campo vazio no
 meio do papel, descoberto na hora de entregar. Por isso o editor recusa e
 diz qual campo é, e se ele não existe ou só existe no outro tipo.
 
-### Três vias por folha
+### Quantas vias couberem na folha
 
-Quando o texto é curto, cabem duas ou três vias na mesma folha, com linha
-de corte entre elas: noventa autorizações em trinta folhas em vez de
-noventa. Cada via repete o cabeçalho com o nome da escola, porque a folha
-vai ser recortada e cada pedaço vai para uma família diferente.
+Contar vias por folha à mão errava sempre para menos: o número certo
+depende do tamanho do texto, que muda de modelo para modelo. O teto de
+três gastava quinze folhas com quarenta e quatro autorizações curtas onde
+cabiam onze.
 
-O mPDF impôs três decisões que só o papel revelou:
+Agora o padrão é **quantas couberem**, e quem conta é o renderizador,
+medindo o texto de verdade:
 
-- **altura fixa na via não funciona** — ele soma a altura declarada ao que
-  o conteúdo já ocupa, e três vias de 90 mm passavam a ocupar 280 mm;
-  quem separa as folhas é o `<pagebreak/>` a cada N vias;
+- no PDF, `page-break-inside: avoid` na via — o mPDF mede a via inteira e
+  a empurra para a folha seguinte quando ela não cabe, sem parti-la;
+- no Word, cada via vai dentro de uma linha de tabela com `cantSplit`,
+  que é o que ele tem de mais próximo. Só `keepNext`/`keepLines` nos
+  parágrafos não bastava: a tabela do cabeçalho ficava no pé de uma folha
+  e o corpo começava na outra, e o pedaço recortado saía sem o nome da
+  escola.
+
+Cada via repete o cabeçalho, porque a folha vai ser recortada e cada
+pedaço vai para uma família diferente. A linha de corte fica **dentro** da
+via, no rodapé dela: solta entre duas, ela ficava para trás quando a
+seguinte descia para a folha nova.
+
+"Uma por folha" continua existindo, para o documento que precisa sair
+sozinho.
+
+O mPDF impôs ainda duas decisões que só o papel revelou:
+
 - **largura de elemento em linha é ignorada** — `inline-block` com
   `min-width` vira um tracinho de dois milímetros. A linha de preencher é
   feita de espaços rígidos com borda embaixo, e o quadradinho é o
@@ -832,6 +848,16 @@ O que o Word impôs, e o teste cobra:
 A turma vem toda marcada, porque é o caso comum, e desmarcar dois é menos
 trabalho que marcar trinta. Os ids vêm da tela, então são cruzados com a
 turma e com o escopo de quem gera: id de aluno de outra turma não entra.
+
+Numa turma de quarenta e quatro, achar um aluno rolando a lista é o
+trabalho que esta tela deveria poupar: há uma busca por nome ou RA — pelo
+RA porque quem está com a chamada na mão procura pelo número.
+
+**Buscar esconde linhas; não desmarca ninguém.** Se desmarcasse, procurar
+um nome desfaria a seleção dos outros. "Marcar todos" e "desmarcar todos"
+valem para o que está à vista, e o rótulo do botão diz quantos são
+("Marcar os 2 à vista"). Gerar leva todos os marcados, e não só os que a
+busca deixou na tela.
 
 ### Compartilhar um modelo com outro PAEET
 
