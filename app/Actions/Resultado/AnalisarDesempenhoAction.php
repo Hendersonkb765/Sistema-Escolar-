@@ -69,13 +69,19 @@ class AnalisarDesempenhoAction
                 $questao = $respostas->first()->provaQuestao;
 
                 return [
+                    'id' => $questao->id,
                     'numero' => $questao->numero,
+                    'prova_id' => $questao->prova_id,
                     'prova' => $questao->prova->titulo,
+                    'bimestre' => $questao->prova->bimestre,
                     'disciplina' => $questao->disciplina->nome,
                     'habilidade' => $questao->habilidade_snapshot ?: 'Sem habilidade informada',
                     'peso' => (float) $questao->peso,
                     'enunciado' => $questao->enunciado_snapshot,
-                    ...$this->contagem($respostas),
+                    // Uma questão é uma medição só: o mínimo de questões
+                    // não se aplica, e o que resta julgar é quantos
+                    // alunos a responderam.
+                    ...$this->contagem($respostas, agregaQuestoes: false),
                 ];
             })
             ->sortBy('percentual')
@@ -281,7 +287,7 @@ class AnalisarDesempenhoAction
                 fn ($q) => $q->whereHas('provaQuestao', fn ($p) => $p->where('disciplina_id', $disciplinaId))
             )
             ->with(['provaQuestao:id,prova_id,numero,disciplina_id,habilidade_snapshot,peso,enunciado_snapshot,professor_id',
-                'provaQuestao.disciplina:id,nome', 'provaQuestao.prova:id,titulo,turma_id',
+                'provaQuestao.disciplina:id,nome', 'provaQuestao.prova:id,titulo,turma_id,bimestre',
                 'resultado:id,prova_id,aluno_id', 'resultado.aluno:id,nome,ra'])
             ->get();
     }
@@ -338,7 +344,7 @@ class AnalisarDesempenhoAction
      * @param  Collection<int, RespostaAluno>  $respostas
      * @return array<string, mixed>
      */
-    protected function contagem(Collection $respostas): array
+    protected function contagem(Collection $respostas, bool $agregaQuestoes = true): array
     {
         $total = $respostas->count();
         $acertos = $respostas->where('acertou', true)->count();
@@ -353,7 +359,7 @@ class AnalisarDesempenhoAction
         $questoes = $respostas->pluck('prova_questao_id')->unique()->count();
         $alunos = $respostas->map(fn (RespostaAluno $r) => $r->resultado->aluno_id)->unique()->count();
 
-        $situacao = $this->criterios->situacao($percentual, $questoes, $total);
+        $situacao = $this->criterios->situacao($percentual, $questoes, $total, $agregaQuestoes);
 
         return [
             'respostas' => $total,
@@ -364,7 +370,7 @@ class AnalisarDesempenhoAction
             'pontos_maximos' => $pontosMaximos,
             'percentual' => $percentual,
             'situacao' => $situacao,
-            'falta_evidencia' => $this->criterios->faltaDeEvidencia($questoes, $total),
+            'falta_evidencia' => $this->criterios->faltaDeEvidencia($questoes, $total, $agregaQuestoes),
             // Mantido porque as telas e os testes já leem por este nome;
             // agora só é verdade quando há evidência para afirmá-lo.
             'atencao' => $situacao === 'atencao',

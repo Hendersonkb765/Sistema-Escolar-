@@ -169,3 +169,70 @@
         .painel-evolucao .coluna { fill: CanvasText; }
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Grade de acerto por questão
+|--------------------------------------------------------------------------
+|
+| Cinco degraus de um tom só, monótonos em luminosidade. No tema claro a
+| rampa escurece conforme o erro aumenta; no escuro ela clareia. Nos dois
+| casos, mais tinta significa mais erro — e não é uma inversão automática,
+| são dois conjuntos escolhidos contra a superfície de cada tema.
+|
+| A cor é atalho, nunca o único canal: o aproveitamento vai escrito dentro
+| de cada célula, o `title` repete em texto e a tabela de apoio traz tudo.
+| As combinações de texto e fundo foram medidas — a pior fica em 4,86:1.
+*/
+@layer components {
+    .celula-questao {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 3.25rem;
+        padding: 0.3rem 0;
+        border-radius: 0.5rem;
+        line-height: 1.1;
+        transition: outline-color 120ms, transform 120ms;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+
+    .celula-questao .numero { font-size: 0.8125rem; font-weight: 600; }
+    .celula-questao .percentual { font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+
+    .celula-questao:hover { transform: translateY(-1px); }
+    .celula-questao:focus-visible,
+    .celula-questao.aberta { outline-color: theme('colors.marca.500'); }
+
+    .celula-amostra {
+        display: inline-block;
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 0.25rem;
+    }
+
+    /*
+        A saturação fica reservada ao problema de verdade (abaixo de 40%).
+        Com ela no meio da escala — onde cai a maioria das questões — a
+        grade inteira gritava, e bloco saturado grande lê alto demais.
+        Contraste de texto medido: o pior par fica em 4,86:1.
+    */
+    .degrau-0 { background: #be123c; color: #f8fafc; }
+    .degrau-1 { background: #fb7185; color: #0f172a; }
+    .degrau-2 { background: #fecdd3; color: #0f172a; }
+    .degrau-3 { background: #ffe4e6; color: #0f172a; }
+    .degrau-4 { background: #fff1f2; color: #0f172a; }
+
+    .dark .degrau-0 { background: #f43f5e; color: #0f172a; }
+    .dark .degrau-1 { background: #9f1239; color: #f8fafc; }
+    .dark .degrau-2 { background: #5e1c2c; color: #f8fafc; }
+    .dark .degrau-3 { background: #3b1b22; color: #f8fafc; }
+    .dark .degrau-4 { background: #241a1d; color: #f8fafc; }
+
+    /* No alto contraste quem manda é o sistema. */
+    @media (forced-colors: active) {
+        .celula-questao { border: 1px solid ButtonBorder; }
+    }
+}

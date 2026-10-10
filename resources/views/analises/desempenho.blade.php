@@ -95,12 +95,59 @@
             </p>
         @endif
 
-        @foreach ($limitacoes as $aviso)
-            <x-alerta tipo="atencao" class="mt-3">{{ $aviso }}</x-alerta>
-        @endforeach
+        {{--
+            As ressalvas numa linha só, abertas a pedido.
+
+            Dois blocos amarelos no topo aparecem no recorte padrão — que
+            junta todas as provas — e viram ruído de fundo: quem vê aviso
+            toda vez para de ler aviso. O conteúdo continua inteiro, a um
+            clique.
+        --}}
+        @if ($limitacoes !== [])
+            <details class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+                <summary class="cursor-pointer text-amber-900 dark:text-amber-200">
+                    {{ count($limitacoes) }} ressalva(s) sobre consolidar estas provas
+                </summary>
+                <ul class="mt-2 list-disc space-y-1 pl-5 text-amber-900/90 dark:text-amber-200/90">
+                    @foreach ($limitacoes as $aviso)
+                        <li>{{ $aviso }}</li>
+                    @endforeach
+                </ul>
+            </details>
+        @endif
     </x-cartao>
 
-    @unless ($grafico->vazio())
+    {{--
+        A página tem três telas de rolagem e nenhuma pista do que vem
+        abaixo. Os atalhos dizem o que existe e levam direto.
+    --}}
+    @if ($porHabilidade->isNotEmpty())
+        <nav aria-label="Seções da análise"
+             class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+            <span class="mr-1">Ir para:</span>
+            @foreach ([
+                '#turma' => 'A turma',
+                '#evolucao' => 'Evolução',
+                '#habilidades' => 'Habilidades',
+                '#questoes' => 'Questões',
+                '#alunos' => 'Alunos',
+            ] as $destino => $rotulo)
+                <a href="{{ $destino }}"
+                   class="rounded-md px-2 py-1 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                    {{ $rotulo }}
+                </a>
+            @endforeach
+        </nav>
+    @endif
+
+    {{--
+        O painel da turma sai de dentro do `@unless` do gráfico.
+
+        Estavam acoplados: sem série para desenhar, a visão geral da
+        turma sumia junto — e ela não depende do gráfico, depende de
+        haver prova no recorte.
+    --}}
+    @if ($provas->isNotEmpty())
         {{--
             O painel da turma.
 
@@ -113,7 +160,7 @@
             Cada indicador diz como foi calculado: um número sem a conta
             atrás dele não dá para contestar nem para usar em reunião.
         --}}
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div id="turma" class="grid scroll-mt-20 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <x-indicador rotulo="Alunos avaliados"
                          :valor="$geral['avaliados'].' de '.$geral['matriculados']"
                          :cor="$geral['pendentes'] > 0 ? 'amarelo' : 'verde'"
@@ -186,7 +233,10 @@
             </x-cartao>
         @endif
 
-        <x-cartao titulo="Evolução por bimestre">
+    @endif
+
+    @unless ($grafico->vazio())
+        <x-cartao id="evolucao" class="scroll-mt-20" titulo="Evolução por bimestre">
             <x-slot:descricao>
                 Nota média de cada disciplina, um painel por disciplina. A linha
                 tracejada é o critério de
@@ -242,7 +292,7 @@
                      descricao="A análise usa as provas que já tiveram os resultados importados. Ajuste os filtros ou importe uma planilha."/>
         </x-cartao>
     @else
-        <x-cartao titulo="Por habilidade avaliada"
+        <x-cartao id="habilidades" class="scroll-mt-20" titulo="Por habilidade avaliada"
                   :descricao="'Ordenado da que mais precisa de atenção. Abaixo de '.$criterios->criterioEsperado.'% de aproveitamento vai destacado.'">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -365,61 +415,200 @@
             uma da turma, outra nominal — é o tipo de coisa que faz
             alguém ler o número errado em reunião.
         --}}
-        <x-cartao titulo="Índice de acerto por questão"
-                  descricao="A mesma leitura pelo número, com a habilidade ao lado. É a turma, não o aluno.">
-            <div class="-mx-4 overflow-x-auto sm:-mx-6">
-                <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                    <thead>
-                        <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th class="px-4 py-2 sm:px-6">Questão</th>
-                            <th class="px-4 py-2">Habilidade</th>
-                            <th class="hidden px-4 py-2 md:table-cell">Disciplina</th>
-                            <th class="px-4 py-2 text-center">Acertos</th>
-                            <th class="px-4 py-2">Índice de acerto</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                        @foreach ($porQuestao as $item)
-                            <tr wire:key="quest-{{ $loop->index }}"
-                                @class(['bg-rose-50/60 dark:bg-rose-950/20' => $item['atencao']])>
-                                <td class="px-4 py-3 sm:px-6">
-                                    <span class="font-medium text-slate-900 dark:text-slate-100">{{ $item['numero'] }}</span>
-                                    <span class="block max-w-xs truncate text-xs text-slate-400">{{ $item['enunciado'] }}</span>
-                                </td>
-                                <td class="px-4 py-3 text-slate-700 dark:text-slate-200">{{ $item['habilidade'] }}</td>
-                                <td class="hidden px-4 py-3 text-slate-600 md:table-cell dark:text-slate-300">
-                                    {{ $item['disciplina'] }}
-                                    <span class="block text-xs text-slate-400">
-                                        peso {{ number_format($item['peso'], 2, ',', '.') }}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-3 text-center tabular-nums text-slate-600 dark:text-slate-300">
-                                    {{ $item['acertos'] }}/{{ $item['respostas'] }}
-                                </td>
-                                <td class="px-4 py-3">
-                                    <x-barra-de-acerto :percentual="$item['percentual']" :atencao="$item['atencao']"/>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+        {{--
+            A grade de questões.
+
+            Eram 27 linhas de tabela, uma por questão, ordenadas por
+            percentual — metade da altura da página para um dado de
+            consulta. Pior: o número da questão só identifica dentro de
+            uma prova, e com três provas no recorte havia três "questão 2"
+            na mesma lista, sem nada que as distinguisse.
+
+            Agora é uma linha por prova, na ordem em que o aluno viu as
+            questões. A cor é um atalho de cinco degraus — passados uns
+            sete tons dois vizinhos deixam de se distinguir —, e o número
+            do aproveitamento vai escrito dentro de cada célula: a cor
+            nunca é o único canal.
+        --}}
+        <x-cartao id="questoes" class="scroll-mt-20" titulo="Acerto por questão">
+            <x-slot:descricao>
+                Uma linha por prova, na ordem em que o aluno viu as questões.
+                Quanto mais forte a célula, mais a turma errou. Clique numa
+                questão para ver o detalhe dela.
+            </x-slot:descricao>
+
+            @php
+                /*
+                 * Escritos por extenso, e não `'degrau-'.$n`: o Tailwind
+                 * varre o código-fonte e remove do CSS toda classe que
+                 * não encontrar escrita. Montada em tempo de execução, a
+                 * regra existe no arquivo e some do bundle — as células
+                 * saem sem cor nenhuma, sem erro em lugar algum.
+                 */
+                $degraus = ['degrau-0', 'degrau-1', 'degrau-2', 'degrau-3', 'degrau-4'];
+            @endphp
+
+            <div class="space-y-5 p-4 sm:p-6">
+                @foreach ($questoesPorProva as $grupo)
+                    <div wire:key="grade-{{ $loop->index }}">
+                        <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            {{ $grupo['prova'] }}
+                            <span class="font-normal text-slate-500 dark:text-slate-400">
+                                · {{ $grupo['bimestre']->rotulo() }}
+                            </span>
+                        </p>
+
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach ($grupo['questoes'] as $questao)
+                                @php
+                                    $degrau = $criterios->degrauDoAproveitamento($questao['percentual']);
+                                    $aberta = $questaoAberta === $questao['id'];
+                                @endphp
+
+                                <button type="button" wire:click="verQuestao({{ $questao['id'] }})"
+                                        wire:key="celula-{{ $questao['id'] }}"
+                                        @class([
+                                            'celula-questao',
+                                            $degraus[$degrau],
+                                            'aberta' => $aberta,
+                                        ])
+                                        aria-pressed="{{ $aberta ? 'true' : 'false' }}"
+                                        title="Questão {{ $questao['numero'] }} — {{ $questao['habilidade'] }} — {{ number_format($questao['percentual'], 1, ',', '.') }}% de aproveitamento">
+                                    <span class="numero">{{ $questao['numero'] }}</span>
+                                    <span class="percentual">{{ round($questao['percentual']) }}%</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+
+                {{-- A legenda nomeia os degraus: cor sem escala não se lê. --}}
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    <span>Aproveitamento:</span>
+                    @foreach ([[0, 'abaixo de 40%'], [1, '40 a 55%'], [2, '55 a 70%'], [3, '70 a 85%'], [4, '85% ou mais']] as [$degrau, $rotulo])
+                        <span class="flex items-center gap-1.5">
+                            <span class="celula-amostra {{ $degraus[$degrau] }}"></span>{{ $rotulo }}
+                        </span>
+                    @endforeach
+                </div>
             </div>
+
+            @if ($questaoEmDetalhe)
+                <div class="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950/40">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="font-medium text-slate-900 dark:text-slate-100">
+                                Questão {{ $questaoEmDetalhe['numero'] }} · {{ $questaoEmDetalhe['prova'] }}
+                            </p>
+                            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                                {{ $questaoEmDetalhe['disciplina'] }} · {{ $questaoEmDetalhe['habilidade'] }}
+                                · peso {{ number_format($questaoEmDetalhe['peso'], 2, ',', '.') }}
+                            </p>
+                        </div>
+                        <x-botao variante="discreto" wire:click="verQuestao({{ $questaoEmDetalhe['id'] }})">
+                            Fechar
+                        </x-botao>
+                    </div>
+
+                    <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                        {{ $questaoEmDetalhe['enunciado'] }}
+                    </p>
+
+                    <dl class="mt-4 grid gap-3 sm:grid-cols-4">
+                        @foreach ([
+                            ['Responderam', $questaoEmDetalhe['respostas'].' de '.$questaoEmDetalhe['alunos'].' aluno(s)'],
+                            ['Acertos', $questaoEmDetalhe['acertos'].' · erros '.$questaoEmDetalhe['erros']],
+                            ['Pontos', number_format($questaoEmDetalhe['pontos_obtidos'], 2, ',', '.').' de '.number_format($questaoEmDetalhe['pontos_maximos'], 2, ',', '.')],
+                            ['Aproveitamento', number_format($questaoEmDetalhe['percentual'], 1, ',', '.').'%'],
+                        ] as [$rotulo, $valor])
+                            <div>
+                                <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $rotulo }}</dt>
+                                <dd class="mt-0.5 text-sm tabular-nums text-slate-900 dark:text-slate-100">{{ $valor }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    {{--
+                        Hipótese, e não conclusão. Muita gente errar uma
+                        questão não prova que o conteúdo não foi aprendido:
+                        pode ser enunciado ambíguo, alternativa mal escrita
+                        ou gabarito trocado. Quem decide é quem dá a aula.
+                    --}}
+                    @if ($questaoEmDetalhe['situacao'] === 'atencao')
+                        <x-alerta tipo="atencao" class="mt-4">
+                            <p class="font-medium">Vale investigar</p>
+                            <p class="mt-0.5">
+                                O aproveitamento ficou abaixo do critério de
+                                {{ number_format($criterios->criterioEsperado, 0) }}%. Isso pode ser dificuldade
+                                com “{{ $questaoEmDetalhe['habilidade'] }}”, mas também enunciado ambíguo,
+                                alternativa mal formulada ou gabarito trocado — a leitura é de quem deu a aula.
+                            </p>
+                        </x-alerta>
+                    @elseif ($questaoEmDetalhe['falta_evidencia'] !== '')
+                        <x-alerta tipo="info" class="mt-4">
+                            Evidências insuficientes para concluir:
+                            {{ $questaoEmDetalhe['falta_evidencia'] }}.
+                        </x-alerta>
+                    @endif
+
+                    <p class="mt-3 text-xs text-slate-400">
+                        A distribuição das respostas por alternativa não aparece aqui porque a planilha
+                        do leitor traz apenas acerto ou erro, nunca a letra que o aluno marcou.
+                    </p>
+                </div>
+            @endif
+
+            {{-- A grade é o atalho; a tabela é a consulta, e ela ordena. --}}
+            <details class="border-t border-slate-200 px-4 py-3 sm:px-6 dark:border-slate-800">
+                <summary class="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                    Ver as {{ $porQuestao->count() }} questões em tabela
+                </summary>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-slate-500 dark:text-slate-400">Ordenar por:</span>
+                    @foreach (['erro' => 'Maior erro', 'numero' => 'Ordem da prova', 'habilidade' => 'Habilidade'] as $chave => $rotulo)
+                        <x-botao variante="{{ $ordemDasQuestoes === $chave ? 'secundario' : 'discreto' }}"
+                                 wire:click="ordenarQuestoes('{{ $chave }}')">{{ $rotulo }}</x-botao>
+                    @endforeach
+                </div>
+
+                <div class="-mx-4 mt-3 overflow-x-auto sm:-mx-6">
+                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                <th class="px-4 py-2 sm:px-6">Questão</th>
+                                <th class="px-4 py-2">Habilidade</th>
+                                <th class="hidden px-4 py-2 md:table-cell">Disciplina</th>
+                                <th class="px-4 py-2 text-center">Acertos</th>
+                                <th class="px-4 py-2 text-right">Aproveitamento</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($questoesOrdenadas as $item)
+                                <tr wire:key="linha-q-{{ $item['id'] }}">
+                                    <td class="px-4 py-2 sm:px-6">
+                                        <span class="text-slate-900 dark:text-slate-100">{{ $item['numero'] }}</span>
+                                        <span class="block text-xs text-slate-400">{{ $item['prova'] }}</span>
+                                    </td>
+                                    <td class="px-4 py-2 text-slate-700 dark:text-slate-200">{{ $item['habilidade'] }}</td>
+                                    <td class="hidden px-4 py-2 text-slate-600 md:table-cell dark:text-slate-300">
+                                        {{ $item['disciplina'] }}
+                                    </td>
+                                    <td class="px-4 py-2 text-center tabular-nums text-slate-600 dark:text-slate-300">
+                                        {{ $item['acertos'] }}/{{ $item['respostas'] }}
+                                    </td>
+                                    <td class="px-4 py-2 text-right tabular-nums text-slate-900 dark:text-slate-100">
+                                        {{ number_format($item['percentual'], 1, ',', '.') }}%
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </details>
         </x-cartao>
 
-        {{--
-            O ✓ e o ✗ de cada aluno.
-
-            Veio da tela de notas, onde atrapalhava quem só queria
-            transcrever a nota, e aqui fica junto das outras leituras por
-            questão. É a única nominal das três: as de cima contam a
-            turma.
-
-            Exige uma prova, e não um recorte — o número da questão só
-            quer dizer alguma coisa dentro da prova em que ela saiu. Duas
-            provas lado a lado teriam duas questões "1" diferentes na
-            mesma coluna.
-        --}}
-        <x-cartao titulo="Acerto de cada aluno">
+        <x-cartao id="alunos" class="scroll-mt-20" titulo="Acerto de cada aluno">
             <x-slot:descricao>
                 @if ($provaDoRecorte)
                     ✓ acertou · ✗ errou, em {{ $provaDoRecorte->titulo }}.

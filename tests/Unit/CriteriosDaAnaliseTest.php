@@ -94,3 +94,32 @@ it('põe a nota na faixa certa, inclusive nos limites', function () {
         ->and($c->faixaDaNota(6.0))->toBe(2)
         ->and($c->faixaDaNota(10.0))->toBe(4);
 });
+
+/*
+ * Habilidade e questão não têm a mesma evidência disponível. Numa
+ * habilidade, parte dela é quantas questões a mediram. Numa questão esse
+ * número é 1 por definição — exigir o mínimo ali deixava toda questão
+ * inconclusiva para sempre, e a leitura por questão inteira sem uso.
+ */
+it('não exige mínimo de questões na leitura de uma questão só', function () {
+    $c = criterios(questoes: 2, respostas: 10);
+
+    expect($c->situacao(30, questoes: 1, respostas: 30, agregaQuestoes: true))
+        ->toBe('inconclusivo')
+        ->and($c->situacao(30, questoes: 1, respostas: 30, agregaQuestoes: false))
+        ->toBe('atencao');
+});
+
+it('continua exigindo respostas na leitura de uma questão só', function () {
+    $c = criterios(respostas: 10);
+
+    expect($c->situacao(30, questoes: 1, respostas: 4, agregaQuestoes: false))
+        ->toBe('inconclusivo');
+});
+
+it('não reclama de questões quando não as agrega', function () {
+    $c = criterios(questoes: 3, respostas: 10);
+
+    expect($c->faltaDeEvidencia(1, 30, agregaQuestoes: false))->toBe('')
+        ->and($c->faltaDeEvidencia(1, 30, agregaQuestoes: true))->toContain('uma questão só');
+});

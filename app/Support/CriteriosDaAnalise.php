@@ -53,11 +53,11 @@ final class CriteriosDaAnalise
     }
 
     /** Por que a evidência não basta, em palavras, ou string vazia. */
-    public function faltaDeEvidencia(int $questoes, int $respostas): string
+    public function faltaDeEvidencia(int $questoes, int $respostas, bool $agregaQuestoes = true): string
     {
         $faltas = [];
 
-        if ($questoes < $this->minimoDeQuestoes) {
+        if ($agregaQuestoes && $questoes < $this->minimoDeQuestoes) {
             $faltas[] = $questoes === 1
                 ? 'uma questão só'
                 : "{$questoes} questões (o mínimo adotado é {$this->minimoDeQuestoes})";
@@ -75,10 +75,25 @@ final class CriteriosDaAnalise
      *
      * `inconclusivo` não é um meio-termo entre bom e ruim: é a recusa de
      * classificar sem base. Vem antes dos outros dois de propósito.
+     *
+     * `$agregaQuestoes` separa duas leituras que não têm a mesma
+     * evidência disponível. Numa habilidade, parte da evidência é
+     * **quantas questões** a mediram: uma só não sustenta conclusão. Numa
+     * questão, esse número é 1 por definição — exigir o mínimo ali
+     * deixaria toda questão inconclusiva para sempre, e o que sobra para
+     * julgar é quantos alunos a responderam.
      */
-    public function situacao(float $percentual, int $questoes, int $respostas): string
-    {
-        if (! $this->temEvidencia($questoes, $respostas)) {
+    public function situacao(
+        float $percentual,
+        int $questoes,
+        int $respostas,
+        bool $agregaQuestoes = true,
+    ): string {
+        $bastante = $agregaQuestoes
+            ? $this->temEvidencia($questoes, $respostas)
+            : $respostas >= $this->minimoDeRespostas;
+
+        if (! $bastante) {
             return 'inconclusivo';
         }
 
@@ -103,6 +118,30 @@ final class CriteriosDaAnalise
             'atencao' => 'vermelho',
             'inconclusivo' => 'cinza',
         ];
+    }
+
+    /**
+     * Em qual dos cinco degraus da grade de questões cai um
+     * aproveitamento.
+     *
+     * Cinco, e não um gradiente contínuo: passados uns sete tons, dois
+     * vizinhos deixam de se distinguir e a cor vira enfeite. O número vai
+     * escrito dentro da célula de qualquer modo — a cor é o atalho, não a
+     * informação.
+     *
+     * 0 é o pior. A rampa é de um tom só, monótona em luminosidade, e no
+     * tema escuro ela sobe em vez de descer: nos dois casos, mais tinta
+     * significa mais erro.
+     */
+    public function degrauDoAproveitamento(float $percentual): int
+    {
+        return match (true) {
+            $percentual < 40 => 0,
+            $percentual < 55 => 1,
+            $percentual < 70 => 2,
+            $percentual < 85 => 3,
+            default => 4,
+        };
     }
 
     /** Em qual faixa de nota cai um valor de 0 a 10. */

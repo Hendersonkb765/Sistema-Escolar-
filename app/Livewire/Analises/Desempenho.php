@@ -58,6 +58,13 @@ class Desempenho extends Component
     #[Url(as: 'habilidade', except: '')]
     public string $habilidadeAberta = '';
 
+    /** A questão aberta na grade, para ver o detalhe dela. */
+    #[Url(as: 'questao', except: null)]
+    public ?int $questaoAberta = null;
+
+    /** Como a tabela de apoio das questões é ordenada. */
+    public string $ordemDasQuestoes = 'erro';
+
     public function mount(): void
     {
         $this->authorize('viewAny', ResultadoAluno::class);
@@ -114,6 +121,7 @@ class Desempenho extends Component
     protected function sincronizarEscolhas(): void
     {
         $this->habilidadeAberta = '';
+        $this->questaoAberta = null;
 
         if ($this->provasEscolhidas === []) {
             return;
@@ -185,6 +193,50 @@ class Desempenho extends Component
         }
 
         return $avisos;
+    }
+
+    /** Abre e fecha o detalhe de uma questão da grade. */
+    public function verQuestao(int $id): void
+    {
+        $this->questaoAberta = $this->questaoAberta === $id ? null : $id;
+    }
+
+    public function ordenarQuestoes(string $por): void
+    {
+        $this->ordemDasQuestoes = in_array($por, ['erro', 'numero', 'habilidade'], true)
+            ? $por
+            : 'erro';
+    }
+
+    /**
+     * As questões agrupadas por prova, na ordem em que o aluno as viu.
+     *
+     * A grade é por prova porque o número da questão só identifica dentro
+     * de uma: com três provas no recorte havia três "questão 2" na mesma
+     * lista, com valores diferentes e nada que as distinguisse.
+     *
+     * @param  ColecaoSimples<int, array<string, mixed>>  $porQuestao
+     * @return array<int, array{prova: string, bimestre: mixed, questoes: array<int, array<string, mixed>>}>
+     */
+    public function questoesPorProva(ColecaoSimples $porQuestao): array
+    {
+        return $porQuestao
+            ->groupBy('prova_id')
+            ->map(fn (ColecaoSimples $questoes) => [
+                'prova' => $questoes->first()['prova'],
+                'bimestre' => $questoes->first()['bimestre'],
+                'questoes' => $questoes->sortBy('numero')->values()->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** @param  ColecaoSimples<int, array<string, mixed>>  $porQuestao */
+    public function questaoEmDetalhe(ColecaoSimples $porQuestao): ?array
+    {
+        return $this->questaoAberta === null
+            ? null
+            : $porQuestao->firstWhere('id', $this->questaoAberta);
     }
 
     public function verAlunos(string $habilidade): void
@@ -259,7 +311,14 @@ class Desempenho extends Component
             'disciplinas' => $disciplinas,
             'geral' => $analisar->visaoGeral($provas, auth()->user(), $disciplina),
             'porHabilidade' => $analisar->porHabilidade($provas, auth()->user(), $disciplina),
-            'porQuestao' => $analisar->porQuestao($provas, auth()->user(), $disciplina),
+            'porQuestao' => $porQuestao = $analisar->porQuestao($provas, auth()->user(), $disciplina),
+            'questoesPorProva' => $this->questoesPorProva($porQuestao),
+            'questaoEmDetalhe' => $this->questaoEmDetalhe($porQuestao),
+            'questoesOrdenadas' => match ($this->ordemDasQuestoes) {
+                'numero' => $porQuestao->sortBy([['prova', 'asc'], ['numero', 'asc']])->values(),
+                'habilidade' => $porQuestao->sortBy([['habilidade', 'asc'], ['percentual', 'asc']])->values(),
+                default => $porQuestao->sortBy('percentual')->values(),
+            },
             'provaDoRecorte' => $provaUnica = $this->provaDoRecorte(),
             'acertoNominal' => $provaUnica === null
                 ? null

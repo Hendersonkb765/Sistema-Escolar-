@@ -24,6 +24,7 @@ use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\RespostaAluno;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
@@ -312,7 +313,7 @@ it('mostra as duas leituras na tela', function () {
         ->assertSee('Calcular endereçamento IP')
         ->assertSee('Evidências insuficientes')
         // Três leituras: duas da turma e uma nominal.
-        ->assertSee('Índice de acerto por questão')
+        ->assertSee('Acerto por questão')
         ->assertSee('Acerto de cada aluno');
 });
 
@@ -715,4 +716,146 @@ it('diz quantos alunos e quantas respostas entram na conta', function () {
         ->test(Desempenho::class)
         ->assertSee('2 aluno(s) avaliado(s)')
         ->assertSee('6 resposta(s)');
+});
+
+/*
+|--------------------------------------------------------------------------
+| A grade de questões
+|--------------------------------------------------------------------------
+|
+| Eram 27 linhas de tabela, metade da altura da página para um dado de
+| consulta — e o número da questão só identifica dentro de uma prova, de
+| modo que havia três "questão 2" diferentes na mesma lista.
+*/
+
+it('agrupa as questões por prova, na ordem em que o aluno as viu', function () {
+    ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+    ($this->provaCom)(Bimestre::Segundo, 'Segunda', [
+        0 => [1 => false, 2 => true, 3 => false], 1 => [1 => false, 2 => true, 3 => false],
+    ]);
+
+    $grupos = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->viewData('questoesPorProva');
+
+    expect($grupos)->toHaveCount(2)
+        ->and(array_column($grupos[0]['questoes'], 'numero'))->toBe([1, 2, 3])
+        // Cada grupo diz de que prova é: sem isso, três "questão 2" na
+        // mesma lista não se distinguem.
+        ->and($grupos[0]['prova'])->not->toBe($grupos[1]['prova']);
+});
+
+it('abre e fecha o detalhe de uma questão', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSet('questaoAberta', null)
+        ->call('verQuestao', $questao->id)
+        ->assertSet('questaoAberta', $questao->id);
+
+    expect($componente->viewData('questaoEmDetalhe')['numero'])->toBe(2);
+
+    $componente->call('verQuestao', $questao->id)->assertSet('questaoAberta', null);
+});
+
+/*
+ * Muita gente errar não prova que o conteúdo não foi aprendido: pode ser
+ * enunciado ambíguo ou gabarito trocado. A tela oferece a hipótese e diz
+ * de quem é a leitura.
+ */
+it('oferece hipótese em vez de diagnóstico na questão com muito erro', function () {
+    config()->set('analise.evidencia_minima.respostas', 2);
+
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $questao->id)
+        ->assertSee('Vale investigar')
+        ->assertSee('gabarito trocado')
+        ->assertSee('a leitura é de quem deu a aula');
+});
+
+/*
+ * O que o sistema não tem, ele diz. A planilha do leitor traz acerto ou
+ * erro, nunca a letra marcada — e um gráfico vazio no lugar seria pior
+ * que a ausência.
+ */
+it('diz por que não mostra a distribuição por alternativa', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $questao->id)
+        ->assertSee('apenas acerto ou erro');
+});
+
+it('ordena a tabela de apoio pelo que se pede', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+
+    // O padrão é a de maior erro primeiro.
+    expect($componente->viewData('questoesOrdenadas')->first()['numero'])->toBe(2);
+
+    $componente->call('ordenarQuestoes', 'numero');
+
+    expect($componente->viewData('questoesOrdenadas')->first()['numero'])->toBe(1);
+
+    // Valor inventado cai no padrão, em vez de quebrar a ordenação.
+    $componente->call('ordenarQuestoes', 'qualquer-coisa')
+        ->assertSet('ordemDasQuestoes', 'erro');
+});
+
+it('solta a questão aberta quando o recorte muda', function () {
+    ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $questao->id)
+        ->set('filtroBimestre', (string) Bimestre::Terceiro->value)
+        ->assertSet('questaoAberta', null);
+});
+
+/*
+ * Três telas de rolagem sem pista do que vem abaixo é desorientação. Os
+ * atalhos dizem o que existe.
+ */
+it('oferece atalhos para as seções quando há o que mostrar', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSee('Ir para:')
+        ->assertSeeHtml('href="#habilidades"')
+        ->assertSeeHtml('id="questoes"');
+});
+
+it('não oferece atalho para o que não existe', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertDontSee('Ir para:');
 });

@@ -705,6 +705,31 @@ cada `<svg>`. Repetir o mesmo bloco uma vez por painel é duplicação — e,
 pior, a variante escura deixava de vencer a clara na cascata que
 sobrava: os números saíam pretos sobre fundo escuro.
 
+### A grade de questões
+
+Era uma tabela de 27 linhas, uma por questão — metade da altura da página
+para um dado de consulta. E o número da questão só identifica dentro de
+uma prova: com três provas no recorte havia três "questão 2" na mesma
+lista, com valores diferentes e nada que as distinguisse.
+
+Agora é uma linha por prova, com as questões na ordem em que o aluno as
+viu. Cinco degraus de um tom só — passados uns sete tons, dois vizinhos
+deixam de se distinguir — e o aproveitamento escrito dentro de cada
+célula: a cor é o atalho, nunca o único canal. A saturação fica reservada
+ao que está abaixo de 40%; com ela no meio da escala, onde cai a maioria,
+a grade inteira gritava.
+
+Clicar numa célula abre o detalhe: enunciado, habilidade, peso, pontos e
+aproveitamento. Quando o resultado é baixo, a tela oferece uma
+**hipótese** e diz de quem é a leitura — muita gente errar não prova que o
+conteúdo não foi aprendido; pode ser enunciado ambíguo ou gabarito
+trocado. E diz por que a distribuição por alternativa não aparece: a
+planilha do leitor traz acerto ou erro, nunca a letra marcada.
+
+A tabela continua, atrás de um `<details>`, e é ela que ordena — por
+maior erro, por ordem da prova ou por habilidade. Ordenar é operação de
+tabela; a grade vale pela ordem da prova.
+
 ### Três leituras, e nenhuma com o nome da outra
 
 - **Por habilidade avaliada** — a que permite intervir: "interpretar
