@@ -156,66 +156,94 @@ it('não transforma bimestre sem avaliação em zero', function () {
 |--------------------------------------------------------------------------
 */
 
-it('usa a paleta em ordem fixa, sem inventar tons', function () {
-    $grafico = GraficoDeEvolucao::de(['1º', '2º'], [
-        'Lógica' => [1.0, 2.0],
-        'Redes' => [3.0, 4.0],
-    ]);
+/*
+ * A forma mudou: era uma linha por disciplina, sobrepostas; passou a ser
+ * um painel por disciplina, com uma coluna por bimestre. O motivo está no
+ * docblock de GraficoDeEvolucao — a linha afirmava o caminho entre março
+ * e junho, e a lacuna de uma disciplina virava um ponto solto.
+ */
 
-    expect($grafico->series[0]['cor'])->toBe(GraficoDeEvolucao::PALETA[0][0])
-        ->and($grafico->series[1]['cor'])->toBe(GraficoDeEvolucao::PALETA[1][0])
-        // Cada série leva também o tom do tema escuro.
-        ->and($grafico->series[0]['corEscura'])->toBe(GraficoDeEvolucao::PALETA[0][1]);
-});
-
-it('não passa do teto de séries', function () {
+it('não passa do teto de painéis', function () {
     $muitas = collect(range(1, 12))->mapWithKeys(fn (int $i) => ["Disciplina {$i}" => [1.0]])->all();
 
     expect(GraficoDeEvolucao::de(['1º'], $muitas)->series)
         ->toHaveCount(GraficoDeEvolucao::MAXIMO_DE_SERIES);
 });
 
-it('põe a nota dez no topo e a zero na base', function () {
-    $grafico = GraficoDeEvolucao::de(['1º', '2º'], ['Lógica' => [10.0, 0.0]]);
-
-    $pontos = $grafico->coordenadas(largura: 720, altura: 260)[0]['pontos'];
-
-    // 16 de margem no topo; 260 - 34 na base.
-    expect($pontos[0]['y'])->toBe(16.0)
-        ->and($pontos[1]['y'])->toBe(226.0)
-        ->and($pontos[0]['x'])->toBeLessThan($pontos[1]['x']);
+/*
+ * Com um painel por disciplina não há segunda série da qual se
+ * distinguir, então sobra uma cor só — e foi isso que permitiu escolher
+ * um tom que passa em contraste nos dois temas sem brigar com daltonismo.
+ */
+it('usa uma cor só, com o tom do tema escuro ao lado', function () {
+    expect(GraficoDeEvolucao::COR)->toBe('#2a78d6')
+        ->and(GraficoDeEvolucao::COR_ESCURA)->toBe('#3987e5')
+        // Nenhuma série carrega cor: a identidade está no título do painel.
+        ->and(GraficoDeEvolucao::de(['1º'], ['Lógica' => [5.0]])->series[0])
+        ->toBe(['nome' => 'Lógica', 'pontos' => [5.0]]);
 });
 
-it('interrompe a linha no bimestre sem prova', function () {
+it('põe a nota dez no topo e mede a coluna do chão para cima', function () {
+    $grafico = GraficoDeEvolucao::de(['1º', '2º'], ['Lógica' => [10.0, 5.0]]);
+
+    $colunas = $grafico->colunas([10.0, 5.0], largura: 228, altura: 132);
+
+    // 18 de margem no topo, 22 na base: 92 de altura útil.
+    expect($colunas[0]['altura'])->toBe(92.0)
+        ->and($colunas[0]['y'])->toBe(18.0)
+        ->and($colunas[1]['altura'])->toBe(46.0)
+        // As duas nascem na mesma linha de base.
+        ->and($colunas[0]['y'] + $colunas[0]['altura'])->toBe($colunas[1]['y'] + $colunas[1]['altura'])
+        ->and($grafico->base(132))->toBe(110.0);
+});
+
+/*
+ * O bimestre sem avaliação não vira coluna de altura zero nem nota zero:
+ * fica sem coluna, e a view escreve "—" no lugar. Ausência de prova não é
+ * queda de desempenho.
+ */
+it('deixa sem coluna o bimestre sem prova', function () {
     $grafico = GraficoDeEvolucao::de(['1º', '2º', '3º'], ['Lógica' => [8.0, null, 6.0]]);
 
-    // Dois pontos, não três com um zero no meio.
-    expect($grafico->coordenadas()[0]['pontos'])->toHaveCount(2);
+    $colunas = $grafico->colunas([8.0, null, 6.0]);
+
+    expect($colunas)->toHaveCount(3)
+        ->and($colunas[1]['valor'])->toBeNull()
+        ->and($colunas[1]['altura'])->toBe(0.0)
+        ->and($colunas[1]['rotulo'])->toBe('')
+        // E as outras duas continuam nos lugares delas.
+        ->and($colunas[0]['valor'])->toBe(8.0)
+        ->and($colunas[2]['valor'])->toBe(6.0);
 });
 
-it('afasta os rótulos de linhas que terminam juntas', function () {
-    // Sem isto, "7,3 Lógica" e "7,9 Redes" se sobrepõem — foi o que
-    // apareceu na primeira renderização.
-    $grafico = GraficoDeEvolucao::de(['1º', '2º'], [
-        'Lógica' => [5.0, 7.3],
-        'Redes' => [5.0, 7.5],
-    ]);
+it('mantém o lugar de cada bimestre, com ou sem nota', function () {
+    $grafico = GraficoDeEvolucao::de(['1º', '2º', '3º', '4º'], ['Lógica' => [8.0, null, 6.0, null]]);
 
-    $rotulos = $grafico->rotulos();
+    $colunas = $grafico->colunas([8.0, null, 6.0, null]);
 
-    expect(abs($rotulos[0]['y'] - $rotulos[1]['y']))->toBeGreaterThanOrEqual(14.0)
-        // E cada um guarda o ponto de origem, para o fio de ligação.
-        ->and($rotulos[0]['yDoPonto'])->not->toBe($rotulos[1]['yDoPonto']);
+    // O 3º bimestre não escorrega para a posição do 2º só porque ele
+    // ficou vazio: o eixo é o calendário, não os dados.
+    expect($colunas[2]['x'])->toBeGreaterThan($colunas[1]['x'])
+        ->and($colunas[3]['x'])->toBeGreaterThan($colunas[2]['x'])
+        ->and(array_column($colunas, 'bimestre'))->toBe(['1º', '2º', '3º', '4º']);
 });
 
-it('deixa os rótulos onde estão quando não há colisão', function () {
-    $grafico = GraficoDeEvolucao::de(['1º'], ['Lógica' => [10.0], 'Redes' => [0.0]]);
+it('deixa respiro entre colunas vizinhas', function () {
+    $colunas = GraficoDeEvolucao::de(['1º', '2º'], ['Lógica' => [5.0, 5.0]])
+        ->colunas([5.0, 5.0], largura: 228, altura: 132);
 
-    $rotulos = $grafico->rotulos();
+    $fimDaPrimeira = $colunas[0]['x'] + $colunas[0]['largura'];
 
-    foreach ($rotulos as $rotulo) {
-        expect($rotulo['y'])->toBe($rotulo['yDoPonto']);
-    }
+    // Sem vão, duas colunas vizinhas se leem como uma só.
+    expect($colunas[1]['x'])->toBeGreaterThan($fimDaPrimeira + 1);
+});
+
+it('desenha a linha do critério na altura da nota esperada', function () {
+    $grafico = GraficoDeEvolucao::de(['1º'], ['Lógica' => [5.0]], criterio: 6.0);
+
+    // Mesma escala das colunas: 6 de 10 sobre 92 de altura útil.
+    expect($grafico->linhaDoCriterio(132))->toBe(round(18.0 + 92.0 * 0.4, 2))
+        ->and(GraficoDeEvolucao::de(['1º'], ['Lógica' => [5.0]])->linhaDoCriterio())->toBeNull();
 });
 
 it('reconhece quando não há o que desenhar', function () {

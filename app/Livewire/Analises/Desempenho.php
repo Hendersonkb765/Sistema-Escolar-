@@ -243,6 +243,9 @@ class Desempenho extends Component
             'grafico' => GraficoDeEvolucao::de(
                 array_values(Bimestre::opcoes()),
                 $analisar->evolucaoPorBimestre($paraEvolucao, auth()->user(), $disciplina),
+                // A linha de referência é o critério da escola: é contra
+                // ela que o professor lê cada coluna, por posição.
+                criterio: $analisar->criterios->notaEsperada,
             ),
             'alunosDaHabilidade' => $this->habilidadeAberta === ''
                 ? collect()

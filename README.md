@@ -679,6 +679,32 @@ desempenho, junto das outras leituras por questão.
 
 ## Análise de desempenho
 
+### O gráfico: um painel por disciplina, não linhas sobrepostas
+
+Eram linhas, uma cor por disciplina. A forma não servia ao dado, e os
+três motivos apareciam na tela:
+
+- **quatro bimestres não são uma série contínua** — a linha liga dois
+  pontos e com isso afirma o caminho entre eles, que não existe: não
+  houve nota nenhuma em março;
+- **a lacuna sumia** — uma disciplina avaliada só no 2º bimestre virava
+  um ponto solto, indistinguível de ruído, quando a regra é que ausência
+  de avaliação não é queda de desempenho;
+- **seis cores não se distinguem** — identidade por cor custa caro, e a
+  comparação que interessa é contra o critério da escola, não entre
+  disciplinas.
+
+Agora cada disciplina tem painel próprio, com quatro colunas e uma linha
+tracejada no critério, rotulada. O nome está no título, então sobra uma
+cor só — e uma cor só não precisa se distinguir de nenhuma outra, o que
+permitiu escolher um tom que passa em contraste nos dois temas. Bimestre
+sem avaliação não tem coluna: aparece como "—".
+
+As cores moram em `resources/css/app.css`, e não num `<style>` dentro de
+cada `<svg>`. Repetir o mesmo bloco uma vez por painel é duplicação — e,
+pior, a variante escura deixava de vencer a clara na cascata que
+sobrava: os números saíam pretos sobre fundo escuro.
+
 ### Três leituras, e nenhuma com o nome da outra
 
 - **Por habilidade avaliada** — a que permite intervir: "interpretar

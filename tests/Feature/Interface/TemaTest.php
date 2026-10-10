@@ -54,12 +54,20 @@ it('liga o tema pela classe, e não pela preferência do sistema', function () {
 
     expect($config)->toContain("darkMode: 'selector'");
 
-    // E o que o projeto escreve à mão acompanha a mesma classe.
+    /*
+     * E o que o projeto escreve à mão acompanha a mesma classe. Inclui as
+     * cores do gráfico, que saíram de um `<style>` dentro de cada `<svg>`
+     * para cá: quatro blocos idênticos eram duplicação, e a variante
+     * escura não vencia a clara na cascata que sobrava.
+     */
     expect(file_get_contents(resource_path('css/app.css')))
         ->toContain('.dark ::-webkit-scrollbar-thumb')
+        ->toContain('.dark .painel-evolucao .coluna')
+        ->toContain('.dark .painel-evolucao .valor')
         ->not->toContain('prefers-color-scheme');
 
+    // E o SVG não traz estilo próprio que escape dessa regra.
     expect(file_get_contents(resource_path('views/components/grafico-evolucao.blade.php')))
-        ->toContain('.dark .serie')
+        ->not->toContain('<style>')
         ->not->toContain('prefers-color-scheme');
 });

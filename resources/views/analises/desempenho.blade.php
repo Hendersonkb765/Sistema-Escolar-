@@ -186,8 +186,14 @@
             </x-cartao>
         @endif
 
-        <x-cartao titulo="Evolução por bimestre"
-                  descricao="Nota média de cada disciplina. Bimestre sem avaliação não vira zero — a linha se interrompe.">
+        <x-cartao titulo="Evolução por bimestre">
+            <x-slot:descricao>
+                Nota média de cada disciplina, um painel por disciplina. A linha
+                tracejada é o critério de
+                {{ number_format($criterios->notaEsperada, 1, ',', '.') }}.
+                Bimestre sem avaliação não tem coluna e aparece como “—”:
+                ausência de prova não é queda de desempenho.
+            </x-slot:descricao>
             {!! $grafico->svg() !!}
 
             {{-- A leitura em tabela é obrigatória: quem não distingue as
@@ -210,9 +216,10 @@
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($grafico->series as $serie)
                                 <tr wire:key="serie-{{ $loop->index }}">
+                                    {{-- Sem bolinha de cor: cada disciplina tem
+                                         painel próprio, e a identidade vem do
+                                         título dele, não de um tom. --}}
                                     <td class="px-4 py-2 sm:px-6">
-                                        <span class="mr-1 inline-block h-2 w-4 rounded-full align-middle"
-                                              style="background: {{ $serie['cor'] }}"></span>
                                         <span class="text-slate-900 dark:text-slate-100">{{ $serie['nome'] }}</span>
                                     </td>
                                     @foreach ($serie['pontos'] as $ponto)

@@ -132,3 +132,40 @@
         text-align: left;
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Painéis de evolução
+|--------------------------------------------------------------------------
+|
+| O SVG é montado no servidor e repetido uma vez por disciplina. As cores
+| moram aqui, e não num `<style>` dentro de cada `<svg>`: repetir o mesmo
+| bloco quatro vezes é duplicação, e a variante escura não vencia a clara
+| na cascata resultante.
+|
+| A cor da coluna (#2a78d6 claro, #3987e5 escuro) passa em contraste nas
+| duas superfícies. Não precisa de separação para daltonismo porque não há
+| segunda série: a identidade da disciplina está no título do painel.
+*/
+@layer components {
+    .painel-evolucao .eixo { stroke: theme('colors.slate.300'); stroke-width: 1; }
+    .painel-evolucao .grade { stroke: theme('colors.slate.200'); stroke-width: 1; }
+    .painel-evolucao .criterio { stroke: theme('colors.slate.400'); stroke-width: 1; stroke-dasharray: 4 3; }
+    .painel-evolucao .rotulo-eixo { fill: theme('colors.slate.500'); font-size: 10px; }
+    .painel-evolucao .valor { fill: theme('colors.slate.900'); font-size: 10px; font-weight: 600; }
+    .painel-evolucao .ausente { fill: theme('colors.slate.400'); font-size: 9px; }
+    .painel-evolucao .coluna { fill: #2a78d6; }
+
+    .dark .painel-evolucao .eixo { stroke: theme('colors.slate.700'); }
+    .dark .painel-evolucao .grade { stroke: theme('colors.slate.800'); }
+    .dark .painel-evolucao .criterio { stroke: theme('colors.slate.500'); }
+    .dark .painel-evolucao .rotulo-eixo { fill: theme('colors.slate.400'); }
+    .dark .painel-evolucao .valor { fill: theme('colors.slate.100'); }
+    .dark .painel-evolucao .ausente { fill: theme('colors.slate.500'); }
+    .dark .painel-evolucao .coluna { fill: #3987e5; }
+
+    /* No alto contraste quem manda é o sistema. */
+    @media (forced-colors: active) {
+        .painel-evolucao .coluna { fill: CanvasText; }
+    }
+}

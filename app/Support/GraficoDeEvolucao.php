@@ -5,35 +5,45 @@ namespace App\Support;
 use Illuminate\Support\HtmlString;
 
 /**
- * A evolução das notas ao longo dos bimestres, em SVG.
+ * A evolução da nota, um painel por disciplina.
  *
- * Desenhado no servidor, e não por uma biblioteca de gráficos no
- * navegador, por três motivos: não entra dependência nova, o resultado é
- * conferível pela mesma suíte de testes do resto, e a mesma marcação
- * serve ao tema claro e ao escuro (a cor de cada série vem em dois tons
- * e o CSS escolhe).
+ * Eram linhas sobrepostas, uma cor por disciplina. A forma não servia ao
+ * dado por três motivos, e os três apareciam na tela:
  *
- * Forma: uma linha por disciplina, porque o trabalho do leitor é
- * distinguir séries ao longo do tempo. A paleta é categórica, de ordem
- * fixa — nunca ciclada —, e cada linha leva rótulo na ponta, que é o que
- * mantém a identidade legível sem depender só da cor.
+ * 1. **Quatro bimestres não são uma série contínua.** A linha liga dois
+ *    pontos e com isso afirma o caminho entre eles, que não existe: não
+ *    houve nota nenhuma em março. Coluna não afirma nada entre uma e
+ *    outra.
+ * 2. **A lacuna some.** Uma disciplina avaliada só no 2º bimestre virava
+ *    um ponto solto, indistinguível de ruído — e a spec é explícita:
+ *    ausência de avaliação não é queda de desempenho. Sem coluna e com
+ *    "sem avaliação" escrito embaixo, a ausência se lê como ausência.
+ * 3. **Seis cores não se distinguem.** Identidade por cor custa caro e a
+ *    comparação que interessa é contra o critério da escola, não entre
+ *    disciplinas. Com um painel por disciplina, o nome está no título e
+ *    sobra uma cor só — que passa nos dois temas e em daltonismo, porque
+ *    não precisa se distinguir de nenhuma outra.
+ *
+ * O que o professor pergunta é "esta disciplina está acima do que
+ * esperamos, e está melhorando?". A linha tracejada do critério responde
+ * a primeira por posição, sem depender de cor; a sequência de colunas
+ * responde a segunda.
  */
 final class GraficoDeEvolucao
 {
     /**
-     * Paleta categórica em ordem fixa, um par (claro, escuro) por série.
-     * Validada para daltonismo e contraste contra as duas superfícies.
+     * Uma cor só, nos dois tons do tema.
+     *
+     * Validada contra as duas superfícies (contraste ≥ 3:1). Não precisa
+     * de separação para daltonismo porque não há segunda série da qual
+     * se distinguir — foi justamente o que a forma antiga pedia e não
+     * conseguia entregar com seis disciplinas.
      */
-    public const PALETA = [
-        ['#2a78d6', '#3987e5'],
-        ['#eb6834', '#d95926'],
-        ['#1baf7a', '#199e70'],
-        ['#eda100', '#c98500'],
-        ['#e87ba4', '#d55181'],
-        ['#008300', '#008300'],
-    ];
+    public const COR = '#2a78d6';
 
-    /** Acima disto a cauda vira uma série só, em vez de inventar tons. */
+    public const COR_ESCURA = '#3987e5';
+
+    /** Acima disto a cauda vira uma série só, em vez de inventar painéis. */
     public const MAXIMO_DE_SERIES = 6;
 
     public const NOTA_MAXIMA = 10.0;
@@ -41,30 +51,25 @@ final class GraficoDeEvolucao
     private function __construct(
         /** @var array<int, string> */
         public readonly array $bimestres,
-        /** @var array<int, array{nome: string, pontos: array<int, ?float>, cor: string, corEscura: string}> */
+        /** @var array<int, array{nome: string, pontos: array<int, ?float>}> */
         public readonly array $series,
+        public readonly ?float $criterio,
     ) {}
 
     /**
      * @param  array<int, string>  $bimestres  rótulos do eixo horizontal
      * @param  array<string, array<int, ?float>>  $series  disciplina => nota por bimestre (null = sem prova)
+     * @param  ?float  $criterio  nota esperada pela escola, desenhada como referência
      */
-    public static function de(array $bimestres, array $series): self
+    public static function de(array $bimestres, array $series, ?float $criterio = null): self
     {
         $preparadas = [];
 
         foreach (array_slice($series, 0, self::MAXIMO_DE_SERIES, preserve_keys: true) as $nome => $pontos) {
-            $slot = self::PALETA[count($preparadas) % count(self::PALETA)];
-
-            $preparadas[] = [
-                'nome' => $nome,
-                'pontos' => array_values($pontos),
-                'cor' => $slot[0],
-                'corEscura' => $slot[1],
-            ];
+            $preparadas[] = ['nome' => $nome, 'pontos' => array_values($pontos)];
         }
 
-        return new self(array_values($bimestres), $preparadas);
+        return new self(array_values($bimestres), $preparadas, $criterio);
     }
 
     public function vazio(): bool
@@ -76,99 +81,79 @@ final class GraficoDeEvolucao
     }
 
     /**
-     * Coordenadas de cada série, já no sistema do SVG.
+     * As colunas de um painel, já no sistema do SVG.
      *
      * Fica separado do desenho para o teste poder conferir a geometria
      * sem ler marcação.
      *
-     * @return array<int, array{nome: string, cor: string, corEscura: string, pontos: array<int, array{x: float, y: float, valor: float, rotulo: string}>}>
+     * @param  array<int, ?float>  $pontos
+     * @return array<int, array{x: float, y: float, largura: float, altura: float, valor: ?float, rotulo: string, bimestre: string}>
      */
-    public function coordenadas(float $largura = 720, float $altura = 260): array
+    public function colunas(array $pontos, float $largura = 228, float $altura = 132): array
     {
-        [$esquerda, $direita, $topo, $base] = [44.0, 132.0, 16.0, 34.0];
+        // 30 à direita: é onde o rótulo do critério é escrito.
+        [$esquerda, $direita, $topo, $base] = [26.0, 30.0, 18.0, 22.0];
 
         $util = max(1.0, $largura - $esquerda - $direita);
         $alturaUtil = max(1.0, $altura - $topo - $base);
-        $passo = count($this->bimestres) > 1 ? $util / (count($this->bimestres) - 1) : 0.0;
 
-        return array_map(function (array $serie) use ($esquerda, $topo, $alturaUtil, $passo) {
-            $pontos = [];
+        $quantas = max(1, count($this->bimestres));
+        $passo = $util / $quantas;
 
-            foreach ($serie['pontos'] as $indice => $valor) {
-                // Bimestre sem prova não vira zero: a linha se interrompe.
-                if ($valor === null) {
-                    continue;
-                }
+        // Dois terços de coluna e um terço de respiro: o vão entre elas é
+        // o que impede que duas vizinhas sejam lidas como uma só.
+        $larguraDaColuna = round($passo * 0.62, 2);
 
-                $pontos[] = [
-                    'x' => round($esquerda + $indice * $passo, 2),
-                    'y' => round($topo + $alturaUtil * (1 - min($valor, self::NOTA_MAXIMA) / self::NOTA_MAXIMA), 2),
-                    'valor' => (float) $valor,
-                    'rotulo' => number_format((float) $valor, 1, ',', '.'),
-                ];
-            }
+        $colunas = [];
 
-            return [...$serie, 'pontos' => $pontos];
-        }, $this->series);
-    }
+        foreach ($this->bimestres as $indice => $rotuloDoBimestre) {
+            $valor = $pontos[$indice] ?? null;
 
-    /**
-     * Onde escrever o nome de cada série, já afastados entre si.
-     *
-     * Linhas que terminam próximas colidiriam os rótulos. Empurrar cada
-     * um para cima ou para baixo o solta da sua linha, e por isso vem
-     * junto o `y` do ponto: a view traça um fio ligando os dois.
-     *
-     * @return array<int, array{nome: string, cor: string, corEscura: string, x: float, y: float, yDoPonto: float, rotulo: string}>
-     */
-    public function rotulos(float $largura = 720, float $altura = 260): array
-    {
-        $alturaDaLinha = 14.0;
+            $centro = $esquerda + $passo * ($indice + 0.5);
 
-        $candidatos = collect($this->coordenadas($largura, $altura))
-            ->filter(fn (array $serie) => $serie['pontos'] !== [])
-            ->map(function (array $serie) {
-                $ultimo = end($serie['pontos']);
+            $alturaDaColuna = $valor === null
+                ? 0.0
+                : round($alturaUtil * min($valor, self::NOTA_MAXIMA) / self::NOTA_MAXIMA, 2);
 
-                return [
-                    'nome' => $serie['nome'],
-                    'cor' => $serie['cor'],
-                    'corEscura' => $serie['corEscura'],
-                    'x' => $ultimo['x'] + 26,
-                    'y' => $ultimo['y'],
-                    'yDoPonto' => $ultimo['y'],
-                    'rotulo' => $ultimo['rotulo'],
-                ];
-            })
-            ->sortBy('y')
-            ->values()
-            ->all();
-
-        // Uma passada de cima para baixo basta: cada rótulo cede o
-        // espaço mínimo ao anterior.
-        foreach ($candidatos as $indice => $rotulo) {
-            if ($indice === 0) {
-                continue;
-            }
-
-            $minimo = $candidatos[$indice - 1]['y'] + $alturaDaLinha;
-
-            if ($rotulo['y'] < $minimo) {
-                $candidatos[$indice]['y'] = $minimo;
-            }
+            $colunas[] = [
+                'x' => round($centro - $larguraDaColuna / 2, 2),
+                'y' => round($topo + $alturaUtil - $alturaDaColuna, 2),
+                'largura' => $larguraDaColuna,
+                'altura' => $alturaDaColuna,
+                'valor' => $valor === null ? null : (float) $valor,
+                'rotulo' => $valor === null ? '' : number_format((float) $valor, 1, ',', '.'),
+                'bimestre' => $rotuloDoBimestre,
+            ];
         }
 
-        return $candidatos;
+        return $colunas;
     }
 
-    public function svg(float $largura = 720, float $altura = 260): HtmlString
+    /** O `y` da linha de referência do critério, ou null quando não há. */
+    public function linhaDoCriterio(float $altura = 132): ?float
+    {
+        if ($this->criterio === null) {
+            return null;
+        }
+
+        [$topo, $base] = [18.0, 22.0];
+        $alturaUtil = max(1.0, $altura - $topo - $base);
+
+        return round($topo + $alturaUtil * (1 - min($this->criterio, self::NOTA_MAXIMA) / self::NOTA_MAXIMA), 2);
+    }
+
+    /** O chão do painel: onde as colunas nascem. */
+    public function base(float $altura = 132): float
+    {
+        return $altura - 22.0;
+    }
+
+    public function svg(float $largura = 228, float $altura = 132): HtmlString
     {
         return new HtmlString(view('components.grafico-evolucao', [
             'grafico' => $this,
             'largura' => $largura,
             'altura' => $altura,
-            'coordenadas' => $this->coordenadas($largura, $altura),
-            'rotulos' => $this->rotulos($largura, $altura),
         ])->render());
     }
 }
