@@ -14,6 +14,7 @@ use App\Actions\Resultado\AnalisarDesempenhoAction;
 use App\Actions\Resultado\CalcularNotasAction;
 use App\Enums\Bimestre;
 use App\Enums\PerfilUsuario;
+use App\Enums\StatusAluno;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Livewire\Analises\Desempenho;
@@ -23,6 +24,7 @@ use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
+use App\Models\RespostaAluno;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use App\Models\User;
@@ -132,7 +134,87 @@ it('agrupa as questões que avaliam a mesma habilidade', function () {
         ->and($repeticao['respostas'])->toBe(4)
         ->and($repeticao['acertos'])->toBe(2)
         ->and($repeticao['percentual'])->toBe(50.0)
-        ->and($repeticao['atencao'])->toBeTrue();
+        // Dois alunos e quatro respostas não sustentam "a turma não
+        // domina isto": sustentam "falta evidência", que é outra coisa.
+        ->and($repeticao['situacao'])->toBe('inconclusivo')
+        ->and($repeticao['atencao'])->toBeFalse()
+        ->and($repeticao['falta_evidencia'])->toContain('4 respostas');
+});
+
+/*
+ * O percentual é ponderado pelos pesos, e não pela contagem de acertos.
+ * Numa habilidade com uma questão de peso 3 e uma de peso 1, acertar só
+ * a de peso 3 dá 50% contando respostas e 75% contando pontos — e é a
+ * segunda que o professor usa para decidir.
+ */
+it('calcula o aproveitamento pelos pontos, respeitando o peso da questão', function () {
+    $prova = ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    // A questão 1 passa a valer 3; a 2 continua valendo 1.
+    $primeira = $prova->questoes()->where('numero', 1)->sole();
+    $primeira->update(['peso' => 3]);
+    RespostaAluno::query()
+        ->where('prova_questao_id', $primeira->id)
+        ->update(['peso' => 3, 'pontuacao' => 3]);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porHabilidade(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    $repeticao = $linhas->firstWhere('habilidade', 'Interpretar estruturas de repetição');
+
+    // 6 pontos obtidos (duas vezes a questão de peso 3) de 8 possíveis.
+    expect($repeticao['pontos_obtidos'])->toBe(6.0)
+        ->and($repeticao['pontos_maximos'])->toBe(8.0)
+        ->and($repeticao['percentual'])->toBe(75.0)
+        // Contando respostas seriam 2 de 4, isto é, 50%.
+        ->and($repeticao['acertos'])->toBe(2)
+        ->and($repeticao['respostas'])->toBe(4);
+});
+
+/*
+ * Com evidência bastante, a leitura volta a ser uma conclusão.
+ */
+it('aponta dificuldade quando há evidência para isso', function () {
+    config()->set('analise.evidencia_minima.respostas', 4);
+    config()->set('analise.evidencia_minima.questoes', 2);
+
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porHabilidade(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    $repeticao = $linhas->firstWhere('habilidade', 'Interpretar estruturas de repetição');
+
+    expect($repeticao['situacao'])->toBe('atencao')
+        ->and($repeticao['atencao'])->toBeTrue()
+        ->and($repeticao['falta_evidencia'])->toBe('');
+});
+
+/*
+ * O limite é o que a escola configurou, e não 60 cravado no código: 60%
+ * ou 70% não são verdades sobre aprendizagem.
+ */
+it('mede contra o critério configurado pela escola', function () {
+    config()->set('analise.evidencia_minima.respostas', 4);
+    config()->set('analise.criterio_esperado', 40);
+
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porHabilidade(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    // 50% passa a ser satisfatório quando o critério da escola é 40%.
+    expect($linhas->firstWhere('habilidade', 'Interpretar estruturas de repetição')['situacao'])
+        ->toBe('satisfatorio');
 });
 
 it('ordena da habilidade que mais precisa de atenção', function () {
@@ -228,7 +310,7 @@ it('mostra as duas leituras na tela', function () {
         ->assertSee('Por habilidade avaliada')
         ->assertSee('Interpretar estruturas de repetição')
         ->assertSee('Calcular endereçamento IP')
-        ->assertSee('Precisa de atenção')
+        ->assertSee('Evidências insuficientes')
         // Três leituras: duas da turma e uma nominal.
         ->assertSee('Índice de acerto por questão')
         ->assertSee('Acerto de cada aluno');
@@ -390,4 +472,247 @@ it('nega a análise a quem não pode ver resultados', function () {
     $semNada = User::factory()->create(['perfil' => PerfilUsuario::Professor]);
 
     expect($semNada->can('viewAny', ResultadoAluno::class))->toBeTrue();
+});
+
+/*
+|--------------------------------------------------------------------------
+| Visão geral da turma
+|--------------------------------------------------------------------------
+|
+| A média sozinha mente por omissão: uma turma com média 7 pode ter um
+| terço dos alunos abaixo de 5. Por isso o painel traz também a mediana,
+| a distribuição por faixa e a contagem de quem está abaixo do critério.
+*/
+
+it('conta matriculados, avaliados e pendentes', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    // Um terceiro aluno, matriculado e sem avaliação.
+    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Rita Souza', 'ra' => '1003']);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    expect($geral['matriculados'])->toBe(3)
+        ->and($geral['avaliados'])->toBe(2)
+        ->and($geral['pendentes'])->toBe(1)
+        ->and(array_column($geral['pendentes_nomes'], 'nome'))->toBe(['Rita Souza']);
+});
+
+/*
+ * Somar o zero de quem faltou rebaixa a turma inteira por um dado que
+ * não existe.
+ */
+it('não transforma aluno sem avaliação em nota zero', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Aluno::factory()->naTurma($this->turma)->create(['nome' => 'Rita Souza', 'ra' => '1003']);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    // Os dois avaliados acertaram tudo: a média é 10, e não 6,67.
+    expect($geral['media'])->toBe(10.0)
+        ->and($geral['pendentes'])->toBe(1);
+});
+
+it('traz média e mediana, que podem discordar', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => false, 2 => false, 3 => false],
+    ]);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    // Duas disciplinas por aluno: quatro notas, duas 10 e duas 0.
+    expect($geral['notas'])->toBe(4)
+        ->and($geral['media'])->toBe(5.0)
+        ->and($geral['mediana'])->toBe(5.0);
+});
+
+it('distribui as notas por faixa', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => false, 2 => false, 3 => false],
+    ]);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    $porRotulo = collect($geral['faixas'])->pluck('quantidade', 'rotulo');
+
+    expect($porRotulo['0 a 2'])->toBe(2)
+        ->and($porRotulo['8 a 10'])->toBe(2)
+        ->and(array_sum($porRotulo->all()))->toBe(4);
+});
+
+/*
+ * O número que encontra o grupo em dificuldade é "quantos alunos têm ao
+ * menos uma nota abaixo", e não a média do aluno — que esconde a
+ * disciplina ruim atrás da boa.
+ */
+it('conta o aluno que tem ao menos uma nota abaixo do critério', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        // Acerta Lógica inteira e erra Redes: média boa, uma nota zero.
+        0 => [1 => true, 2 => true, 3 => false],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    expect($geral['alunos_abaixo'])->toBe(1)
+        ->and($geral['percentual_alunos_abaixo'])->toBe(50.0);
+});
+
+it('mede o critério pela nota que a escola configurou', function () {
+    config()->set('analise.nota_esperada', 9);
+
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => false],
+        1 => [1 => true, 2 => true, 3 => false],
+    ]);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    // Lógica 10 e Redes 0: com o corte em 9, metade das notas passa.
+    expect($geral['no_criterio'])->toBe(2)
+        ->and($geral['abaixo'])->toBe(2);
+});
+
+it('devolve o painel vazio sem explodir quando não há prova no recorte', function () {
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::query()->whereRaw('1 = 0')->get(), $this->paeet);
+
+    expect($geral['matriculados'])->toBe(0)
+        ->and($geral['media'])->toBeNull()
+        ->and($geral['mediana'])->toBeNull()
+        ->and($geral['percentual_no_criterio'])->toBeNull();
+});
+
+it('não conta como pendente o aluno que saiu da turma', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Aluno::factory()->naTurma($this->turma)->create([
+        'nome' => 'Transferido Silva', 'ra' => '1009',
+        'status' => StatusAluno::Transferido,
+    ]);
+
+    $geral = app(AnalisarDesempenhoAction::class)
+        ->visaoGeral(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    expect($geral['matriculados'])->toBe(2)
+        ->and($geral['pendentes'])->toBe(0);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Seleção dos dados da análise
+|--------------------------------------------------------------------------
+*/
+
+it('consolida mais de uma prova quando o professor marca as duas', function () {
+    $primeira = ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => true, 2 => true, 3 => true],
+    ]);
+    $segunda = ($this->provaCom)(Bimestre::Segundo, 'Segunda', [
+        0 => [1 => false, 2 => false, 3 => false],
+        1 => [1 => false, 2 => false, 3 => false],
+    ]);
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('provasEscolhidas', [(string) $primeira->id]);
+
+    $so = $componente->viewData('porHabilidade')
+        ->firstWhere('habilidade', 'Interpretar estruturas de repetição');
+
+    expect($so['percentual'])->toBe(100.0);
+
+    $componente->set('provasEscolhidas', [(string) $primeira->id, (string) $segunda->id]);
+
+    $juntas = $componente->viewData('porHabilidade')
+        ->firstWhere('habilidade', 'Interpretar estruturas de repetição');
+
+    // Oito respostas: quatro certas na primeira, quatro erradas na segunda.
+    expect($juntas['percentual'])->toBe(50.0)
+        ->and($juntas['respostas'])->toBe(8);
+});
+
+/*
+ * Somar duas provas que mediram conteúdos diferentes dá um número certo
+ * sobre uma pergunta errada. O número fica; a ressalva aparece ao lado.
+ */
+it('avisa que o recorte junta bimestres diferentes', function () {
+    ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+    ($this->provaCom)(Bimestre::Segundo, 'Segunda', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSee('junta bimestres diferentes');
+});
+
+it('não avisa nada quando o recorte é de uma prova só', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertDontSee('junta bimestres diferentes')
+        ->assertDontSee('quantidades diferentes de questões');
+});
+
+it('filtra pelo ano letivo', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Deste ano', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('filtroAno', '1998')
+        ->assertSee('Nada para analisar neste recorte');
+});
+
+/*
+ * Trocar o recorte não pode deixar uma prova marcada que saiu dele: a
+ * tela ficaria vazia sem dizer por quê.
+ */
+it('solta a prova marcada que saiu do recorte', function () {
+    $primeira = ($this->provaCom)(Bimestre::Primeiro, 'Primeira', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('provasEscolhidas', [(string) $primeira->id])
+        ->set('filtroBimestre', (string) Bimestre::Terceiro->value)
+        ->assertSet('provasEscolhidas', []);
+});
+
+it('diz quantos alunos e quantas respostas entram na conta', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSee('2 aluno(s) avaliado(s)')
+        ->assertSee('6 resposta(s)');
 });

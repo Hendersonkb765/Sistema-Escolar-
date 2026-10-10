@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\CriteriosDaAnalise;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
@@ -14,7 +15,13 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        /*
+         * Os critérios da análise vêm da configuração, num lugar só. O
+         * container injeta o mesmo objeto na Action e na tela, de modo
+         * que o número contra o qual um resultado foi medido é o número
+         * que a tela mostra ao lado dele.
+         */
+        $this->app->singleton(CriteriosDaAnalise::class, fn () => CriteriosDaAnalise::daConfiguracao());
     }
 
     public function boot(): void

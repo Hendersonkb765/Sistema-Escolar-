@@ -78,6 +78,22 @@ fica lá com a aparência certa e não faz nada ao ser clicado.
   `Js::from()` é o que a diretiva usa por baixo, e escapa acento e aspas
   do mesmo jeito.
 
+Pelo mesmo motivo, **diretiva colada no fim de uma palavra não compila**:
+
+```blade
+{{-- @endif fica literal: o `x` antes dele encosta no `@` --}}
+@if ($sobra) e outros@endif.
+
+{{-- compila: um espaço, ou um sinal, basta --}}
+@if ($sobra) e outros @endif.
+```
+
+Vale para letra e dígito; depois de `>` ou de espaço o Blade reconhece.
+O `@if` abre, o `@endif` não fecha, e o erro que aparece é um
+`syntax error, unexpected end of file` apontando para o fim do arquivo
+compilado — longe da linha culpada. Quando a condição é curta, troque por
+um ternário dentro de `{{ }}`.
+
 `tests/Feature/Interface/DiretivasCompiladasTest.php` varre o HTML de
 todas as telas atrás de diretiva crua. É o teste que pega a família
 inteira de uma vez: `assertSee` não pega, porque o rótulo continua lá.

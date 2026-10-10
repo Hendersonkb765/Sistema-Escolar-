@@ -13,6 +13,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection as ColecaoSimples;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -30,14 +31,25 @@ class Desempenho extends Component
 {
     use AuthorizesRequests;
 
+    #[Url(as: 'ano', except: '')]
+    public string $filtroAno = '';
+
     #[Url(as: 'turma', except: '')]
     public string $filtroTurma = '';
 
     #[Url(as: 'bimestre', except: '')]
     public string $filtroBimestre = '';
 
-    #[Url(as: 'prova', except: '')]
-    public string $filtroProva = '';
+    /**
+     * As provas escolhidas, por id. Vazio significa todas as do recorte.
+     *
+     * Várias, e não uma: consolidar duas provas do mesmo bimestre é o
+     * caso comum de quem quer olhar a habilidade com evidência bastante.
+     *
+     * @var array<int, string>
+     */
+    #[Url(as: 'provas', except: [])]
+    public array $provasEscolhidas = [];
 
     #[Url(as: 'disciplina', except: '')]
     public string $filtroDisciplina = '';
@@ -60,7 +72,7 @@ class Desempenho extends Component
     public function provasAnalisadas(): Collection
     {
         return $this->consultaDeProvas()
-            ->when($this->filtroProva !== '', fn (Builder $q) => $q->whereKey($this->filtroProva))
+            ->when($this->provasEscolhidas !== [], fn (Builder $q) => $q->whereKey($this->provasEscolhidas))
             ->get();
     }
 
@@ -70,9 +82,109 @@ class Desempenho extends Component
             ->visivelPara(auth()->user())
             ->whereHas('resultados')
             ->with(['turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id'])
+            ->when(
+                $this->filtroAno !== '',
+                fn (Builder $q) => $q->whereHas('turma', fn ($t) => $t->where('periodo_letivo', $this->filtroAno))
+            )
             ->when($this->filtroTurma !== '', fn (Builder $q) => $q->where('turma_id', $this->filtroTurma))
             ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
             ->orderByDesc('gerada_em');
+    }
+
+    /*
+     * Mudar o recorte não pode deixar uma escolha apontando para fora
+     * dele: a tela ficaria vazia sem dizer por quê. O que continua
+     * valendo fica marcado; o resto volta a "todas do recorte".
+     */
+    public function updatedFiltroAno(): void
+    {
+        $this->sincronizarEscolhas();
+    }
+
+    public function updatedFiltroTurma(): void
+    {
+        $this->sincronizarEscolhas();
+    }
+
+    public function updatedFiltroBimestre(): void
+    {
+        $this->sincronizarEscolhas();
+    }
+
+    protected function sincronizarEscolhas(): void
+    {
+        $this->habilidadeAberta = '';
+
+        if ($this->provasEscolhidas === []) {
+            return;
+        }
+
+        $noRecorte = $this->consultaDeProvas()->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        $this->provasEscolhidas = array_values(array_intersect($this->provasEscolhidas, $noRecorte));
+    }
+
+    /**
+     * Os anos letivos que têm prova com resultado.
+     *
+     * `Support\Collection`, e não a do Eloquent: `pluck` sobre uma
+     * consulta devolve valores, não models.
+     *
+     * @return ColecaoSimples<int, string>
+     */
+    public function anosDisponiveis(): ColecaoSimples
+    {
+        return Turma::query()
+            ->visivelPara(auth()->user())
+            ->whereHas('provas', fn (Builder $q) => $q->whereHas('resultados'))
+            ->orderByDesc('periodo_letivo')
+            ->pluck('periodo_letivo')
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * O que a consolidação junta, e o que isso tem de limitação.
+     *
+     * Duas provas com quantidades de questões ou pesos diferentes somam
+     * pontos que não pesam igual. O número continua certo; o que muda é
+     * o que ele permite afirmar, e isso tem de estar escrito ao lado
+     * dele.
+     *
+     * @param  Collection<int, Prova>  $provas
+     * @return array<int, string>
+     */
+    public function limitacoesDaConsolidacao(Collection $provas): array
+    {
+        if ($provas->count() < 2) {
+            return [];
+        }
+
+        $avisos = [];
+
+        if ($provas->pluck('bimestre')->unique()->count() > 1) {
+            $avisos[] = 'O recorte junta bimestres diferentes, que avaliaram conteúdos diferentes: '
+                .'o consolidado soma provas que não medem a mesma coisa.';
+        }
+
+        if ($provas->pluck('turma_id')->unique()->count() > 1) {
+            $avisos[] = 'O recorte junta turmas diferentes. As médias saem do conjunto, '
+                .'e não de cada turma.';
+        }
+
+        $questoes = ProvaQuestao::query()
+            ->whereIn('prova_id', $provas->modelKeys())
+            ->selectRaw('prova_id, count(*) as total, sum(peso) as pontos')
+            ->groupBy('prova_id')
+            ->get();
+
+        if ($questoes->pluck('total')->unique()->count() > 1) {
+            $avisos[] = 'As provas do recorte têm quantidades diferentes de questões ('
+                .$questoes->pluck('total')->sort()->join(', ').'): '
+                .'quem fez a mais longa pesa mais no consolidado.';
+        }
+
+        return $avisos;
     }
 
     public function verAlunos(string $habilidade): void
@@ -137,16 +249,19 @@ class Desempenho extends Component
                 : $analisar->porAluno($provas, auth()->user(), $this->habilidadeAberta, $disciplina),
             'turmaDoRecorte' => $this->turmaDoRecorte(),
             'provasDisponiveis' => $this->consultaDeProvas()->get(),
+            'anos' => $this->anosDisponiveis(),
+            'limitacoes' => $this->limitacoesDaConsolidacao($provas),
             'turmas' => Turma::query()->visivelPara(auth()->user())->orderBy('nome')->pluck('nome', 'id'),
             'bimestres' => Bimestre::opcoes(),
             'disciplinas' => $disciplinas,
+            'geral' => $analisar->visaoGeral($provas, auth()->user(), $disciplina),
             'porHabilidade' => $analisar->porHabilidade($provas, auth()->user(), $disciplina),
             'porQuestao' => $analisar->porQuestao($provas, auth()->user(), $disciplina),
             'provaDoRecorte' => $provaUnica = $this->provaDoRecorte(),
             'acertoNominal' => $provaUnica === null
                 ? null
                 : $analisar->acertoDeCadaAluno($provaUnica, auth()->user(), $disciplina),
-            'limite' => AnalisarDesempenhoAction::LIMITE_DE_ATENCAO,
+            'criterios' => $analisar->criterios,
         ])->layout('components.layouts.app', [
             'titulo' => 'Análise de desempenho',
             'subtitulo' => 'Por habilidade avaliada, e não só pelo número da questão',

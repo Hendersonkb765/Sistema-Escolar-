@@ -3,11 +3,14 @@
 namespace App\Actions\Resultado;
 
 use App\Enums\Bimestre;
+use App\Enums\StatusAluno;
+use App\Models\Aluno;
 use App\Models\NotaDisciplina;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\RespostaAluno;
 use App\Models\User;
+use App\Support\CriteriosDaAnalise;
 use Illuminate\Database\Eloquent\Collection as ColecaoDeModels;
 use Illuminate\Support\Collection;
 
@@ -25,8 +28,7 @@ use Illuminate\Support\Collection;
  */
 class AnalisarDesempenhoAction
 {
-    /** Abaixo disto a turma não domina o conteúdo. */
-    public const LIMITE_DE_ATENCAO = 60.0;
+    public function __construct(public readonly CriteriosDaAnalise $criterios) {}
 
     /**
      * @param  Collection<int, Prova>  $provas
@@ -78,6 +80,172 @@ class AnalisarDesempenhoAction
             })
             ->sortBy('percentual')
             ->values();
+    }
+
+    /**
+     * O painel da turma: quem foi avaliado, como foi, e quem ficou de
+     * fora.
+     *
+     * A média sozinha mente por omissão — uma turma com média 7 pode ter
+     * um terço dos alunos abaixo de 5. Por isso vêm juntas a mediana, a
+     * distribuição por faixa e a contagem de quem está abaixo do
+     * critério.
+     *
+     * Aluno sem avaliação registrada **não vira zero**: ele entra como
+     * pendente e fica de fora das contas. Somar o zero de quem faltou
+     * rebaixa a turma inteira por um dado que não existe.
+     *
+     * @param  Collection<int, Prova>  $provas
+     * @return array<string, mixed>
+     */
+    public function visaoGeral(Collection $provas, User $leitor, ?int $disciplinaId = null): array
+    {
+        $visiveis = $this->visiveis($provas, $leitor);
+
+        $vazio = [
+            'matriculados' => 0, 'avaliados' => 0, 'pendentes' => 0,
+            'notas' => 0, 'media' => null, 'mediana' => null,
+            'faixas' => $this->faixasVazias(), 'no_criterio' => 0, 'abaixo' => 0,
+            'percentual_no_criterio' => null, 'alunos_abaixo' => 0,
+            'percentual_alunos_abaixo' => null, 'pendentes_nomes' => [],
+        ];
+
+        if ($visiveis->isEmpty()) {
+            return $vazio;
+        }
+
+        $turmas = $visiveis->pluck('turma_id')->unique();
+
+        /*
+         * Matriculado é quem está ativo na turma hoje. Um aluno
+         * transferido no meio do bimestre não é "pendente": ele não
+         * deveria ter feito a prova.
+         */
+        $matriculados = Aluno::query()
+            ->visivelPara($leitor)
+            ->whereIn('turma_id', $turmas)
+            ->where('status', StatusAluno::Ativo)
+            ->get(['id', 'nome', 'ra', 'turma_id']);
+
+        $notas = $this->notasDoRecorte($visiveis, $leitor, $disciplinaId);
+
+        $avaliados = $notas->pluck('aluno_id')->unique();
+
+        $valores = $notas->pluck('nota')->map(fn ($n) => (float) $n)->sort()->values();
+
+        $pendentes = $matriculados->reject(fn (Aluno $a) => $avaliados->contains($a->id))->values();
+
+        $noCriterio = $valores->filter(fn (float $n) => $n >= $this->criterios->notaEsperada)->count();
+
+        // Um aluno conta como "abaixo" se QUALQUER nota dele no recorte
+        // está abaixo — é essa leitura que encontra o grupo em
+        // dificuldade, e não a média do aluno.
+        $alunosAbaixo = $notas
+            ->filter(fn (array $n) => (float) $n['nota'] < $this->criterios->notaEsperada)
+            ->pluck('aluno_id')->unique()->count();
+
+        return [
+            'matriculados' => $matriculados->count(),
+            'avaliados' => $avaliados->count(),
+            'pendentes' => $pendentes->count(),
+            'pendentes_nomes' => $pendentes->take(12)->map(
+                fn (Aluno $a) => ['nome' => $a->nome, 'ra' => $a->ra]
+            )->values()->all(),
+            'notas' => $valores->count(),
+            'media' => $valores->isEmpty() ? null : round($valores->avg(), 2),
+            'mediana' => $this->mediana($valores),
+            'faixas' => $this->distribuicao($valores),
+            'no_criterio' => $noCriterio,
+            'abaixo' => $valores->count() - $noCriterio,
+            'percentual_no_criterio' => $valores->isEmpty()
+                ? null
+                : round(100 * $noCriterio / $valores->count(), 1),
+            'alunos_abaixo' => $alunosAbaixo,
+            'percentual_alunos_abaixo' => $avaliados->isEmpty()
+                ? null
+                : round(100 * $alunosAbaixo / $avaliados->count(), 1),
+        ];
+    }
+
+    /**
+     * As notas de disciplina do recorte.
+     *
+     * A unidade é a nota **por disciplina**, e não uma nota única por
+     * aluno: somar questões de disciplinas diferentes numa nota só
+     * apagaria justamente o que a escola quer ver.
+     *
+     * @param  ColecaoDeModels<int, Prova>  $provas
+     * @return Collection<int, array{aluno_id: int, disciplina: string, nota: float, prova: string}>
+     */
+    protected function notasDoRecorte(ColecaoDeModels $provas, User $leitor, ?int $disciplinaId): Collection
+    {
+        return NotaDisciplina::query()
+            ->whereHas('resultado', fn ($q) => $q->whereIn('prova_id', $provas->modelKeys()))
+            ->when($disciplinaId !== null, fn ($q) => $q->where('disciplina_id', $disciplinaId))
+            ->when(
+                ! $leitor->ehGestao(),
+                // O professor lê as notas das disciplinas em que tem
+                // questão na prova — o mesmo recorte das outras leituras.
+                fn ($q) => $q->whereHas('resultado.prova.questoes', fn ($p) => $p
+                    ->where('professor_id', $leitor->getKey())
+                    ->whereColumn('prova_questoes.disciplina_id', 'notas_disciplina.disciplina_id'))
+            )
+            ->with(['disciplina:id,nome', 'resultado:id,prova_id,aluno_id', 'resultado.prova:id,titulo'])
+            ->get()
+            ->map(fn (NotaDisciplina $nota) => [
+                'aluno_id' => $nota->resultado->aluno_id,
+                'disciplina' => $nota->disciplina->nome,
+                'nota' => (float) $nota->nota,
+                'prova' => $nota->resultado->prova->titulo,
+            ]);
+    }
+
+    /** @param  Collection<int, float>  $ordenadas */
+    protected function mediana(Collection $ordenadas): ?float
+    {
+        $total = $ordenadas->count();
+
+        if ($total === 0) {
+            return null;
+        }
+
+        $meio = intdiv($total, 2);
+
+        return round(
+            $total % 2 === 1
+                ? $ordenadas[$meio]
+                : ($ordenadas[$meio - 1] + $ordenadas[$meio]) / 2,
+            2,
+        );
+    }
+
+    /**
+     * @param  Collection<int, float>  $valores
+     * @return array<int, array{rotulo: string, cor: string, quantidade: int, percentual: float}>
+     */
+    protected function distribuicao(Collection $valores): array
+    {
+        $faixas = $this->faixasVazias();
+
+        foreach ($valores as $nota) {
+            $faixas[$this->criterios->faixaDaNota($nota)]['quantidade']++;
+        }
+
+        $total = $valores->count();
+
+        return array_map(fn (array $faixa) => [
+            ...$faixa,
+            'percentual' => $total === 0 ? 0.0 : round(100 * $faixa['quantidade'] / $total, 1),
+        ], $faixas);
+    }
+
+    /** @return array<int, array{rotulo: string, cor: string, quantidade: int}> */
+    protected function faixasVazias(): array
+    {
+        return array_map(
+            fn (array $faixa) => ['rotulo' => $faixa['rotulo'], 'cor' => $faixa['cor'], 'quantidade' => 0],
+            $this->criterios->faixas,
+        );
     }
 
     /**
@@ -155,18 +323,51 @@ class AnalisarDesempenhoAction
      * @param  Collection<int, RespostaAluno>  $respostas
      * @return array{respostas: int, acertos: int, erros: int, percentual: float, atencao: bool}
      */
+    /**
+     * A conta que todas as leituras desta tela usam.
+     *
+     * **Ponderada pelos pesos**, e não pela contagem de acertos: numa
+     * habilidade com uma questão de peso 3 e duas de peso 1, acertar só a
+     * de peso 3 dá 33% contando respostas e 60% contando pontos. A
+     * segunda é a que o professor usa para decidir, e é a que a escola
+     * definiu ao dar peso às questões.
+     *
+     * `pontuacao` e `peso` já vêm gravados em cada resposta pela
+     * importação, então isto é leitura, não recálculo.
+     *
+     * @param  Collection<int, RespostaAluno>  $respostas
+     * @return array<string, mixed>
+     */
     protected function contagem(Collection $respostas): array
     {
         $total = $respostas->count();
         $acertos = $respostas->where('acertou', true)->count();
-        $percentual = $total === 0 ? 0.0 : round(100 * $acertos / $total, 1);
+
+        $pontosObtidos = round((float) $respostas->sum('pontuacao'), 2);
+        $pontosMaximos = round((float) $respostas->sum('peso'), 2);
+
+        $percentual = $pontosMaximos <= 0
+            ? 0.0
+            : round(100 * $pontosObtidos / $pontosMaximos, 1);
+
+        $questoes = $respostas->pluck('prova_questao_id')->unique()->count();
+        $alunos = $respostas->map(fn (RespostaAluno $r) => $r->resultado->aluno_id)->unique()->count();
+
+        $situacao = $this->criterios->situacao($percentual, $questoes, $total);
 
         return [
             'respostas' => $total,
+            'alunos' => $alunos,
             'acertos' => $acertos,
             'erros' => $total - $acertos,
+            'pontos_obtidos' => $pontosObtidos,
+            'pontos_maximos' => $pontosMaximos,
             'percentual' => $percentual,
-            'atencao' => $percentual < self::LIMITE_DE_ATENCAO,
+            'situacao' => $situacao,
+            'falta_evidencia' => $this->criterios->faltaDeEvidencia($questoes, $total),
+            // Mantido porque as telas e os testes já leem por este nome;
+            // agora só é verdade quando há evidência para afirmá-lo.
+            'atencao' => $situacao === 'atencao',
         ];
     }
 

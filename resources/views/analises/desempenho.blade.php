@@ -15,6 +15,15 @@
             </x-slot:acoes>
         @endif
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+            <x-campo rotulo="Ano letivo" para="filtro-ano">
+                <x-select id="filtro-ano" wire:model.live="filtroAno">
+                    <option value="">Todos</option>
+                    @foreach ($anos as $ano)
+                        <option value="{{ $ano }}">{{ $ano }}</option>
+                    @endforeach
+                </x-select>
+            </x-campo>
+
             <x-campo rotulo="Turma" para="filtro-turma">
                 <x-select id="filtro-turma" wire:model.live="filtroTurma">
                     <option value="">Todas</option>
@@ -33,17 +42,6 @@
                 </x-select>
             </x-campo>
 
-            <x-campo rotulo="Prova" para="filtro-prova">
-                <x-select id="filtro-prova" wire:model.live="filtroProva">
-                    <option value="">Todas do recorte</option>
-                    @foreach ($provasDisponiveis as $opcao)
-                        <option value="{{ $opcao->id }}">
-                            {{ $opcao->titulo }} · {{ $opcao->turma->nome }} · {{ $opcao->bimestre->sigla() }}
-                        </option>
-                    @endforeach
-                </x-select>
-            </x-campo>
-
             <x-campo rotulo="Disciplina" para="filtro-disciplina">
                 <x-select id="filtro-disciplina" wire:model.live="filtroDisciplina">
                     <option value="">Todas</option>
@@ -54,15 +52,140 @@
             </x-campo>
         </div>
 
+        {{--
+            As provas do recorte, uma caixa cada.
+
+            Consolidar duas provas do mesmo bimestre é o caso comum de
+            quem quer olhar a habilidade com evidência bastante — e um
+            select de uma opção só não deixa.
+        --}}
+        @if ($provasDisponiveis->isNotEmpty())
+            <div class="mt-4">
+                <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Provas consideradas
+                    <span class="font-normal text-slate-500 dark:text-slate-400">
+                        — nenhuma marcada vale por todas as {{ $provasDisponiveis->count() }} do recorte
+                    </span>
+                </p>
+
+                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($provasDisponiveis as $opcao)
+                        <label wire:key="prova-{{ $opcao->id }}"
+                               class="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                            <input type="checkbox" value="{{ $opcao->id }}" wire:model.live="provasEscolhidas"
+                                   class="mt-0.5 rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
+                            <span class="min-w-0">
+                                <span class="block truncate text-slate-900 dark:text-slate-100">{{ $opcao->titulo }}</span>
+                                <span class="block text-xs text-slate-400">
+                                    {{ $opcao->turma->nome }} · {{ $opcao->bimestre->rotulo() }}
+                                </span>
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if ($provas->isNotEmpty())
+            {{-- Quantos dados entram na conta: um percentual sem o tamanho da amostra não se lê. --}}
             <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                {{ $provas->count() }} prova(s) no recorte:
-                {{ $provas->map(fn ($p) => $p->titulo.' ('.$p->bimestre->sigla().')')->join(', ') }}
+                {{ $provas->count() }} prova(s),
+                {{ $geral['avaliados'] }} aluno(s) avaliado(s) e
+                {{ collect($porQuestao)->sum('respostas') }} resposta(s) entram nos cálculos.
             </p>
         @endif
+
+        @foreach ($limitacoes as $aviso)
+            <x-alerta tipo="atencao" class="mt-3">{{ $aviso }}</x-alerta>
+        @endforeach
     </x-cartao>
 
     @unless ($grafico->vazio())
+        {{--
+            O painel da turma.
+
+            A média sozinha mente por omissão: uma turma com média 7 pode
+            ter um terço dos alunos abaixo de 5. Por isso ela vem ao lado
+            da mediana, da distribuição e de quantos alunos têm ao menos
+            uma nota abaixo do critério — que é o número que encontra o
+            grupo em dificuldade.
+
+            Cada indicador diz como foi calculado: um número sem a conta
+            atrás dele não dá para contestar nem para usar em reunião.
+        --}}
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <x-indicador rotulo="Alunos avaliados"
+                         :valor="$geral['avaliados'].' de '.$geral['matriculados']"
+                         :cor="$geral['pendentes'] > 0 ? 'amarelo' : 'verde'"
+                         :detalhe="$geral['pendentes'] === 0
+                            ? 'Todos os matriculados têm resultado importado.'
+                            : $geral['pendentes'].' sem resultado importado — não entram nas contas.'"/>
+
+            <x-indicador rotulo="Média das notas"
+                         :valor="$geral['media'] === null ? '—' : number_format($geral['media'], 2, ',', '.')"
+                         cor="azul"
+                         :detalhe="$geral['notas'].' nota(s) de disciplina lançadas no recorte.'"/>
+
+            <x-indicador rotulo="Mediana"
+                         :valor="$geral['mediana'] === null ? '—' : number_format($geral['mediana'], 2, ',', '.')"
+                         cor="azul"
+                         detalhe="O valor do meio. Longe da média, indica turma partida em dois grupos."/>
+
+            <x-indicador rotulo="Alunos abaixo do critério"
+                         :valor="$geral['percentual_alunos_abaixo'] === null
+                            ? '—'
+                            : $geral['alunos_abaixo'].' ('.number_format($geral['percentual_alunos_abaixo'], 1, ',', '.').'%)'"
+                         :cor="($geral['alunos_abaixo'] ?? 0) > 0 ? 'vermelho' : 'verde'"
+                         :detalhe="'Com ao menos uma nota abaixo de '
+                            .number_format($criterios->notaEsperada, 1, ',', '.').', entre os avaliados.'"/>
+        </div>
+
+        @if ($geral['notas'] > 0)
+            <x-cartao titulo="Distribuição das notas"
+                      :descricao="'Por faixa, entre as '.$geral['notas'].' notas de disciplina do recorte. '
+                        .$geral['no_criterio'].' atingiram o critério de '
+                        .number_format($criterios->notaEsperada, 1, ',', '.').'.'">
+                <div class="space-y-2 p-4 sm:p-6">
+                    @foreach ($geral['faixas'] as $faixa)
+                        <div class="flex items-center gap-3 text-sm">
+                            <span class="w-16 shrink-0 tabular-nums text-slate-600 dark:text-slate-300">
+                                {{ $faixa['rotulo'] }}
+                            </span>
+                            <div class="h-3 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                                {{-- A cor não é o único sinal: o número vem ao lado. --}}
+                                <div @class([
+                                        'h-full rounded-full',
+                                        'bg-rose-500' => $faixa['cor'] === 'vermelho',
+                                        'bg-amber-500' => $faixa['cor'] === 'amarelo',
+                                        'bg-emerald-500' => $faixa['cor'] === 'verde',
+                                     ])
+                                     style="width: {{ $faixa['percentual'] }}%"></div>
+                            </div>
+                            <span class="w-28 shrink-0 text-right tabular-nums text-slate-500 dark:text-slate-400">
+                                {{ $faixa['quantidade'] }} ({{ number_format($faixa['percentual'], 1, ',', '.') }}%)
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+
+                @if ($geral['pendentes'] > 0)
+                    <div class="border-t border-slate-200 px-4 py-3 text-sm sm:px-6 dark:border-slate-800">
+                        <p class="font-medium text-slate-700 dark:text-slate-200">
+                            {{ $geral['pendentes'] }} aluno(s) sem avaliação registrada
+                        </p>
+                        @php
+                            $nomes = collect($geral['pendentes_nomes'])->pluck('nome')->join(', ');
+                            $sobraram = $geral['pendentes'] - count($geral['pendentes_nomes']);
+                        @endphp
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            Ficam de fora da média e da distribuição: nota que não existe não é zero.
+                            {{ $nomes }}{{ $sobraram > 0 ? " e mais {$sobraram}" : '' }}.
+                        </p>
+                    </div>
+                @endif
+            </x-cartao>
+        @endif
+
         <x-cartao titulo="Evolução por bimestre"
                   descricao="Nota média de cada disciplina. Bimestre sem avaliação não vira zero — a linha se interrompe.">
             {!! $grafico->svg() !!}
@@ -113,7 +236,7 @@
         </x-cartao>
     @else
         <x-cartao titulo="Por habilidade avaliada"
-                  :descricao="'Ordenado da que mais precisa de atenção. Abaixo de '.$limite.'% de acerto vai destacado.'">
+                  :descricao="'Ordenado da que mais precisa de atenção. Abaixo de '.$criterios->criterioEsperado.'% de aproveitamento vai destacado.'">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                     <thead>
@@ -132,8 +255,22 @@
                                 @class(['bg-rose-50/60 dark:bg-rose-950/20' => $item['atencao']])>
                                 <td class="px-4 py-3 sm:px-6">
                                     <span class="font-medium text-slate-900 dark:text-slate-100">{{ $item['habilidade'] }}</span>
-                                    @if ($item['atencao'])
-                                        <x-badge cor="vermelho" rotulo="Precisa de atenção" class="ml-1"/>
+
+                                    {{--
+                                        Três estados, e não dois. "Evidências
+                                        insuficientes" não é um meio-termo entre
+                                        bom e ruim: é a recusa de classificar sem
+                                        base, e some da lista de prioridades em
+                                        vez de entrar como problema.
+                                    --}}
+                                    <x-badge class="ml-1"
+                                             :cor="App\Support\CriteriosDaAnalise::cores()[$item['situacao']]"
+                                             :rotulo="App\Support\CriteriosDaAnalise::rotulos()[$item['situacao']]"/>
+
+                                    @if ($item['falta_evidencia'] !== '')
+                                        <span class="block pt-0.5 text-xs text-slate-400">
+                                            {{ $item['falta_evidencia'] }}
+                                        </span>
                                     @endif
                                 </td>
                                 <td class="hidden px-4 py-3 text-slate-600 md:table-cell dark:text-slate-300">
