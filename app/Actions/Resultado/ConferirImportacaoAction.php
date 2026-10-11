@@ -41,10 +41,14 @@ class ConferirImportacaoAction
 
         $planilha = PlanilhaDeResultados::ler(Storage::disk('local')->path($importacao->arquivo));
 
+        // `letra_correta` e as alternativas entram porque, no formato de
+        // letras, é aqui que o acerto se decide — e indexada pelo número,
+        // que é como a planilha chama a questão.
         $questoes = ProvaQuestao::query()
             ->where('prova_id', $prova->getKey())
             ->orderBy('numero')
-            ->get(['id', 'numero', 'disciplina_id', 'peso']);
+            ->get(['id', 'numero', 'disciplina_id', 'peso', 'letra_correta', 'alternativas_snapshot'])
+            ->keyBy('numero');
 
         $conciliador = new ConciliadorDeAlunos(
             Aluno::query()
@@ -67,6 +71,7 @@ class ConferirImportacaoAction
                 ? StatusImportacao::Falhou
                 : StatusImportacao::Validada,
             'relatorio' => [
+                'formato' => $planilha->formato->value,
                 'questoes_na_prova' => $questoes->count(),
                 'questoes_na_planilha' => count($planilha->questoes),
                 'linhas' => $relatorio,
@@ -95,6 +100,10 @@ class ConferirImportacaoAction
         $questoes,
         array &$vistos,
     ): array {
+        // O acerto depende do gabarito, que a planilha não conhece: no
+        // formato de letras é aqui que ele se decide.
+        $linha = $linha->resolver($questoes);
+
         $achado = $conciliador->conciliar($linha);
         $aluno = $achado['aluno'];
 
@@ -138,6 +147,12 @@ class ConferirImportacaoAction
                 .$faltando->implode(', ').' desta prova.';
 
             return $registro;
+        }
+
+        foreach ($linha->letrasInvalidas($questoes) as $numero => $letra) {
+            $registro['avisos'][] = "A questão {$numero} não tem alternativa \"{$letra}\": "
+                .'a folha foi lida errada ou a coluna não é dessa questão. '
+                .'Vale como erro até alguém conferir.';
         }
 
         if (! $linha->contagemConfere()) {

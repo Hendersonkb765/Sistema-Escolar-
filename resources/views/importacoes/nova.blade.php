@@ -68,7 +68,7 @@
                 </x-botao>
             </x-slot:acoes>
 
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
                 <div>
                     <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Linhas lidas</dt>
                     <dd class="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100">{{ $linhas->count() }}</dd>
@@ -90,7 +90,29 @@
                         {{ $importacao->relatorio['questoes_na_planilha'] ?? 0 }} na planilha
                     </dd>
                 </div>
+                {{--
+                    Qual dos dois formatos o leitor exportou. Importa
+                    porque só um deles traz a letra marcada, e sem ela a
+                    análise não tem como dizer onde a turma se confundiu.
+                --}}
+                @if ($formato)
+                    <div data-formato>
+                        <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Formato lido</dt>
+                        <dd class="mt-0.5 text-sm font-medium text-slate-900 dark:text-slate-100"
+                            title="{{ $formato->descricao() }}">
+                            {{ $formato->rotulo() }}
+                        </dd>
+                    </div>
+                @endif
             </div>
+
+            @unless ($formato?->temMarcacao() ?? true)
+                <x-alerta tipo="informacao" class="mt-4" titulo="Sem a letra marcada">
+                    Esta planilha traz só acerto e erro. As notas saem certas, mas a análise de
+                    desempenho não poderá mostrar qual alternativa errada atraiu a turma. Se o
+                    leitor permitir, exporte com a resposta de cada aluno.
+                </x-alerta>
+            @endunless
 
             @if ($comErro->isNotEmpty())
                 <x-alerta tipo="atencao" class="mt-4" titulo="Linhas que ficarão de fora">

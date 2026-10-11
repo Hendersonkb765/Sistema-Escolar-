@@ -139,7 +139,7 @@
                                     : 'Importe a planilha do leitor de folhas para trazer os acertos.'"/>
                     @else
                         <div class="-mx-4 overflow-x-auto sm:-mx-6">
-                            <table data-notas class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                            <table data-notas="{{ $prova->id }}" class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
                                 <thead>
                                     <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                         <th class="px-4 py-2 sm:px-6">Aluno</th>

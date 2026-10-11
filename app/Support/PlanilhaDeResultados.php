@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\FormatoDaPlanilha;
 use App\Exceptions\RegraDeNegocioException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Exception as ExcecaoDeLeitura;
@@ -41,6 +42,7 @@ final class PlanilhaDeResultados
         public readonly array $posicoes,
         public readonly array $questoes,
         public readonly array $linhas,
+        public readonly FormatoDaPlanilha $formato,
     ) {}
 
     public static function ler(string $caminho): self
@@ -65,7 +67,14 @@ final class PlanilhaDeResultados
 
         [$posicoes, $questoes] = self::mapearCabecalho(array_shift($celulas));
 
-        return new self($posicoes, $questoes, self::lerLinhas($celulas, $posicoes, $questoes));
+        $linhas = self::lerLinhas($celulas, $posicoes, $questoes);
+
+        return new self(
+            $posicoes,
+            $questoes,
+            $linhas,
+            $linhas === [] ? FormatoDaPlanilha::Acerto : $linhas[0]->formato,
+        );
     }
 
     /**
@@ -120,6 +129,8 @@ final class PlanilhaDeResultados
      */
     protected static function lerLinhas(array $celulas, array $posicoes, array $questoes): array
     {
+        $formato = self::formatoDas($celulas, $questoes);
+
         $linhas = [];
 
         foreach ($celulas as $indice => $celula) {
@@ -132,12 +143,24 @@ final class PlanilhaDeResultados
             }
 
             $respostas = [];
+            $marcadas = [];
 
             foreach ($questoes as $numero => $coluna) {
                 $valor = trim((string) ($celula[$coluna] ?? ''));
 
+                if ($formato === FormatoDaPlanilha::Resposta) {
+                    // Em branco é questão não respondida: nem letra, nem
+                    // acerto. Quem decide o acerto é o gabarito da prova,
+                    // mais tarde — aqui ainda não se sabe qual ele é.
+                    $marcadas[$numero] = $valor === '' ? null : mb_strtoupper($valor);
+                    $respostas[$numero] = false;
+
+                    continue;
+                }
+
                 // Em branco conta como erro: o aluno não marcou nada.
                 $respostas[$numero] = $valor !== '' && (float) $valor > 0;
+                $marcadas[$numero] = null;
             }
 
             $linhas[] = new LinhaDeResultado(
@@ -149,10 +172,57 @@ final class PlanilhaDeResultados
                 respostas: $respostas,
                 totalInformado: self::inteiro($celula, $posicoes['total'] ?? null),
                 acertosInformados: self::inteiro($celula, $posicoes['acertos'] ?? null),
+                formato: $formato,
+                marcadas: $marcadas,
             );
         }
 
         return $linhas;
+    }
+
+    /**
+     * Qual dos dois formatos a planilha usa, pelo que está nas células.
+     *
+     * Pelo conteúdo e não pelo cabeçalho: as colunas se chamam `Q1`, `Q2`
+     * nos dois. Uma letra em qualquer célula de questão resolve a
+     * questão; só números significa o formato antigo.
+     *
+     * Misturar os dois não é um caso a adivinhar — é planilha montada à
+     * mão, e importar metade de cada jeito calaria o problema.
+     *
+     * @param  array<int, array<int, mixed>>  $celulas
+     * @param  array<int, int>  $questoes
+     */
+    protected static function formatoDas(array $celulas, array $questoes): FormatoDaPlanilha
+    {
+        $temLetra = false;
+        $temNumero = false;
+
+        foreach ($celulas as $celula) {
+            foreach ($questoes as $coluna) {
+                $valor = trim((string) ($celula[$coluna] ?? ''));
+
+                if ($valor === '') {
+                    continue;
+                }
+
+                if (preg_match('/^\p{L}$/u', $valor) === 1) {
+                    $temLetra = true;
+                } elseif (is_numeric($valor)) {
+                    $temNumero = true;
+                }
+            }
+        }
+
+        if ($temLetra && $temNumero) {
+            throw RegraDeNegocioException::porque(
+                'As colunas de questão misturam letras e números. O leitor exporta de dois '
+                .'jeitos — 1 e 0 para acerto e erro, ou a letra que o aluno marcou — e a '
+                .'planilha precisa usar um só.'
+            );
+        }
+
+        return $temLetra ? FormatoDaPlanilha::Resposta : FormatoDaPlanilha::Acerto;
     }
 
     /** @param  array<int, mixed>  $celula */

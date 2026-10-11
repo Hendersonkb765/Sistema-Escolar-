@@ -4,6 +4,7 @@ namespace App\Livewire\Importacoes;
 
 use App\Actions\Resultado\ConferirImportacaoAction;
 use App\Actions\Resultado\ConfirmarImportacaoAction;
+use App\Enums\FormatoDaPlanilha;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Exceptions\RegraDeNegocioException;
@@ -164,6 +165,7 @@ class NovaImportacao extends Component
             ->with(['turma:id,nome,periodo,periodo_letivo,curso_id', 'turma.curso:id,nome,eixo_id'])
             ->whereIn('status', [StatusProva::Gerada, StatusProva::Aplicada])
             ->orderByDesc('gerada_em')
+            ->orderByDesc('id')
             ->get();
     }
 
@@ -175,6 +177,7 @@ class NovaImportacao extends Component
             'provas' => $this->provasDisponiveis(),
             'importacao' => $importacao,
             'linhas' => collect($importacao?->relatorio['linhas'] ?? []),
+            'formato' => FormatoDaPlanilha::tryFrom($importacao?->relatorio['formato'] ?? ''),
         ])->layout('components.layouts.app', [
             'titulo' => 'Importar resultados',
             'subtitulo' => 'Confira antes de gravar: o primeiro passo não altera nada',

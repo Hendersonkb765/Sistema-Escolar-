@@ -19,6 +19,8 @@ use App\Models\Aluno;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
+use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use App\Support\ConciliadorDeAlunos;
@@ -411,4 +413,153 @@ it('nega a importação de outro Eixo por id', function () {
 
     expect(fn () => app(ConferirImportacaoAction::class)->executar($importacao, $forasteiro))
         ->toThrow(AuthorizationException::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| A planilha que traz a letra marcada
+|--------------------------------------------------------------------------
+|
+| O leitor exporta de dois jeitos. No antigo, `Q1` vem como 1 ou 0 e o
+| acerto já está decidido; no outro, vem a letra que o aluno marcou, e
+| quem confere contra o gabarito é o sistema. É esse segundo formato que
+| permite dizer, depois, qual alternativa errada atraiu a turma.
+*/
+
+/** O gabarito da prova, questão a questão. */
+function gabarito(Prova $prova): array
+{
+    return ProvaQuestao::query()
+        ->where('prova_id', $prova->getKey())
+        ->orderBy('numero')
+        ->pluck('letra_correta', 'numero')
+        ->all();
+}
+
+/** Uma letra que existe na questão e não é a correta. */
+function letraErrada(Prova $prova, int $numero): string
+{
+    $questao = ProvaQuestao::query()
+        ->where('prova_id', $prova->getKey())
+        ->where('numero', $numero)
+        ->sole();
+
+    return collect($questao->letrasValidas())
+        ->first(fn (string $letra) => $letra !== $questao->letra_correta);
+}
+
+it('confere a letra marcada contra o gabarito da prova', function () {
+    $certas = gabarito($this->prova);
+
+    $importacao = ($this->importar)(($this->planilha)([
+        ['Prova', '1 A', '5001', '1001', 'Marina', 'Coutinho', 4, 4, 100, 'A',
+            $certas[1], $certas[2], $certas[3], $certas[4]],
+        ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 2, 50, 'A',
+            $certas[1], letraErrada($this->prova, 2), $certas[3], letraErrada($this->prova, 4)],
+    ]));
+
+    app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
+
+    $linhas = collect($importacao->refresh()->relatorio['linhas']);
+
+    expect($linhas->firstWhere('linha', 2)['acertos'])->toBe(4)
+        ->and($linhas->firstWhere('linha', 3)['acertos'])->toBe(2)
+        // A contagem do leitor bate: nenhum aviso de divergência.
+        ->and($linhas->pluck('avisos')->flatten())->toBeEmpty();
+});
+
+it('guarda a letra que o aluno marcou, inclusive a errada', function () {
+    $certas = gabarito($this->prova);
+    $erradaNa2 = letraErrada($this->prova, 2);
+
+    $importacao = ($this->importar)(($this->planilha)([
+        ['Prova', '1 A', '5001', '1001', 'Marina', 'Coutinho', 4, 4, 100, 'A',
+            $certas[1], $certas[2], $certas[3], $certas[4]],
+        ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 3, 75, 'A',
+            $certas[1], $erradaNa2, $certas[3], $certas[4]],
+    ]));
+
+    app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
+    app(ConfirmarImportacaoAction::class)->executar($importacao->refresh(), $this->paeet);
+
+    $respostas = ResultadoAluno::query()
+        ->where('aluno_id', $this->caio->id)
+        ->with('respostas.provaQuestao:id,numero')
+        ->sole()
+        ->respostas
+        ->keyBy(fn ($resposta) => $resposta->provaQuestao->numero);
+
+    expect($respostas[2]->alternativa_marcada)->toBe($erradaNa2)
+        ->and($respostas[2]->acertou)->toBeFalse()
+        ->and($respostas[1]->alternativa_marcada)->toBe($certas[1])
+        ->and($respostas[1]->acertou)->toBeTrue();
+});
+
+it('trata a questão em branco como erro, sem letra nenhuma', function () {
+    $certas = gabarito($this->prova);
+
+    $importacao = ($this->importar)(($this->planilha)([
+        ['Prova', '1 A', '5001', '1001', 'Marina', 'Coutinho', 4, 4, 100, 'A',
+            $certas[1], $certas[2], $certas[3], $certas[4]],
+        ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 3, 75, 'A',
+            $certas[1], '', $certas[3], $certas[4]],
+    ]));
+
+    app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
+    app(ConfirmarImportacaoAction::class)->executar($importacao->refresh(), $this->paeet);
+
+    $resposta = ResultadoAluno::query()
+        ->where('aluno_id', $this->caio->id)
+        ->with('respostas.provaQuestao:id,numero')
+        ->sole()
+        ->respostas
+        ->first(fn ($resposta) => $resposta->provaQuestao->numero === 2);
+
+    expect($resposta->alternativa_marcada)->toBeNull()
+        ->and($resposta->acertou)->toBeFalse();
+});
+
+it('avisa quando a letra não existe entre as alternativas da questão', function () {
+    $certas = gabarito($this->prova);
+
+    $importacao = ($this->importar)(($this->planilha)([
+        ['Prova', '1 A', '5001', '1001', 'Marina', 'Coutinho', 4, 3, 75, 'A',
+            $certas[1], 'Z', $certas[3], $certas[4]],
+        ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 4, 100, 'A',
+            $certas[1], $certas[2], $certas[3], $certas[4]],
+    ]));
+
+    app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
+
+    $marina = collect($importacao->refresh()->relatorio['linhas'])->firstWhere('linha', 2);
+
+    // Avisa, mas não recusa: a conferência é de quem olha a folha.
+    expect($marina['erro'])->toBeNull()
+        ->and($marina['avisos'])->toHaveCount(1)
+        ->and($marina['avisos'][0])->toContain('A questão 2 não tem alternativa "Z"');
+});
+
+it('recusa a planilha que mistura letras e números nas questões', function () {
+    $certas = gabarito($this->prova);
+
+    $importacao = ($this->importar)(($this->planilha)([
+        ['Prova', '1 A', '5001', '1001', 'Marina', 'Coutinho', 4, 4, 100, 'A',
+            $certas[1], $certas[2], $certas[3], $certas[4]],
+        ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 2, 50, 'A', 1, 0, 1, 0],
+    ]));
+
+    expect(fn () => app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet))
+        ->toThrow(RegraDeNegocioException::class, 'misturam letras e números');
+});
+
+it('não inventa letra nenhuma no formato de acerto e erro', function () {
+    $importacao = ($this->importar)(($this->planilha)($this->duasLinhas));
+
+    app(ConferirImportacaoAction::class)->executar($importacao, $this->paeet);
+    app(ConfirmarImportacaoAction::class)->executar($importacao->refresh(), $this->paeet);
+
+    $respostas = ResultadoAluno::query()->with('respostas')->get()->pluck('respostas')->flatten();
+
+    expect($respostas)->toHaveCount(8)
+        ->and($respostas->pluck('alternativa_marcada')->unique()->all())->toBe([null]);
 });

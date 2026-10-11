@@ -21,6 +21,7 @@ use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
 use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use Illuminate\Http\UploadedFile;
@@ -189,6 +190,41 @@ it('confere a planilha sem gravar nada e mostra o relatório', function () {
 
     expect(ResultadoAluno::query()->count())->toBe(0)
         ->and(Importacao::query()->sole()->status)->toBe(StatusImportacao::Validada);
+});
+
+/*
+ * O formato da planilha não é detalhe de implementação: só um dos dois
+ * traz a letra marcada, e quem importa precisa saber disso antes de
+ * procurar na análise uma distribuição que nunca vai existir.
+ */
+it('diz qual formato leu e avisa quando a planilha não traz a letra', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(NovaImportacao::class)
+        ->set('prova_id', $this->prova->id)
+        ->set('planilha', ($this->arquivo)($this->duasLinhas))
+        ->call('conferir')
+        ->assertSee('Acerto e erro (1 ou 0)')
+        ->assertSee('Sem a letra marcada');
+});
+
+it('reconhece a planilha com a letra marcada e não mostra o aviso', function () {
+    $certas = ProvaQuestao::query()
+        ->where('prova_id', $this->prova->id)
+        ->orderBy('numero')
+        ->pluck('letra_correta', 'numero');
+
+    Livewire::actingAs($this->paeet)
+        ->test(NovaImportacao::class)
+        ->set('prova_id', $this->prova->id)
+        ->set('planilha', ($this->arquivo)([
+            ['Prova', '1 A', '5001', '1001', 'Marina', 'Alves', 4, 4, 100, 'A',
+                $certas[1], $certas[2], $certas[3], $certas[4]],
+            ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 4, 100, 'A',
+                $certas[1], $certas[2], $certas[3], $certas[4]],
+        ]))
+        ->call('conferir')
+        ->assertSee('Resposta do aluno (a letra marcada)')
+        ->assertDontSee('Sem a letra marcada');
 });
 
 it('grava só no segundo passo e leva para as notas', function () {
@@ -614,21 +650,24 @@ it('desenha uma seção só quando a prova é escolhida', function () {
  */
 it('não põe na seção de uma prova a disciplina que só existe na outra', function () {
     ($this->importado)();
-    ($this->soLogicaNaSegunda)();
+    $recuperacao = ($this->soLogicaNaSegunda)();
 
     $html = Livewire::actingAs($this->paeet)
         ->test(ListaResultados::class)
         ->set('filtroTurma', (string) $this->turma->id)
         ->html();
 
-    preg_match_all('/<table data-notas.*?<\\/table>/s', $html, $tabelas);
+    preg_match_all('/<table data-notas="(\\d+)".*?<\\/table>/s', $html, $tabelas, PREG_SET_ORDER);
 
-    $cabecalhos = array_map(fn (string $tabela) => strip_tags($tabela), $tabelas[0]);
+    // Pela prova, e não pela posição: a ordem da tela é por data, e as
+    // duas nascem no mesmo segundo.
+    $porProva = collect($tabelas)
+        ->mapWithKeys(fn (array $t) => [(int) $t[1] => strip_tags($t[0])]);
 
-    expect($cabecalhos)->toHaveCount(2)
-        // A primeira prova avaliou as duas; a segunda, só Lógica.
-        ->and($cabecalhos[0])->toContain('Redes')
-        ->and($cabecalhos[1])->not->toContain('Redes');
+    expect($porProva)->toHaveCount(2)
+        // A primeira prova avaliou as duas; a de recuperação, só Lógica.
+        ->and($porProva[$this->prova->id])->toContain('Redes')
+        ->and($porProva[$recuperacao->id])->not->toContain('Redes');
 });
 
 /*

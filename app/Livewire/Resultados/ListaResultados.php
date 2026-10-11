@@ -116,6 +116,7 @@ class ListaResultados extends Component
             ->when($this->filtroTurma !== '', fn (Builder $q) => $q->where('turma_id', $this->filtroTurma))
             ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
             ->orderByDesc('gerada_em')
+            ->orderByDesc('id')
             ->get();
     }
 

@@ -52,7 +52,7 @@ class ConfirmarImportacaoAction
 
         $questoes = ProvaQuestao::query()
             ->where('prova_id', $prova->getKey())
-            ->get(['id', 'numero', 'disciplina_id', 'peso'])
+            ->get(['id', 'numero', 'disciplina_id', 'peso', 'letra_correta'])
             ->keyBy('numero');
 
         $planilha = PlanilhaDeResultados::ler(Storage::disk('local')->path($importacao->arquivo));
@@ -97,6 +97,8 @@ class ConfirmarImportacaoAction
 
         $resultado->respostas()->delete();
 
+        $linha = $linha->resolver($questoes);
+
         foreach ($linha->respostas as $numero => $acertou) {
             $questao = $questoes->get($numero);
 
@@ -107,8 +109,9 @@ class ConfirmarImportacaoAction
 
             $resultado->respostas()->create([
                 'prova_questao_id' => $questao->getKey(),
-                // O leitor entrega acerto ou erro, não a letra marcada.
-                'alternativa_marcada' => null,
+                // Nula no formato de acerto, que não traz a letra; é ela
+                // que permite dizer qual alternativa errada atraiu a turma.
+                'alternativa_marcada' => $linha->marcadas[$numero] ?? null,
                 'acertou' => $acertou,
                 'peso' => $questao->peso,
                 'pontuacao' => $acertou ? $questao->peso : 0,
