@@ -109,7 +109,7 @@ class AnalisarDesempenhoAction
         $visiveis = $this->visiveis($provas, $leitor);
 
         $vazio = [
-            'matriculados' => 0, 'avaliados' => 0, 'pendentes' => 0,
+            'matriculados' => 0, 'avaliados' => 0, 'pendentes' => 0, 'respostas' => 0,
             'notas' => 0, 'media' => null, 'mediana' => null,
             'faixas' => $this->faixasVazias(), 'no_criterio' => 0, 'abaixo' => 0,
             'percentual_no_criterio' => null, 'alunos_abaixo' => 0,
@@ -134,6 +134,7 @@ class AnalisarDesempenhoAction
             ->get(['id', 'nome', 'ra', 'turma_id']);
 
         $notas = $this->notasDoRecorte($visiveis, $leitor, $disciplinaId);
+        $quantasRespostas = $this->contarRespostas($visiveis, $leitor, $disciplinaId);
 
         $avaliados = $notas->pluck('aluno_id')->unique();
 
@@ -153,6 +154,7 @@ class AnalisarDesempenhoAction
         return [
             'matriculados' => $matriculados->count(),
             'avaliados' => $avaliados->count(),
+            'respostas' => $quantasRespostas,
             'pendentes' => $pendentes->count(),
             'pendentes_nomes' => $pendentes->take(12)->map(
                 fn (Aluno $a) => ['nome' => $a->nome, 'ra' => $a->ra]
@@ -171,6 +173,35 @@ class AnalisarDesempenhoAction
                 ? null
                 : round(100 * $alunosAbaixo / $avaliados->count(), 1),
         ];
+    }
+
+    /**
+     * Quantas respostas entram nos cálculos.
+     *
+     * Conta no banco em vez de hidratar as linhas: a tela só precisa do
+     * número, e com três provas de uma turma já são centenas de
+     * registros que seriam carregados para serem contados e jogados
+     * fora.
+     *
+     * @param  ColecaoDeModels<int, Prova>  $provas
+     */
+    public function contarRespostas(ColecaoDeModels $provas, User $leitor, ?int $disciplinaId = null): int
+    {
+        if ($provas->isEmpty()) {
+            return 0;
+        }
+
+        return RespostaAluno::query()
+            ->whereHas('resultado', fn ($q) => $q->whereIn('prova_id', $provas->modelKeys()))
+            ->when(
+                ! $leitor->ehGestao(),
+                fn ($q) => $q->whereHas('provaQuestao', fn ($p) => $p->where('professor_id', $leitor->getKey()))
+            )
+            ->when(
+                $disciplinaId !== null,
+                fn ($q) => $q->whereHas('provaQuestao', fn ($p) => $p->where('disciplina_id', $disciplinaId))
+            )
+            ->count();
     }
 
     /**

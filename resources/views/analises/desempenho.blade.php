@@ -91,7 +91,7 @@
             <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
                 {{ $provas->count() }} prova(s),
                 {{ $geral['avaliados'] }} aluno(s) avaliado(s) e
-                {{ collect($porQuestao)->sum('respostas') }} resposta(s) entram nos cálculos.
+                {{ $geral['respostas'] }} resposta(s) entram nos cálculos.
             </p>
         @endif
 
@@ -118,26 +118,50 @@
     </x-cartao>
 
     {{--
-        A página tem três telas de rolagem e nenhuma pista do que vem
-        abaixo. Os atalhos dizem o que existe e levam direto.
+        Abas, e não âncoras.
+
+        O atalho que apenas rolava não era navegação: a página continuava
+        inteira e a pessoa continuava sem saber onde estava. Uma leitura
+        por vez responde a uma pergunta por vez, que é como o professor
+        chega aqui.
+
+        `role="tablist"` e `aria-selected` porque o visual de aba sem a
+        semântica deixa quem usa leitor de tela sem saber que são
+        alternativas, e não cinco links.
     --}}
-    @if ($porHabilidade->isNotEmpty())
-        <nav aria-label="Seções da análise"
-             class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
-            <span class="mr-1">Ir para:</span>
-            @foreach ([
-                '#turma' => 'A turma',
-                '#evolucao' => 'Evolução',
-                '#habilidades' => 'Habilidades',
-                '#questoes' => 'Questões',
-                '#alunos' => 'Alunos',
-            ] as $destino => $rotulo)
-                <a href="{{ $destino }}"
-                   class="rounded-md px-2 py-1 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+    @if ($geral['respostas'] === 0)
+        {{--
+            Sem resposta no recorte não há leitura nenhuma a oferecer — e
+            uma tela só com os filtros, sem dizer por quê, é um beco.
+        --}}
+        <x-cartao>
+            <x-vazio titulo="Nada para analisar neste recorte"
+                     descricao="A análise usa as provas que já tiveram os resultados importados. Ajuste os filtros ou importe uma planilha.">
+                <x-slot:acoes>
+                    @can('create', App\Models\Importacao::class)
+                        <x-botao href="{{ route('importacoes.criar') }}" wire:navigate>Importar resultados</x-botao>
+                    @endcan
+                </x-slot:acoes>
+            </x-vazio>
+        </x-cartao>
+    @else
+        <div role="tablist" aria-label="Leituras da análise"
+             class="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            @foreach ($abas as $chave => $rotulo)
+                <button type="button" role="tab"
+                        id="aba-{{ $chave }}"
+                        aria-selected="{{ $aba === $chave ? 'true' : 'false' }}"
+                        aria-controls="painel-{{ $chave }}"
+                        wire:click="abrir('{{ $chave }}')"
+                        @class([
+                            'rounded-lg px-3 py-2 text-sm font-medium transition',
+                            'bg-marca-600 text-white shadow-sm' => $aba === $chave,
+                            'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' => $aba !== $chave,
+                        ])>
                     {{ $rotulo }}
-                </a>
+                </button>
             @endforeach
-        </nav>
+        </div>
     @endif
 
     {{--
@@ -147,7 +171,8 @@
         turma sumia junto — e ela não depende do gráfico, depende de
         haver prova no recorte.
     --}}
-    @if ($provas->isNotEmpty())
+    @if ($aba === 'turma' && $provas->isNotEmpty())
+        <div role="tabpanel" id="painel-turma" aria-labelledby="aba-turma" class="space-y-4">
         {{--
             O painel da turma.
 
@@ -232,11 +257,18 @@
                 @endif
             </x-cartao>
         @endif
-
+        </div>
     @endif
 
-    @unless ($grafico->vazio())
-        <x-cartao id="evolucao" class="scroll-mt-20" titulo="Evolução por bimestre">
+    @if ($aba === 'evolucao')
+        <div role="tabpanel" id="painel-evolucao" aria-labelledby="aba-evolucao" class="space-y-4">
+        @if ($grafico->vazio())
+            <x-cartao>
+                <x-vazio titulo="Sem nota para comparar"
+                         descricao="A evolução usa as notas por disciplina das provas já importadas. Ajuste o recorte ou importe uma planilha."/>
+            </x-cartao>
+        @else
+        <x-cartao titulo="Evolução por bimestre">
             <x-slot:descricao>
                 Nota média de cada disciplina, um painel por disciplina. A linha
                 tracejada é o critério de
@@ -284,15 +316,19 @@
                 </div>
             </details>
         </x-cartao>
-    @endunless
+        @endif
+        </div>
+    @endif
 
-    @if ($porHabilidade->isEmpty())
-        <x-cartao>
-            <x-vazio titulo="Nada para analisar neste recorte"
-                     descricao="A análise usa as provas que já tiveram os resultados importados. Ajuste os filtros ou importe uma planilha."/>
-        </x-cartao>
-    @else
-        <x-cartao id="habilidades" class="scroll-mt-20" titulo="Por habilidade avaliada"
+    @if ($aba === 'habilidades')
+        <div role="tabpanel" id="painel-habilidades" aria-labelledby="aba-habilidades" class="space-y-4">
+        @if ($porHabilidade->isEmpty())
+            <x-cartao>
+                <x-vazio titulo="Nenhuma habilidade neste recorte"
+                         descricao="As questões do recorte não trazem habilidade informada, ou não há resposta sua nelas."/>
+            </x-cartao>
+        @else
+        <x-cartao titulo="Por habilidade avaliada"
                   :descricao="'Ordenado da que mais precisa de atenção. Abaixo de '.$criterios->criterioEsperado.'% de aproveitamento vai destacado.'">
             <div class="-mx-4 overflow-x-auto sm:-mx-6">
                 <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
@@ -430,7 +466,13 @@
             do aproveitamento vai escrito dentro de cada célula: a cor
             nunca é o único canal.
         --}}
-        <x-cartao id="questoes" class="scroll-mt-20" titulo="Acerto por questão">
+        @endif
+        </div>
+    @endif
+
+    @if ($aba === 'questoes')
+        <div role="tabpanel" id="painel-questoes" aria-labelledby="aba-questoes" class="space-y-4">
+        <x-cartao titulo="Acerto por questão">
             <x-slot:descricao>
                 Uma linha por prova, na ordem em que o aluno viu as questões.
                 Quanto mais forte a célula, mais a turma errou. Clique numa
@@ -608,7 +650,12 @@
             </details>
         </x-cartao>
 
-        <x-cartao id="alunos" class="scroll-mt-20" titulo="Acerto de cada aluno">
+        </div>
+    @endif
+
+    @if ($aba === 'alunos')
+        <div role="tabpanel" id="painel-alunos" aria-labelledby="aba-alunos" class="space-y-4">
+        <x-cartao titulo="Acerto de cada aluno">
             <x-slot:descricao>
                 @if ($provaDoRecorte)
                     ✓ acertou · ✗ errou, em {{ $provaDoRecorte->titulo }}.

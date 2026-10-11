@@ -65,6 +65,25 @@ class Desempenho extends Component
     /** Como a tabela de apoio das questões é ordenada. */
     public string $ordemDasQuestoes = 'erro';
 
+    /**
+     * A aba aberta.
+     *
+     * Uma leitura por vez. A página inteira de uma vez eram três telas de
+     * rolagem, e o atalho que apenas rolava não era navegação — a pessoa
+     * continuava sem saber onde estava.
+     */
+    #[Url(as: 'aba', except: 'turma')]
+    public string $aba = 'turma';
+
+    /** @var array<string, string> */
+    public const ABAS = [
+        'turma' => 'A turma',
+        'evolucao' => 'Evolução',
+        'habilidades' => 'Habilidades',
+        'questoes' => 'Questões',
+        'alunos' => 'Alunos',
+    ];
+
     public function mount(): void
     {
         $this->authorize('viewAny', ResultadoAluno::class);
@@ -195,6 +214,11 @@ class Desempenho extends Component
         return $avisos;
     }
 
+    public function abrir(string $aba): void
+    {
+        $this->aba = array_key_exists($aba, self::ABAS) ? $aba : 'turma';
+    }
+
     /** Abre e fecha o detalhe de uma questão da grade. */
     public function verQuestao(int $id): void
     {
@@ -275,6 +299,7 @@ class Desempenho extends Component
     {
         $provas = $this->provasAnalisadas();
         $disciplina = $this->filtroDisciplina === '' ? null : (int) $this->filtroDisciplina;
+        $leitor = auth()->user();
 
         $disciplinas = $provas->isEmpty()
             ? collect()
@@ -286,32 +311,88 @@ class Desempenho extends Component
                 ->unique()
                 ->sort();
 
-        // A evolução ignora o filtro de prova: comparar bimestres exige
-        // olhar além do recorte de uma avaliação só.
-        $paraEvolucao = $this->consultaDeProvas()->get();
+        /*
+         * Cada aba calcula só o que mostra.
+         *
+         * Antes a tela consolidava habilidade, questão, aluno e evolução
+         * a cada render, para desenhar as quatro de uma vez. Com uma
+         * leitura por vez, as outras três são trabalho jogado fora — e a
+         * consolidação por habilidade percorre todas as respostas do
+         * recorte.
+         */
+        $dados = match ($this->aba) {
+            'evolucao' => $this->dadosDaEvolucao($analisar, $disciplina, $leitor),
+            'habilidades' => $this->dadosDasHabilidades($analisar, $provas, $disciplina, $leitor),
+            'questoes' => $this->dadosDasQuestoes($analisar, $provas, $disciplina, $leitor),
+            'alunos' => $this->dadosDosAlunos($analisar, $disciplina, $leitor),
+            default => [],
+        };
 
         return view('analises.desempenho', [
+            ...$dados,
             'provas' => $provas,
-            'grafico' => GraficoDeEvolucao::de(
-                array_values(Bimestre::opcoes()),
-                $analisar->evolucaoPorBimestre($paraEvolucao, auth()->user(), $disciplina),
-                // A linha de referência é o critério da escola: é contra
-                // ela que o professor lê cada coluna, por posição.
-                criterio: $analisar->criterios->notaEsperada,
-            ),
-            'alunosDaHabilidade' => $this->habilidadeAberta === ''
-                ? collect()
-                : $analisar->porAluno($provas, auth()->user(), $this->habilidadeAberta, $disciplina),
+            'abas' => self::ABAS,
             'turmaDoRecorte' => $this->turmaDoRecorte(),
             'provasDisponiveis' => $this->consultaDeProvas()->get(),
             'anos' => $this->anosDisponiveis(),
             'limitacoes' => $this->limitacoesDaConsolidacao($provas),
-            'turmas' => Turma::query()->visivelPara(auth()->user())->orderBy('nome')->pluck('nome', 'id'),
+            'turmas' => Turma::query()->visivelPara($leitor)->orderBy('nome')->pluck('nome', 'id'),
             'bimestres' => Bimestre::opcoes(),
             'disciplinas' => $disciplinas,
-            'geral' => $analisar->visaoGeral($provas, auth()->user(), $disciplina),
-            'porHabilidade' => $analisar->porHabilidade($provas, auth()->user(), $disciplina),
-            'porQuestao' => $porQuestao = $analisar->porQuestao($provas, auth()->user(), $disciplina),
+            // O painel fica fora do `match`: a aba "A turma" o mostra, e
+            // o resumo do recorte usa os números dele em qualquer aba.
+            'geral' => $analisar->visaoGeral($provas, $leitor, $disciplina),
+            'criterios' => $analisar->criterios,
+        ])->layout('components.layouts.app', [
+            'titulo' => 'Análise de desempenho',
+            'subtitulo' => 'Por habilidade avaliada, e não só pelo número da questão',
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    protected function dadosDaEvolucao(AnalisarDesempenhoAction $analisar, ?int $disciplina, $leitor): array
+    {
+        // A evolução ignora o filtro de prova: comparar bimestres exige
+        // olhar além do recorte de uma avaliação só.
+        $paraEvolucao = $this->consultaDeProvas()->get();
+
+        return [
+            'grafico' => GraficoDeEvolucao::de(
+                array_values(Bimestre::opcoes()),
+                $analisar->evolucaoPorBimestre($paraEvolucao, $leitor, $disciplina),
+                // A linha de referência é o critério da escola: é contra
+                // ela que o professor lê cada coluna, por posição.
+                criterio: $analisar->criterios->notaEsperada,
+            ),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    protected function dadosDasHabilidades(
+        AnalisarDesempenhoAction $analisar,
+        Collection $provas,
+        ?int $disciplina,
+        $leitor,
+    ): array {
+        return [
+            'porHabilidade' => $analisar->porHabilidade($provas, $leitor, $disciplina),
+            'alunosDaHabilidade' => $this->habilidadeAberta === ''
+                ? collect()
+                : $analisar->porAluno($provas, $leitor, $this->habilidadeAberta, $disciplina),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    protected function dadosDasQuestoes(
+        AnalisarDesempenhoAction $analisar,
+        Collection $provas,
+        ?int $disciplina,
+        $leitor,
+    ): array {
+        $porQuestao = $analisar->porQuestao($provas, $leitor, $disciplina);
+
+        return [
+            'porQuestao' => $porQuestao,
             'questoesPorProva' => $this->questoesPorProva($porQuestao),
             'questaoEmDetalhe' => $this->questaoEmDetalhe($porQuestao),
             'questoesOrdenadas' => match ($this->ordemDasQuestoes) {
@@ -319,14 +400,19 @@ class Desempenho extends Component
                 'habilidade' => $porQuestao->sortBy([['habilidade', 'asc'], ['percentual', 'asc']])->values(),
                 default => $porQuestao->sortBy('percentual')->values(),
             },
-            'provaDoRecorte' => $provaUnica = $this->provaDoRecorte(),
-            'acertoNominal' => $provaUnica === null
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    protected function dadosDosAlunos(AnalisarDesempenhoAction $analisar, ?int $disciplina, $leitor): array
+    {
+        $prova = $this->provaDoRecorte();
+
+        return [
+            'provaDoRecorte' => $prova,
+            'acertoNominal' => $prova === null
                 ? null
-                : $analisar->acertoDeCadaAluno($provaUnica, auth()->user(), $disciplina),
-            'criterios' => $analisar->criterios,
-        ])->layout('components.layouts.app', [
-            'titulo' => 'Análise de desempenho',
-            'subtitulo' => 'Por habilidade avaliada, e não só pelo número da questão',
-        ]);
+                : $analisar->acertoDeCadaAluno($prova, $leitor, $disciplina),
+        ];
     }
 }

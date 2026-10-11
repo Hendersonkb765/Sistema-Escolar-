@@ -705,6 +705,27 @@ cada `<svg>`. Repetir o mesmo bloco uma vez por painel é duplicação — e,
 pior, a variante escura deixava de vencer a clara na cascata que
 sobrava: os números saíam pretos sobre fundo escuro.
 
+### Uma leitura por vez
+
+As cinco leituras ficam em abas — A turma, Evolução, Habilidades,
+Questões, Alunos — e só a aberta é desenhada. Antes eram âncoras que
+rolavam a página: o atalho levava até a seção, mas a página continuava
+inteira e quem clicava continuava sem saber onde estava.
+
+Cada aba cabe numa tela (~1000 px, contra 3201 px da página inteira), e a
+aba aberta vai para o endereço, de modo que um link aponta para a leitura
+certa. O recorte fica acima das abas, porque ele vale para todas, e trocar
+de aba não mexe nos filtros.
+
+São `role="tablist"` e `aria-selected` de verdade: o visual de aba sem a
+semântica deixa quem usa leitor de tela sem saber que são alternativas, e
+não cinco links.
+
+**Cada aba calcula só o que mostra.** Antes a tela consolidava habilidade,
+questão, aluno e evolução a cada render para desenhar as quatro juntas —
+três quartos do trabalho jogados fora, e a consolidação por habilidade
+percorre todas as respostas do recorte.
+
 ### A grade de questões
 
 Era uma tabela de 27 linhas, uma por questão — metade da altura da página

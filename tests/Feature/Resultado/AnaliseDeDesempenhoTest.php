@@ -282,7 +282,8 @@ it('separa a análise por bimestre', function () {
         1 => [1 => true, 2 => true, 3 => true],
     ]);
 
-    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class)
+        ->call('abrir', 'habilidades');
 
     // Sem filtro, os dois bimestres entram: 4 acertos em 8 respostas.
     expect($componente->viewData('porHabilidade')
@@ -299,7 +300,7 @@ it('separa a análise por bimestre', function () {
         ->firstWhere('habilidade', 'Interpretar estruturas de repetição')['percentual'])->toBe(100.0);
 });
 
-it('mostra as duas leituras na tela', function () {
+it('mostra as leituras uma por vez, em abas', function () {
     ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
         0 => [1 => false, 2 => false, 3 => true],
         1 => [1 => false, 2 => false, 3 => true],
@@ -307,14 +308,16 @@ it('mostra as duas leituras na tela', function () {
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
         ->assertOk()
         ->assertSee('Por habilidade avaliada')
         ->assertSee('Interpretar estruturas de repetição')
         ->assertSee('Calcular endereçamento IP')
         ->assertSee('Evidências insuficientes')
-        // Três leituras: duas da turma e uma nominal.
-        ->assertSee('Acerto por questão')
-        ->assertSee('Acerto de cada aluno');
+        // As outras leituras existem como aba, e não na mesma tela.
+        ->assertDontSee('Acerto por questão')
+        ->assertSeeHtml('aria-controls="painel-questoes"')
+        ->assertSeeHtml('aria-controls="painel-alunos"');
 });
 
 /*
@@ -336,6 +339,7 @@ it('mostra a análise ao professor mesmo sem ele poder abrir a prova', function 
 
     Livewire::actingAs($this->profLogica)
         ->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
         ->assertOk()
         ->assertSee('Interpretar estruturas de repetição');
 });
@@ -357,6 +361,7 @@ it('mostra o ✓ e o ✗ de cada aluno quando o recorte é de uma prova só', fu
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
         ->set('filtroBimestre', (string) Bimestre::Segundo->value)
         ->assertOk()
         ->assertSee('✓')
@@ -382,6 +387,7 @@ it('pede uma prova quando o recorte junta mais de uma', function () {
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
         ->assertSee('Uma prova por vez')
         ->assertDontSee('✓');
 });
@@ -398,6 +404,7 @@ it('volta a mostrar assim que o recorte aponta para uma prova', function () {
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
         ->assertSee('Uma prova por vez')
         ->set('filtroBimestre', (string) Bimestre::Segundo->value)
         ->assertDontSee('Uma prova por vez')
@@ -419,6 +426,7 @@ it('conta os acertos só das questões mostradas', function () {
 
     $html = Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
         ->set('filtroBimestre', (string) Bimestre::Segundo->value)
         ->set('filtroDisciplina', (string) $logica)
         ->html();
@@ -450,7 +458,8 @@ it('mostra ao professor só as habilidades das questões dele', function () {
         1 => [1 => true, 2 => false, 3 => true],
     ]);
 
-    $componente = Livewire::actingAs($this->profLogica)->test(Desempenho::class);
+    $componente = Livewire::actingAs($this->profLogica)->test(Desempenho::class)
+        ->call('abrir', 'habilidades')->call('abrir', 'habilidades');
 
     expect($componente->viewData('porHabilidade')->pluck('habilidade')->all())
         ->toBe(['Interpretar estruturas de repetição']);
@@ -465,6 +474,7 @@ it('não vaza a análise de outro Eixo', function () {
 
     Livewire::actingAs($forasteiro)
         ->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
         ->assertSee('Nada para analisar neste recorte')
         ->assertDontSee('Interpretar estruturas de repetição');
 });
@@ -635,6 +645,7 @@ it('consolida mais de uma prova quando o professor marca as duas', function () {
 
     $componente = Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
         ->set('provasEscolhidas', [(string) $primeira->id]);
 
     $so = $componente->viewData('porHabilidade')
@@ -738,6 +749,7 @@ it('agrupa as questões por prova, na ordem em que o aluno as viu', function () 
 
     $grupos = Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
         ->viewData('questoesPorProva');
 
     expect($grupos)->toHaveCount(2)
@@ -756,6 +768,7 @@ it('abre e fecha o detalhe de uma questão', function () {
 
     $componente = Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
         ->assertSet('questaoAberta', null)
         ->call('verQuestao', $questao->id)
         ->assertSet('questaoAberta', $questao->id);
@@ -781,6 +794,7 @@ it('oferece hipótese em vez de diagnóstico na questão com muito erro', functi
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
         ->call('verQuestao', $questao->id)
         ->assertSee('Vale investigar')
         ->assertSee('gabarito trocado')
@@ -801,6 +815,7 @@ it('diz por que não mostra a distribuição por alternativa', function () {
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
         ->call('verQuestao', $questao->id)
         ->assertSee('apenas acerto ou erro');
 });
@@ -810,7 +825,8 @@ it('ordena a tabela de apoio pelo que se pede', function () {
         0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
     ]);
 
-    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class)
+        ->call('abrir', 'questoes');
 
     // O padrão é a de maior erro primeiro.
     expect($componente->viewData('questoesOrdenadas')->first()['numero'])->toBe(2);
@@ -842,20 +858,124 @@ it('solta a questão aberta quando o recorte muda', function () {
  * Três telas de rolagem sem pista do que vem abaixo é desorientação. Os
  * atalhos dizem o que existe.
  */
-it('oferece atalhos para as seções quando há o que mostrar', function () {
+it('oferece as abas quando há o que mostrar', function () {
     ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
         0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
     ]);
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
-        ->assertSee('Ir para:')
-        ->assertSeeHtml('href="#habilidades"')
-        ->assertSeeHtml('id="questoes"');
+        ->assertSeeHtml('role="tablist"')
+        ->assertSeeHtml('aria-controls="painel-habilidades"')
+        // A aba aberta se anuncia, e não só por cor.
+        ->assertSeeHtml('id="aba-turma"')
+        ->assertSeeHtml('aria-selected="true"');
 });
 
-it('não oferece atalho para o que não existe', function () {
+it('não oferece aba nenhuma quando não há o que analisar', function () {
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
-        ->assertDontSee('Ir para:');
+        ->assertDontSeeHtml('role="tablist"');
+});
+
+/*
+|--------------------------------------------------------------------------
+| As abas
+|--------------------------------------------------------------------------
+|
+| Uma leitura por vez. O atalho que apenas rolava não era navegação: a
+| página continuava inteira e a pessoa continuava sem saber onde estava.
+*/
+
+it('abre na turma e mostra só a leitura da aba aberta', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSet('aba', 'turma')
+        ->assertSee('Distribuição das notas')
+        ->assertDontSee('Por habilidade avaliada')
+        ->assertDontSee('Acerto por questão');
+});
+
+it('troca de leitura ao escolher outra aba', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->assertSet('aba', 'questoes')
+        ->assertSee('Acerto por questão')
+        ->assertDontSee('Distribuição das notas');
+});
+
+it('ignora aba inventada em vez de quebrar', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'inventada')
+        ->assertSet('aba', 'turma');
+});
+
+/*
+ * Trocar de aba não pode desfazer o recorte: quem ajustou quatro filtros
+ * para chegar até ali não quer recomeçar ao olhar a leitura seguinte.
+ */
+it('mantém o recorte ao trocar de aba', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->value('id');
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->set('filtroDisciplina', (string) $logica)
+        ->call('abrir', 'habilidades')
+        ->assertSet('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->assertSet('filtroDisciplina', (string) $logica);
+});
+
+/*
+ * Cada aba calcula só o que mostra. Antes a tela consolidava habilidade,
+ * questão, aluno e evolução a cada render para desenhar as quatro juntas
+ * — três quartos do trabalho jogados fora.
+ */
+it('não calcula a leitura das abas fechadas', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $naTurma = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+
+    $calculou = true;
+
+    try {
+        $naTurma->viewData('porQuestao');
+    } catch (Throwable) {
+        $calculou = false;
+    }
+
+    expect($calculou)->toBeFalse();
+
+    $nasQuestoes = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)->call('abrir', 'questoes');
+
+    expect($nasQuestoes->viewData('porQuestao'))->not->toBeEmpty();
+});
+
+it('leva a aba no endereço, para o link apontar para a leitura certa', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    Livewire::withQueryParams(['aba' => 'habilidades'])
+        ->actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->assertSet('aba', 'habilidades')
+        ->assertSee('Por habilidade avaliada');
 });

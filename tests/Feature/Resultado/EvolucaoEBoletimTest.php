@@ -296,7 +296,8 @@ it('o botão da tela chama o método com a habilidade certa', function () {
         '1002' => [1 => false, 2 => false, 3 => true],
     ]);
 
-    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class);
+    $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class)
+        ->call('abrir', 'habilidades');
 
     preg_match_all('/wire:click="verAlunos\((.+?)\)"/', $componente->html(), $achados);
 
@@ -319,6 +320,7 @@ it('abre e fecha o detalhe na tela', function () {
     ]);
 
     $componente = Livewire::actingAs($this->paeet)->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
         ->assertSee('Ver alunos')
         ->assertDontSee('Aluno a aluno');
 
@@ -339,6 +341,7 @@ it('mostra o gráfico e a tabela equivalente', function () {
 
     Livewire::actingAs($this->paeet)
         ->test(Desempenho::class)
+        ->call('abrir', 'evolucao')
         ->assertSee('Evolução por bimestre')
         ->assertSee('<svg', escape: false)
         // A leitura em tabela não é opcional: quem não distingue as
