@@ -751,6 +751,26 @@ A tabela continua, atrás de um `<details>`, e é ela que ordena — por
 maior erro, por ordem da prova ou por habilidade. Ordenar é operação de
 tabela; a grade vale pela ordem da prova.
 
+### A questão completa, e o que se pode dizer da resposta
+
+Clicar numa questão — na grade, ou num ✓/✗ da leitura nominal — abre a
+questão **como ela estava no papel**: enunciado, blocos de apoio e todas
+as alternativas, com a correta assinalada. Sai do snapshot da prova, e
+não da questão original: uma análise de prova antiga mostra o que o aluno
+leu naquele dia, mesmo que a questão tenha sido reescrita depois.
+
+Sobre a resposta do aluno, o sistema diz **só o que o dado sustenta**. A
+planilha do leitor traz 1 ou 0 — acerto ou erro —, nunca a letra marcada:
+
+- quem acertou marcou a correta, e isso se deduz. A alternativa aparece
+  com duas marcas: "Correta" e "Fulano marcou";
+- de quem errou se sabe apenas que marcou outra. A tela escreve isso, e
+  não escolhe qual.
+
+Para ter a letra de quem errou seria preciso que a exportação do leitor
+trouxesse as respostas do aluno, e não só a conferência contra o
+gabarito. A coluna `alternativa_marcada` já existe na tabela, esperando.
+
 ### Três leituras, e nenhuma com o nome da outra
 
 - **Por habilidade avaliada** — a que permite intervir: "interpretar

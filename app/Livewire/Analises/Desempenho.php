@@ -62,6 +62,9 @@ class Desempenho extends Component
     #[Url(as: 'questao', except: null)]
     public ?int $questaoAberta = null;
 
+    /** O aluno escolhido na aba Alunos, para ver a questão com a resposta dele. */
+    public ?int $alunoAberto = null;
+
     /** Como a tabela de apoio das questões é ordenada. */
     public string $ordemDasQuestoes = 'erro';
 
@@ -141,6 +144,7 @@ class Desempenho extends Component
     {
         $this->habilidadeAberta = '';
         $this->questaoAberta = null;
+        $this->alunoAberto = null;
 
         if ($this->provasEscolhidas === []) {
             return;
@@ -223,6 +227,40 @@ class Desempenho extends Component
     public function verQuestao(int $id): void
     {
         $this->questaoAberta = $this->questaoAberta === $id ? null : $id;
+        $this->alunoAberto = null;
+    }
+
+    /** Abre a questão com a resposta de um aluno, a partir da grade nominal. */
+    public function verRespostaDoAluno(int $questaoId, int $alunoId): void
+    {
+        $mesma = $this->questaoAberta === $questaoId && $this->alunoAberto === $alunoId;
+
+        $this->questaoAberta = $mesma ? null : $questaoId;
+        $this->alunoAberto = $mesma ? null : $alunoId;
+    }
+
+    /**
+     * A questão aberta, carregada do snapshot da prova.
+     *
+     * Passa pelo escopo: um id na URL não pode abrir questão de outro
+     * Eixo nem questão de colega.
+     */
+    public function questaoCompleta(): ?ProvaQuestao
+    {
+        if ($this->questaoAberta === null) {
+            return null;
+        }
+
+        $questao = ProvaQuestao::query()
+            ->whereKey($this->questaoAberta)
+            ->whereHas('prova', fn (Builder $q) => $q->visivelPara(auth()->user()))
+            ->when(
+                ! auth()->user()->ehGestao(),
+                fn (Builder $q) => $q->where('professor_id', auth()->id())
+            )
+            ->first();
+
+        return $questao;
     }
 
     public function ordenarQuestoes(string $por): void
@@ -391,10 +429,16 @@ class Desempenho extends Component
     ): array {
         $porQuestao = $analisar->porQuestao($provas, $leitor, $disciplina);
 
+        $completa = $this->questaoCompleta();
+
         return [
             'porQuestao' => $porQuestao,
             'questoesPorProva' => $this->questoesPorProva($porQuestao),
             'questaoEmDetalhe' => $this->questaoEmDetalhe($porQuestao),
+            'questaoCompleta' => $completa,
+            'respostasDaQuestao' => $completa === null
+                ? collect()
+                : $analisar->respostasDaQuestao($completa, $leitor),
             'questoesOrdenadas' => match ($this->ordemDasQuestoes) {
                 'numero' => $porQuestao->sortBy([['prova', 'asc'], ['numero', 'asc']])->values(),
                 'habilidade' => $porQuestao->sortBy([['habilidade', 'asc'], ['percentual', 'asc']])->values(),
@@ -408,11 +452,15 @@ class Desempenho extends Component
     {
         $prova = $this->provaDoRecorte();
 
+        $completa = $this->questaoCompleta();
+
         return [
             'provaDoRecorte' => $prova,
             'acertoNominal' => $prova === null
                 ? null
                 : $analisar->acertoDeCadaAluno($prova, $leitor, $disciplina),
+            'questaoCompleta' => $completa,
+            'alunoAberto' => $this->alunoAberto,
         ];
     }
 }

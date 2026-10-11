@@ -552,9 +552,21 @@
                         </x-botao>
                     </div>
 
-                    <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
-                        {{ $questaoEmDetalhe['enunciado'] }}
-                    </p>
+                    {{--
+                        A questão como o aluno a viu: enunciado, blocos de
+                        apoio e as alternativas, com a correta assinalada.
+                        Sai do snapshot da prova — uma análise de prova
+                        antiga mostra o que estava no papel naquele dia.
+                    --}}
+                    @if ($questaoCompleta)
+                        <div class="mt-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                            <x-questao-completa :questao="$questaoCompleta"/>
+                        </div>
+                    @else
+                        <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
+                            {{ $questaoEmDetalhe['enunciado'] }}
+                        </p>
+                    @endif
 
                     <dl class="mt-4 grid gap-3 sm:grid-cols-4">
                         @foreach ([
@@ -593,9 +605,42 @@
                         </x-alerta>
                     @endif
 
+                    {{--
+                        Quem errou primeiro: é com esses que o professor
+                        vai falar. A grade diz que a questão teve 33% de
+                        acerto; esta lista diz quem são os dois terços.
+                    --}}
+                    @if ($respostasDaQuestao->isNotEmpty())
+                        <div class="mt-4">
+                            <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Quem acertou e quem errou
+                            </p>
+                            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                @foreach ($respostasDaQuestao as $resposta)
+                                    <div class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                                        <span @class([
+                                            'font-semibold',
+                                            'text-emerald-600 dark:text-emerald-400' => $resposta['acertou'],
+                                            'text-rose-500' => ! $resposta['acertou'],
+                                        ])>{{ $resposta['acertou'] ? '✓' : '✗' }}</span>
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-slate-900 dark:text-slate-100">{{ $resposta['aluno'] }}</span>
+                                            <span class="block text-xs text-slate-400">
+                                                RA {{ $resposta['ra'] }} ·
+                                                {{ $resposta['acertou']
+                                                    ? 'marcou '.$questaoCompleta?->letra_correta
+                                                    : 'marcou outra' }}
+                                            </span>
+                                        </span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <p class="mt-3 text-xs text-slate-400">
-                        A distribuição das respostas por alternativa não aparece aqui porque a planilha
-                        do leitor traz apenas acerto ou erro, nunca a letra que o aluno marcou.
+                        De quem errou, a planilha do leitor não diz qual alternativa marcou — ela traz
+                        apenas acerto ou erro. Quem acertou marcou a correta, e isso está assinalado.
                     </p>
                 </div>
             @endif
@@ -700,16 +745,28 @@
                                         <span class="block text-xs text-slate-400">RA {{ $linha['ra'] }}</span>
                                     </td>
                                     @foreach ($acertoNominal['questoes'] as $questao)
-                                        @php $acertou = $linha['acertou'][$questao['id']] ?? null; @endphp
+                                        @php
+                                            $acertou = $linha['acertou'][$questao['id']] ?? null;
+                                            $neste = $questaoCompleta?->id === $questao['id']
+                                                && $alunoAberto === $linha['aluno_id'];
+                                        @endphp
                                         <td class="px-1 py-2 text-center">
                                             @if ($acertou === null)
                                                 <span class="text-slate-300" title="Sem resposta importada">·</span>
-                                            @elseif ($acertou)
-                                                <span class="font-semibold text-emerald-600 dark:text-emerald-400"
-                                                      title="Questão {{ $questao['numero'] }} — acertou">✓</span>
                                             @else
-                                                <span class="font-semibold text-rose-500"
-                                                      title="Questão {{ $questao['numero'] }} — errou">✗</span>
+                                                {{-- Clicável: o ✗ sozinho não diz o que o aluno
+                                                     não soube, e é isso que o professor quer ver. --}}
+                                                <button type="button"
+                                                        wire:click="verRespostaDoAluno({{ $questao['id'] }}, {{ $linha['aluno_id'] }})"
+                                                        @class([
+                                                            'rounded px-1 font-semibold transition',
+                                                            'text-emerald-600 dark:text-emerald-400' => $acertou,
+                                                            'text-rose-500' => ! $acertou,
+                                                            'ring-2 ring-marca-500' => $neste,
+                                                        ])
+                                                        title="Questão {{ $questao['numero'] }} — {{ $acertou ? 'acertou' : 'errou' }}. Clique para ver a questão.">
+                                                    {{ $acertou ? '✓' : '✗' }}
+                                                </button>
                                             @endif
                                         </td>
                                     @endforeach
@@ -721,6 +778,43 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{--
+                    O ✗ sozinho não diz o que o aluno não soube. Clicar
+                    nele abre a questão como ela estava no papel, com a
+                    correta assinalada e — quando ele acertou — a marca de
+                    que foi essa que ele escolheu.
+                --}}
+                @if ($questaoCompleta && $alunoAberto)
+                    @php
+                        $linhaDoAluno = collect($acertoNominal['alunos'])->firstWhere('aluno_id', $alunoAberto);
+                        $acertouEsta = $linhaDoAluno['acertou'][$questaoCompleta->id] ?? null;
+                    @endphp
+
+                    <div class="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950/40">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="font-medium text-slate-900 dark:text-slate-100">
+                                    Questão {{ $questaoCompleta->numero }} · {{ $linhaDoAluno['aluno'] }}
+                                </p>
+                                <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                                    RA {{ $linhaDoAluno['ra'] }} ·
+                                    {{ $questaoCompleta->habilidade_snapshot ?: 'Sem habilidade informada' }}
+                                </p>
+                            </div>
+                            <x-botao variante="discreto"
+                                     wire:click="verRespostaDoAluno({{ $questaoCompleta->id }}, {{ $alunoAberto }})">
+                                Fechar
+                            </x-botao>
+                        </div>
+
+                        <div class="mt-3">
+                            <x-questao-completa :questao="$questaoCompleta"
+                                                :acertou="$acertouEsta"
+                                                :aluno="$linhaDoAluno['aluno']"/>
+                        </div>
+                    </div>
+                @endif
             @endif
         </x-cartao>
     @endif

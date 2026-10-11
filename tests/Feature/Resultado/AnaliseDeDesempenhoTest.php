@@ -979,3 +979,155 @@ it('leva a aba no endereço, para o link apontar para a leitura certa', function
         ->assertSet('aba', 'habilidades')
         ->assertSee('Por habilidade avaliada');
 });
+
+/*
+|--------------------------------------------------------------------------
+| A questão completa e a resposta do aluno
+|--------------------------------------------------------------------------
+*/
+
+it('mostra a questão como o aluno a viu, com a correta assinalada', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true], 1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->call('verQuestao', $questao->id)
+        ->assertSee($questao->enunciado_snapshot)
+        // Todas as alternativas, e o rótulo da correta — nunca só a cor.
+        ->assertSee('Alternativa A')
+        ->assertSee('Alternativa B')
+        ->assertSee('Correta');
+});
+
+/*
+ * O enunciado sai do snapshot da prova: uma análise de prova antiga tem
+ * de mostrar o que estava no papel naquele dia, mesmo que a questão
+ * original tenha sido reescrita depois.
+ */
+it('mostra o enunciado congelado, e não a questão reescrita depois', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $provaQuestao = ProvaQuestao::query()->with('questao')->where('numero', 1)->sole();
+    $provaQuestao->questao->update(['enunciado' => 'Texto reescrito depois da prova']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->call('verQuestao', $provaQuestao->id)
+        ->assertSee($provaQuestao->enunciado_snapshot)
+        ->assertDontSee('Texto reescrito depois da prova');
+});
+
+it('diz quem acertou e quem errou a questão, pelo nome', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => false, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->call('verQuestao', $questao->id)
+        ->assertSee('Quem acertou e quem errou')
+        ->assertSee($this->alunos[0]->nome)
+        ->assertSee($this->alunos[1]->nome)
+        ->html();
+
+    // De quem acertou dá para dizer a letra; de quem errou, não.
+    expect($html)->toContain('marcou outra');
+});
+
+/*
+ * A planilha do leitor traz 1 ou 0, nunca a letra marcada. Quem acertou
+ * marcou a correta — isso se deduz. De quem errou só se sabe que marcou
+ * outra, e dizer qual seria invenção.
+ */
+it('deduz a letra de quem acertou e não inventa a de quem errou', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true],
+        1 => [1 => false, 2 => true, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value);
+
+    // Quem acertou: a alternativa correta aparece marcada por ele.
+    // Quem acertou: a alternativa correta aparece marcada por ele.
+    $componente->call('verRespostaDoAluno', $questao->id, $this->alunos[0]->id)
+        ->assertSee($this->alunos[0]->nome.' marcou')
+        ->assertSee('Correta');
+
+    // Quem errou: a tela diz que marcou outra, sem escolher qual.
+    $componente->call('verRespostaDoAluno', $questao->id, $this->alunos[1]->id)
+        ->assertSee('marcou uma das outras alternativas')
+        ->assertSee('apenas acerto ou erro');
+});
+
+it('abre e fecha a resposta do aluno pelo mesmo clique', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'alunos')
+        ->set('filtroBimestre', (string) Bimestre::Segundo->value)
+        ->call('verRespostaDoAluno', $questao->id, $this->alunos[0]->id)
+        ->assertSet('alunoAberto', $this->alunos[0]->id)
+        ->call('verRespostaDoAluno', $questao->id, $this->alunos[0]->id)
+        ->assertSet('alunoAberto', null)
+        ->assertSet('questaoAberta', null);
+});
+
+/*
+ * O id vem da URL. Sem escopo, ele abriria a questão de outro Eixo — com
+ * enunciado, alternativas e os nomes dos alunos de lá.
+ */
+it('não abre questão de prova fora do escopo de quem olha', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+
+    $intruso = paeet(Eixo::factory()->create(['codigo' => 'OUT']));
+
+    $componente = Livewire::actingAs($intruso)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->call('verQuestao', $questao->id);
+
+    expect($componente->viewData('questaoCompleta'))->toBeNull()
+        ->and($componente->viewData('respostasDaQuestao'))->toBeEmpty();
+});
+
+it('não abre ao professor a questão que não é dele', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => true, 3 => true], 1 => [1 => true, 2 => true, 3 => true],
+    ]);
+
+    // A questão 3 é de Redes, do outro professor.
+    $deRedes = ProvaQuestao::query()->where('numero', 3)->sole();
+
+    $componente = Livewire::actingAs($this->profLogica)
+        ->test(Desempenho::class)
+        ->call('abrir', 'questoes')
+        ->call('verQuestao', $deRedes->id);
+
+    expect($componente->viewData('questaoCompleta'))->toBeNull();
+});

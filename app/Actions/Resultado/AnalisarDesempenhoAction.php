@@ -448,6 +448,47 @@ class AnalisarDesempenhoAction
     }
 
     /**
+     * Quem acertou e quem errou **uma** questão, com nome.
+     *
+     * Fecha a leitura por questão: a grade diz que a 7 teve 33% de
+     * acerto; esta lista diz quem são os dois terços.
+     *
+     * O escopo é o mesmo das outras leituras — a questão precisa estar
+     * numa prova visível ao leitor, e o professor só alcança as que
+     * escreveu. Sem isso, um id na URL abriria questão de outro Eixo.
+     *
+     * @return Collection<int, array{aluno: string, ra: ?string, acertou: bool}>
+     */
+    public function respostasDaQuestao(ProvaQuestao $questao, User $leitor): Collection
+    {
+        $visivel = Prova::query()
+            ->visivelPara($leitor)
+            ->whereKey($questao->prova_id)
+            ->exists();
+
+        if (! $visivel) {
+            return collect();
+        }
+
+        if (! $leitor->ehGestao() && (int) $questao->professor_id !== $leitor->getKey()) {
+            return collect();
+        }
+
+        return RespostaAluno::query()
+            ->where('prova_questao_id', $questao->getKey())
+            ->with(['resultado:id,aluno_id', 'resultado.aluno:id,nome,ra'])
+            ->get()
+            ->map(fn (RespostaAluno $resposta) => [
+                'aluno' => $resposta->resultado->aluno->nome,
+                'ra' => $resposta->resultado->aluno->ra,
+                'acertou' => (bool) $resposta->acertou,
+            ])
+            // Quem errou primeiro: é com esses que o professor vai falar.
+            ->sortBy([['acertou', 'asc'], ['aluno', 'asc']])
+            ->values();
+    }
+
+    /**
      * O ✓ e o ✗ de cada aluno, questão a questão.
      *
      * É a única leitura **nominal** por questão do sistema: as outras
@@ -486,6 +527,7 @@ class AnalisarDesempenhoAction
                 $porQuestao = $doAluno->keyBy(fn (RespostaAluno $r) => $r->provaQuestao->id);
 
                 return [
+                    'aluno_id' => $aluno->id,
                     'aluno' => $aluno->nome,
                     'ra' => $aluno->ra,
                     'acertou' => $porQuestao->map(fn (RespostaAluno $r) => (bool) $r->acertou)->all(),
