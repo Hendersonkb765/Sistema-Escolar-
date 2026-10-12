@@ -14,6 +14,18 @@
                     <x-botao wire:click="abrirPainelAvanco">Avançar ano</x-botao>
                 @endif
             @endcan
+            {{--
+                No último período não há para onde avançar, e o botão
+                some. Antes sumia sem dizer nada: quem chegava ao 2º de
+                um curso de dois períodos não encontrava mais o avanço e
+                nem a razão. Agora o lugar dele é ocupado pelo fim do
+                percurso.
+            --}}
+            @can('encerrar', $turma)
+                @if ($turma->podeConcluir())
+                    <x-botao wire:click="abrirPainelConclusao">Concluir turma</x-botao>
+                @endif
+            @endcan
         </x-slot:acoes>
 
         <dl class="grid grid-cols-2 gap-4 sm:grid-cols-5">
@@ -45,6 +57,20 @@
                 <dd class="mt-0.5"><x-badge :cor="$turma->status->cor()" :rotulo="$turma->status->rotulo()"/></dd>
             </div>
         </dl>
+
+        {{--
+            Turma fora de circulação diz por quê, e o que isso significa
+            na prática. Sem esta linha, a tela de uma turma concluída é
+            igual à de uma ativa, menos dois botões que sumiram.
+        --}}
+        @if (! $turma->podeAvancar() && ! $turma->podeConcluir())
+            <x-alerta tipo="info" class="mt-4"
+                      titulo="Turma {{ $turma->status->rotulo() }}">
+                O percurso desta turma terminou: ela não avança mais de período e não aparece
+                como opção ao abrir uma solicitação de prova. As notas, o histórico e os alunos
+                continuam aqui.
+            </x-alerta>
+        @endif
 
         @if ($gradeDesatualizada)
             <x-alerta tipo="info" class="mt-4" titulo="Há uma versão de grade mais recente (v{{ $gradeDesatualizada->versao }})">
@@ -92,6 +118,34 @@
                 <div class="flex justify-end gap-2">
                     <x-botao variante="secundario" wire:click="fecharPainelAvanco">Cancelar</x-botao>
                     <x-botao wire:click="avancarAno" wire:loading.attr="disabled">Confirmar avanço</x-botao>
+                </div>
+            </div>
+        </x-cartao>
+    @endif
+
+    @if ($painelConclusaoAberto)
+        <x-cartao titulo="Concluir a turma {{ $turma->nome }}"
+                  descricao="Último período do curso. O estado atual vai para o histórico antes de qualquer mudança. Nada é apagado.">
+            <div class="space-y-4">
+                <x-alerta tipo="atencao">
+                    @if ($alunosAtivos > 0)
+                        {{ $alunosAtivos }} aluno(s) ativo(s) passam a <strong>Concluinte</strong>, cada um com
+                        registro em seu histórico. Quem já está transferido ou inativo fica como está.
+                    @else
+                        Nenhum aluno ativo nesta turma: só o estado da turma muda.
+                    @endif
+                    A turma passa a <strong>Concluída</strong> e deixa de aparecer ao abrir
+                    uma solicitação de prova.
+                </x-alerta>
+
+                <x-campo rotulo="Observações" para="observacoes-conclusao"
+                         ajuda="Fica no histórico da turma, junto do registro de encerramento.">
+                    <x-area-texto id="observacoes-conclusao" wire:model="observacoesConclusao" :linhas="2"/>
+                </x-campo>
+
+                <div class="flex justify-end gap-2">
+                    <x-botao variante="secundario" wire:click="fecharPainelConclusao">Cancelar</x-botao>
+                    <x-botao wire:click="concluirTurma" wire:loading.attr="disabled">Confirmar conclusão</x-botao>
                 </div>
             </div>
         </x-cartao>

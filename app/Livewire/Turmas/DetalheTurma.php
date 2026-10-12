@@ -3,6 +3,8 @@
 namespace App\Livewire\Turmas;
 
 use App\Actions\Academico\AvancarTurmaAction;
+use App\Actions\Academico\ConcluirTurmaAction;
+use App\Enums\StatusAluno;
 use App\Enums\StatusGrade;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
@@ -31,6 +33,10 @@ class DetalheTurma extends Component
 
     public string $observacoesAvanco = '';
 
+    public bool $painelConclusaoAberto = false;
+
+    public string $observacoesConclusao = '';
+
     public function mount(Turma $turma): void
     {
         $this->authorize('view', $turma);
@@ -51,6 +57,53 @@ class DetalheTurma extends Component
     {
         $this->painelAvancoAberto = false;
         $this->reset(['turmaDestinoId', 'observacoesAvanco']);
+    }
+
+    public function abrirPainelConclusao(): void
+    {
+        $this->authorize('encerrar', $this->turma);
+
+        $this->painelConclusaoAberto = true;
+    }
+
+    public function fecharPainelConclusao(): void
+    {
+        $this->painelConclusaoAberto = false;
+        $this->reset('observacoesConclusao');
+    }
+
+    /**
+     * Fim do percurso: a turma chegou ao último período e encerra.
+     *
+     * Fica na mesma tela — a turma continua existindo, só muda de
+     * estado —, então notifica por evento. O avanço, que leva para outra
+     * turma, é que usa flash.
+     */
+    public function concluirTurma(ConcluirTurmaAction $action): void
+    {
+        $this->authorize('encerrar', $this->turma);
+
+        try {
+            $resultado = $action->executar(
+                turma: $this->turma,
+                autor: auth()->user(),
+                observacoes: $this->observacoesConclusao ?: null,
+            );
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        $this->fecharPainelConclusao();
+
+        $this->turma = $resultado['turma'];
+
+        $concluintes = $resultado['concluintes'];
+
+        $this->notificarSucesso(
+            "Turma concluída. {$concluintes} aluno(s) passaram a concluinte."
+        );
     }
 
     public function avancarAno(AvancarTurmaAction $action): void
@@ -131,6 +184,9 @@ class DetalheTurma extends Component
                 ->latest('created_at')
                 ->get(),
             'destinos' => $this->turmasDestinoPossiveis(),
+            // Quantos deixam de ser "ativo" ao concluir: o painel diz o
+            // que vai acontecer antes de acontecer.
+            'alunosAtivos' => $this->turma->alunos()->where('status', StatusAluno::Ativo)->count(),
             'gradeDesatualizada' => $this->gradeDesatualizada(),
         ])->layout('components.layouts.app', [
             'titulo' => $this->turma->nome,

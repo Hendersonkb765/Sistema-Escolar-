@@ -137,6 +137,17 @@ class Turma extends Model
     }
 
     /**
+     * No último período e ainda ativa: não há para onde avançar, e o que
+     * resta é encerrar. É o complemento de `podeAvancar()` — das turmas
+     * ativas, uma das duas é sempre verdadeira.
+     */
+    public function podeConcluir(): bool
+    {
+        return $this->status === StatusTurma::Ativa
+            && $this->periodo >= $this->periodoFinal();
+    }
+
+    /**
      * Sugere o nome do próximo período trocando o prefixo numérico:
      * "2 A" vira "3 A". O nome é livre, então quando não começa por
      * dígito o valor atual é mantido e cabe ao usuário ajustar.

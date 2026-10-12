@@ -2,7 +2,6 @@
 
 namespace App\Policies;
 
-use App\Enums\StatusTurma;
 use App\Models\Turma;
 use App\Models\User;
 
@@ -25,10 +24,15 @@ class TurmaPolicy extends PolicyBase
         return $usuario->ehGestao() && $this->noEscopo($usuario, $turma);
     }
 
+    /**
+     * Quem pode encerrar a turma. Como em `avancarAno`, responde só
+     * "este recurso é seu?": se a turma ainda não chegou ao último
+     * período, ou já foi concluída, quem recusa é a ConcluirTurmaAction,
+     * com a razão escrita. Estava aqui, e um "ainda não dá" virava 403
+     * mudo.
+     */
     public function encerrar(User $usuario, Turma $turma): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $turma)
-            && $turma->status === StatusTurma::Ativa;
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $turma);
     }
 }
