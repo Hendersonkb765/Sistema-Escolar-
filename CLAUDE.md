@@ -156,6 +156,24 @@ Os dois caminhos desembocam no mesmo painel flutuante
 (`x-notificacoes`, montado no layout). Testes usam
 `assertDispatched('notificar', ...)`.
 
+## O que o sistema não sabe, ele diz
+
+A planilha do leitor de folhas chega em dois formatos: `Q1` como 1 ou 0,
+ou como a letra que o aluno marcou (`App\Enums\FormatoDaPlanilha`). Só o
+segundo permite dizer **qual** alternativa errada atraiu a turma.
+
+Daí uma regra que vale além dele: dado ausente e dado zero não são a
+mesma coisa, e a tela nunca desenha o primeiro como se fosse o segundo.
+
+- `alternativa_marcada` nula tem dois significados — "deixou em branco"
+  e "a planilha nunca soube" —, separados pelo formato da prova, não da
+  resposta;
+- onde não há distribuição, a tela explica por que não há, em vez de
+  mostrar barra vazia;
+- aluno sem resultado entra como pendente, nunca como zero;
+- abaixo do mínimo de evidência a leitura é "inconclusivo", que não é um
+  meio-termo entre bom e ruim: é a recusa de classificar sem base.
+
 ## Histórico nunca é reescrito
 
 `turma_historicos`, `aluno_historicos` e `questao_feedbacks` são append-only:

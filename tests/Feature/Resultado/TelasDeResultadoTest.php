@@ -12,6 +12,7 @@ use App\Actions\Resultado\ConfirmarImportacaoAction;
 use App\Enums\Bimestre;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
+use App\Livewire\Analises\Desempenho;
 use App\Livewire\Importacoes\ListaImportacoes;
 use App\Livewire\Importacoes\NovaImportacao;
 use App\Livewire\Resultados\ListaResultados;
@@ -768,4 +769,42 @@ it('não vaza importação de outro Eixo na listagem', function () {
         ->test(ListaImportacoes::class)
         ->assertOk()
         ->assertDontSee('resultados.xlsx');
+});
+
+/*
+ * O caminho inteiro pela tela, com a planilha de letras: conferir,
+ * confirmar e encontrar a marcação na análise. É o que liga as duas
+ * pontas — sem a letra gravada aqui, a aba das alternativas não teria o
+ * que mostrar.
+ */
+it('leva a letra marcada da planilha até a análise de desempenho', function () {
+    $certas = ProvaQuestao::query()
+        ->where('prova_id', $this->prova->id)
+        ->orderBy('numero')
+        ->pluck('letra_correta', 'numero');
+
+    $erradaNa2 = collect(
+        ProvaQuestao::query()->where('prova_id', $this->prova->id)->where('numero', 2)->sole()->letrasValidas()
+    )->first(fn (string $letra) => $letra !== $certas[2]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(NovaImportacao::class)
+        ->set('prova_id', $this->prova->id)
+        ->set('planilha', ($this->arquivo)([
+            ['Prova', '1 A', '5001', '1001', 'Marina', 'Alves', 4, 4, 100, 'A',
+                $certas[1], $certas[2], $certas[3], $certas[4]],
+            ['Prova', '1 A', '5002', '1002', 'Caio', 'Prado', 4, 3, 75, 'A',
+                $certas[1], $erradaNa2, $certas[3], $certas[4]],
+        ]))
+        ->call('conferir')
+        ->assertHasNoErrors()
+        ->call('confirmar');
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('provasEscolhidas', [(string) $this->prova->id])
+        ->call('abrir', 'alternativas')
+        ->assertSee('A mais marcada entre as erradas')
+        ->assertSee('A correta era '.$certas[2])
+        ->assertDontSee('Sem a letra marcada');
 });
