@@ -76,4 +76,13 @@ class Aluno extends Model
     {
         return $this->hasMany(ResultadoAluno::class);
     }
+
+    /**
+     * Só quem está ativo pode ser retirado da turma. Quem já saiu, saiu;
+     * quem concluiu, concluiu.
+     */
+    public function podeSerDesligado(): bool
+    {
+        return $this->status === StatusAluno::Ativo;
+    }
 }

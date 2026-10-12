@@ -165,17 +165,82 @@
             @endforelse
         </x-cartao>
 
-        <x-cartao titulo="Alunos" :descricao="$alunos->count().' matriculado(s)'">
+        @php
+            // Matriculados e ativos são números diferentes assim que
+            // alguém sai, e é o segundo que responde "quantos alunos
+            // esta turma tem hoje".
+            $ativos = $alunos->where('status', App\Enums\StatusAluno::Ativo)->count();
+        @endphp
+
+        <x-cartao titulo="Alunos"
+                  :descricao="$alunos->count().' matriculado(s)'
+                      .($ativos === $alunos->count() ? '' : ' · '.$ativos.' ativo(s)')">
             @forelse ($alunos as $aluno)
-                <div class="flex items-center justify-between border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
-                    <div class="min-w-0">
-                        <a href="{{ route('alunos.editar', $aluno) }}" wire:navigate
-                           class="block truncate text-sm font-medium text-marca-600 hover:underline dark:text-marca-400">
-                            {{ $aluno->nome }}
-                        </a>
-                        <span class="text-xs text-slate-400">RA {{ $aluno->ra }}</span>
+                <div wire:key="aluno-{{ $aluno->id }}"
+                     class="border-b border-slate-100 py-2 last:border-0 dark:border-slate-800">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <a href="{{ route('alunos.editar', $aluno) }}" wire:navigate
+                               class="block truncate text-sm font-medium text-marca-600 hover:underline dark:text-marca-400">
+                                {{ $aluno->nome }}
+                            </a>
+                            <span class="text-xs text-slate-400">RA {{ $aluno->ra }}</span>
+                        </div>
+
+                        <div class="flex shrink-0 items-center gap-2">
+                            <x-badge :cor="$aluno->status->cor()" :rotulo="$aluno->status->rotulo()"/>
+
+                            {{--
+                                Quem já saiu não sai de novo: o botão
+                                aparece só para quem está ativo, e o selo
+                                ao lado diz o que aconteceu com os outros.
+                            --}}
+                            @can('desligar', $aluno)
+                                @if ($aluno->podeSerDesligado() && $alunoDesligando !== $aluno->id)
+                                    <x-botao variante="discreto" wire:click="abrirDesligamento({{ $aluno->id }})">
+                                        Retirar
+                                    </x-botao>
+                                @endif
+                            @endcan
+                        </div>
                     </div>
-                    <x-badge :cor="$aluno->status->cor()" :rotulo="$aluno->status->rotulo()"/>
+
+                    @if ($alunoDesligando === $aluno->id)
+                        <div class="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Retirar {{ $aluno->nome }} da turma. O cadastro, as notas e o histórico
+                                continuam; ele(a) deixa de ser contado(a) como ativo(a) e não entra em prova nova.
+                            </p>
+
+                            <x-campo rotulo="Para onde está saindo" para="saida-{{ $aluno->id }}">
+                                <x-select id="saida-{{ $aluno->id }}" wire:model.live="situacaoDesligamento">
+                                    @foreach ($situacoesDeSaida as $situacao)
+                                        <option value="{{ $situacao->value }}">
+                                            {{ $situacao->rotulo() }} — {{ $situacao->descricao() }}
+                                        </option>
+                                    @endforeach
+                                </x-select>
+                            </x-campo>
+
+                            {{--
+                                Obrigatório: "Transferido" responde para
+                                onde, não por quê, e é o porquê que alguém
+                                vai procurar no histórico daqui a um ano.
+                            --}}
+                            <x-campo rotulo="Motivo" para="motivo-{{ $aluno->id }}"
+                                     ajuda="Fica no histórico do aluno, que não é reescrito.">
+                                <x-input id="motivo-{{ $aluno->id }}" wire:model="motivoDesligamento"
+                                         placeholder="Transferência para a E.E. Central"/>
+                            </x-campo>
+
+                            <div class="flex justify-end gap-2">
+                                <x-botao variante="secundario" wire:click="fecharDesligamento">Cancelar</x-botao>
+                                <x-botao wire:click="desligarAluno" wire:loading.attr="disabled">
+                                    Confirmar saída
+                                </x-botao>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @empty
                 <x-vazio titulo="Nenhum aluno matriculado"/>

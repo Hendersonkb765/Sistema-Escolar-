@@ -4,10 +4,12 @@ namespace App\Livewire\Turmas;
 
 use App\Actions\Academico\AvancarTurmaAction;
 use App\Actions\Academico\ConcluirTurmaAction;
+use App\Actions\Academico\DesligarAlunoAction;
 use App\Enums\StatusAluno;
 use App\Enums\StatusGrade;
 use App\Exceptions\RegraDeNegocioException;
 use App\Livewire\Concerns\Notifica;
+use App\Models\Aluno;
 use App\Models\GradeCurricular;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -36,6 +38,13 @@ class DetalheTurma extends Component
     public bool $painelConclusaoAberto = false;
 
     public string $observacoesConclusao = '';
+
+    /** O aluno cujo desligamento está aberto na lista, por id. */
+    public ?int $alunoDesligando = null;
+
+    public string $situacaoDesligamento = '';
+
+    public string $motivoDesligamento = '';
 
     public function mount(Turma $turma): void
     {
@@ -104,6 +113,78 @@ class DetalheTurma extends Component
         $this->notificarSucesso(
             "Turma concluída. {$concluintes} aluno(s) passaram a concluinte."
         );
+    }
+
+    /*
+     * Retirar aluno da turma.
+     *
+     * Abre dentro da própria linha dele, e não num painel no alto da
+     * página: numa turma de trinta, um formulário longe da linha é um
+     * convite a desligar o aluno errado.
+     */
+    public function abrirDesligamento(int $alunoId): void
+    {
+        $aluno = $this->alunoDaTurma($alunoId);
+
+        $this->authorize('desligar', $aluno);
+
+        $this->alunoDesligando = $aluno->getKey();
+        $this->situacaoDesligamento = StatusAluno::Transferido->value;
+        $this->motivoDesligamento = '';
+    }
+
+    public function fecharDesligamento(): void
+    {
+        $this->reset(['alunoDesligando', 'situacaoDesligamento', 'motivoDesligamento']);
+    }
+
+    public function desligarAluno(DesligarAlunoAction $action): void
+    {
+        $aluno = $this->alunoDaTurma((int) $this->alunoDesligando);
+
+        $this->authorize('desligar', $aluno);
+
+        $situacao = StatusAluno::tryFrom($this->situacaoDesligamento);
+
+        if ($situacao === null) {
+            $this->notificarErro('Escolha para onde o aluno está saindo.');
+
+            return;
+        }
+
+        try {
+            $action->executar(
+                aluno: $aluno,
+                autor: auth()->user(),
+                situacao: $situacao,
+                motivo: $this->motivoDesligamento,
+            );
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        $nome = $aluno->nome;
+
+        $this->fecharDesligamento();
+
+        $this->notificarSucesso(
+            "{$nome} foi retirado(a) da turma como {$situacao->rotulo()}. "
+            .'As notas e o histórico dele(a) continuam aqui.'
+        );
+    }
+
+    /**
+     * O aluno pelo id, confinado a esta turma.
+     *
+     * Pelo relacionamento, e não por `Aluno::find`: o id chega do
+     * navegador, e sem este recorte um id de outra turma — ou de outro
+     * Eixo — seria desligado a partir desta tela.
+     */
+    protected function alunoDaTurma(int $alunoId): Aluno
+    {
+        return $this->turma->alunos()->whereKey($alunoId)->firstOrFail();
     }
 
     public function avancarAno(AvancarTurmaAction $action): void
@@ -177,6 +258,7 @@ class DetalheTurma extends Component
         return view('turmas.detalhe', [
             'disciplinasDoPeriodo' => $this->turma->disciplinasDoPeriodo(),
             'alunos' => $this->turma->alunos()->orderBy('nome')->get(),
+            'situacoesDeSaida' => StatusAluno::desligamentos(),
             // `grade` entra aqui porque o histórico mostra a versão que
             // estava congelada à época do registro.
             'historicos' => $this->turma->historicos()
