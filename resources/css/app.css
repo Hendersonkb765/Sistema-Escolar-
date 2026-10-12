@@ -175,14 +175,25 @@
 | Grade de acerto por questão
 |--------------------------------------------------------------------------
 |
-| Cinco degraus de um tom só, monótonos em luminosidade. No tema claro a
-| rampa escurece conforme o erro aumenta; no escuro ela clareia. Nos dois
-| casos, mais tinta significa mais erro — e não é uma inversão automática,
-| são dois conjuntos escolhidos contra a superfície de cada tema.
+| Cinco degraus de vermelho a verde, passando por laranja e amarelo — a
+| convenção do semáforo, que é a mesma das faixas de nota em
+| `config/analise.php`.
+|
+| Antes era um tom só, do vermelho forte ao quase branco: a ideia era
+| "mais tinta, mais erro". Na prática a grade inteira saía avermelhada, e
+| uma questão com 90% de acerto, pintada de rosa pálido, continuava
+| parecendo um problema. O degrau-2 (55 a 70%) é onde cai o critério da
+| escola, e é por isso que o amarelo mora no meio.
 |
 | A cor é atalho, nunca o único canal: o aproveitamento vai escrito dentro
-| de cada célula, o `title` repete em texto e a tabela de apoio traz tudo.
-| As combinações de texto e fundo foram medidas — a pior fica em 4,86:1.
+| de cada célula, o `title` repete em texto, a legenda nomeia cada faixa e
+| a tabela de apoio traz tudo. As combinações de texto e fundo foram
+| medidas — a pior fica em 4,83:1.
+|
+| O que esta escala não resolve: na deuteranopia o vermelho forte e o
+| verde claro se aproximam. É o preço de qualquer rampa vermelho-verde, e
+| quem não distingue as pontas lê o número dentro da célula — que está lá
+| justamente para isso.
 */
 @layer components {
     .celula-questao {
@@ -214,22 +225,26 @@
     }
 
     /*
-        A saturação fica reservada ao problema de verdade (abaixo de 40%).
-        Com ela no meio da escala — onde cai a maioria das questões — a
-        grade inteira gritava, e bloco saturado grande lê alto demais.
-        Contraste de texto medido: o pior par fica em 4,86:1.
-    */
-    .degrau-0 { background: #be123c; color: #f8fafc; }
-    .degrau-1 { background: #fb7185; color: #0f172a; }
-    .degrau-2 { background: #fecdd3; color: #0f172a; }
-    .degrau-3 { background: #ffe4e6; color: #0f172a; }
-    .degrau-4 { background: #fff1f2; color: #0f172a; }
+        Quase a mesma rampa nos dois temas, e as duas diferenças têm
+        motivo: o vermelho clareia um degrau no escuro, porque o
+        #b91c1c do tema claro quase some sobre o slate-900; e o amarelo
+        escurece, porque o tom claro sobre fundo escuro ofusca.
 
-    .dark .degrau-0 { background: #f43f5e; color: #0f172a; }
-    .dark .degrau-1 { background: #9f1239; color: #f8fafc; }
-    .dark .degrau-2 { background: #5e1c2c; color: #f8fafc; }
-    .dark .degrau-3 { background: #3b1b22; color: #f8fafc; }
-    .dark .degrau-4 { background: #241a1d; color: #f8fafc; }
+        Contraste de texto, degrau a degrau —
+        claro:  6,47 · 6,24 · 13,27 · 5,23 · 5,02
+        escuro: 4,83 · 6,24 · 11,42 · 5,23 · 5,02
+    */
+    .degrau-0 { background: #b91c1c; color: #ffffff; }
+    .degrau-1 { background: #f97316; color: #1c1917; }
+    .degrau-2 { background: #fde047; color: #1c1917; }
+    .degrau-3 { background: #4ade80; color: #14532d; }
+    .degrau-4 { background: #15803d; color: #ffffff; }
+
+    .dark .degrau-0 { background: #dc2626; color: #ffffff; }
+    .dark .degrau-1 { background: #f97316; color: #1c1917; }
+    .dark .degrau-2 { background: #facc15; color: #1c1917; }
+    .dark .degrau-3 { background: #4ade80; color: #14532d; }
+    .dark .degrau-4 { background: #15803d; color: #ffffff; }
 
     /* No alto contraste quem manda é o sistema. */
     @media (forced-colors: active) {

@@ -488,8 +488,8 @@
         <x-cartao titulo="Acerto por questão">
             <x-slot:descricao>
                 Uma linha por prova, na ordem em que o aluno viu as questões.
-                Quanto mais forte a célula, mais a turma errou. Clique numa
-                questão para ver o detalhe dela.
+                Vermelho é onde a turma mais errou; verde, onde foi melhor.
+                Clique numa questão para ver o enunciado e as alternativas.
             </x-slot:descricao>
 
             @php
