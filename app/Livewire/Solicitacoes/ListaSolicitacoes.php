@@ -75,6 +75,9 @@ class ListaSolicitacoes extends Component
     {
         $usuario = auth()->user();
 
+        // Nulo para a gestão, que olha a solicitação inteira.
+        $comoProfessor = $usuario->ehProfessor() ? $usuario : null;
+
         $consulta = SolicitacaoProva::query()
             ->visivelPara($usuario)
             ->with([
@@ -101,19 +104,16 @@ class ListaSolicitacoes extends Component
             ->when($this->filtroCurso !== '', fn (Builder $q) => $q->where('curso_id', $this->filtroCurso))
             ->when($this->filtroStatus !== '', fn (Builder $q) => $q->where('status', $this->filtroStatus))
             ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
-            // "Atrasada" é estado de prazo, não de fluxo: pendente com
-            // prazo vencido, ou enviada depois do combinado.
-            // "Atrasada" é estado de prazo, não de fluxo: alguma parte
-            // pendente com prazo vencido, ou entregue depois do combinado.
-            ->when($this->filtroPrazo === 'atrasadas', fn (Builder $q) => $q
-                ->whereHas('partes', fn (Builder $p) => $p
-                    ->where(fn (Builder $sub) => $sub
-                        ->where('enviada_em_atraso', true)
-                        ->orWhere(fn (Builder $pendente) => $pendente
-                            ->whereNull('enviada_em')
-                            ->whereHas('solicitacao', fn (Builder $s) => $s->where('prazo', '<', now()))))))
-            ->when($this->filtroPrazo === 'pendentes', fn (Builder $q) => $q
-                ->whereHas('partes', fn (Builder $p) => $p->whereNull('enviada_em')))
+            /*
+             * Pelos escopos do model, compartilhados com o painel: o
+             * número de lá aponta para esta lista, e dois recortes
+             * escritos à mão divergem no dia em que um deles muda.
+             *
+             * Para o professor, só a parte dele conta — com a regra
+             * genérica, ele via "Atrasada" por causa do colega.
+             */
+            ->when($this->filtroPrazo === 'atrasadas', fn (Builder $q) => $q->atrasadas($comoProfessor))
+            ->when($this->filtroPrazo === 'pendentes', fn (Builder $q) => $q->comPartePendente($comoProfessor))
             ->when($this->filtroPrazo === 'devolvidas', fn (Builder $q) => $q
                 ->whereHas('questoes', fn (Builder $sub) => $sub
                     ->where('status', StatusQuestao::Rejeitada)));

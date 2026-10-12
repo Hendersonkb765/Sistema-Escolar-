@@ -30,8 +30,19 @@
             @endif
         </p>
 
+        {{--
+            Os números acima são todos recortados pelo escopo de quem
+            olha: o PAEET conta o que é do Eixo dele, o professor conta o
+            que é dele. Dizer isso aqui evita o chamado de "faltam
+            turmas no painel".
+        --}}
         <p class="mt-3 text-xs text-slate-400 dark:text-slate-500">
-            Os indicadores de provas e resultados entram junto com os milestones 5 a 7.
+            @if ($usuario->ehProfessor())
+                Os números acima contam apenas as suas solicitações e questões.
+            @else
+                Os números acima contam apenas o que pertence
+                {{ count($usuario->eixoIds()) === 1 ? 'ao seu Eixo' : 'aos seus Eixos' }}.
+            @endif
         </p>
     </x-cartao>
 </div>

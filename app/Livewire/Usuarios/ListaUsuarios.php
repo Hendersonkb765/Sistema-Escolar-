@@ -86,7 +86,7 @@ class ListaUsuarios extends Component
 
         $consulta = User::query()
             ->with('eixos:id,nome')
-            ->where(fn (Builder $q) => $this->restringirAoEscopo($q, $usuario))
+            ->visivelPara($usuario)
             ->when($this->busca !== '', function (Builder $q) {
                 $termo = '%'.str_replace('%', '\%', $this->busca).'%';
                 $q->where(fn (Builder $sub) => $sub
@@ -103,17 +103,5 @@ class ListaUsuarios extends Component
             'titulo' => 'Usuários',
             'subtitulo' => 'Contas são criadas apenas aqui — não existe autocadastro',
         ]);
-    }
-
-    /**
-     * Um usuário de gestão vê as contas que tocam seus Eixos, as que ele
-     * mesmo criou e a própria conta.
-     */
-    protected function restringirAoEscopo(Builder $consulta, User $usuario): Builder
-    {
-        return $consulta
-            ->whereHas('eixos', fn (Builder $q) => $q->whereIn('eixos.id', $usuario->eixoIds()))
-            ->orWhere('criado_por', $usuario->getKey())
-            ->orWhere('usuarios.id', $usuario->getKey());
     }
 }

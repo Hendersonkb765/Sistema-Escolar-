@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PerfilUsuario;
 use App\Enums\StatusQuestao;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -173,6 +174,30 @@ class User extends Authenticatable
     public function eixoIds(): array
     {
         return $this->eixoIdsCache ??= $this->eixos()->pluck('eixos.id')->all();
+    }
+
+    /**
+     * As contas que este usuário enxerga: as que tocam seus Eixos, as que
+     * ele mesmo criou e a própria.
+     *
+     * Morava copiada na tela de usuários e no painel. Duas cópias da
+     * mesma regra é uma divergência esperando acontecer — e, quando
+     * acontece, o painel mostra um número e a tela para onde ele aponta
+     * mostra outro.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeVisivelPara(Builder $query, ?self $usuario): Builder
+    {
+        if (! $usuario instanceof self || ! $usuario->ativo || ! $usuario->ehGestao()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(fn (Builder $escopo) => $escopo
+            ->whereHas('eixos', fn (Builder $q) => $q->whereIn('eixos.id', $usuario->eixoIds()))
+            ->orWhere('criado_por', $usuario->getKey())
+            ->orWhere('usuarios.id', $usuario->getKey()));
     }
 
     public function temAcessoAoEixo(?int $eixoId): bool

@@ -42,13 +42,22 @@ class Painel extends Component
             return $this->indicadoresDoProfessor($usuario);
         }
 
-        $indicadores = [
+        /*
+         * "Eixos no meu escopo: 1" não informa nada a quem tem um Eixo
+         * só — e é o caso do PAEET. O subtítulo já diz qual é. O cartão
+         * fica para quem tem mais de um, onde o número é notícia.
+         */
+        $indicadores = count($usuario->eixoIds()) > 1 ? [
             [
                 'rotulo' => 'Eixos no meu escopo',
                 'valor' => count($usuario->eixoIds()),
                 'cor' => 'roxo',
                 'href' => Gate::allows('viewAny', Eixo::class) ? route('eixos.index') : null,
             ],
+        ] : [];
+
+        $indicadores = [
+            ...$indicadores,
             [
                 'rotulo' => 'Cursos',
                 'valor' => Curso::query()->visivelPara($usuario)->count(),
@@ -78,7 +87,9 @@ class Painel extends Component
         if (Gate::allows('viewAny', User::class)) {
             $indicadores[] = [
                 'rotulo' => 'Usuários',
-                'valor' => $this->contarUsuariosVisiveis($usuario),
+                // Pelo mesmo escopo da tela de usuários, que é para
+                // onde este número leva: se divergirem, o painel mente.
+                'valor' => User::query()->visivelPara($usuario)->count(),
                 'cor' => 'cinza',
                 'href' => route('usuarios.index'),
             ];
@@ -97,20 +108,18 @@ class Painel extends Component
     {
         $visiveis = fn () => SolicitacaoProva::query()->visivelPara($usuario);
 
+        /*
+         * Pelos escopos do model, que são os mesmos da listagem para
+         * onde cada número aponta. Aqui havia `whereNull('enviada_em')`
+         * direto na solicitação — coluna que mora nas partes —, e os
+         * dois contadores viviam zerados sem reclamar.
+         */
         $aguardando = (clone $visiveis())
             ->where('status', StatusSolicitacao::Aberta)
-            ->whereNull('enviada_em')
+            ->comPartePendente()
             ->count();
 
-        $atrasadas = (clone $visiveis())
-            ->whereNull('enviada_em')
-            ->where('prazo', '<', now())
-            ->whereIn('status', [
-                StatusSolicitacao::Aberta->value,
-                StatusSolicitacao::Enviada->value,
-                StatusSolicitacao::EmAnalise->value,
-            ])
-            ->count();
+        $atrasadas = (clone $visiveis())->atrasadas()->count();
 
         $aguardandoAnalise = (clone $visiveis())
             ->whereIn('status', [StatusSolicitacao::Enviada->value, StatusSolicitacao::EmAnalise->value])
@@ -163,22 +172,24 @@ class Painel extends Component
     {
         $minhas = fn () => SolicitacaoProva::query()->visivelPara($usuario);
 
+        /*
+         * Sempre com o professor: a parte do colega não é pendência de
+         * quem já entregou a sua. Antes `whereNotNull('enviada_em')`
+         * resolvia para texto e era verdadeiro em toda linha — "Já
+         * enviadas" contava até as que ele nem tinha aberto.
+         */
         $aResponder = (clone $minhas())
             ->where('status', StatusSolicitacao::Aberta)
-            ->whereNull('enviada_em')
+            ->comPartePendente($usuario)
             ->count();
 
-        $atrasadas = (clone $minhas())
-            ->where('status', StatusSolicitacao::Aberta)
-            ->whereNull('enviada_em')
-            ->where('prazo', '<', now())
-            ->count();
+        $atrasadas = (clone $minhas())->atrasadas($usuario)->count();
 
-        $enviadas = (clone $minhas())->whereNotNull('enviada_em')->count();
+        $enviadas = (clone $minhas())->comParteEnviada($usuario)->count();
 
         $proximoPrazo = (clone $minhas())
             ->where('status', StatusSolicitacao::Aberta)
-            ->whereNull('enviada_em')
+            ->comPartePendente($usuario)
             ->orderBy('prazo')
             ->value('prazo');
 
@@ -231,18 +242,6 @@ class Painel extends Component
         ];
     }
 
-    protected function contarUsuariosVisiveis(User $usuario): int
-    {
-        return User::query()
-            ->where(function ($consulta) use ($usuario) {
-                $consulta
-                    ->whereHas('eixos', fn ($q) => $q->whereIn('eixos.id', $usuario->eixoIds()))
-                    ->orWhere('criado_por', $usuario->getKey())
-                    ->orWhere('usuarios.id', $usuario->getKey());
-            })
-            ->count();
-    }
-
     protected function descricaoDoEscopo(User $usuario): string
     {
         if (! $usuario->ehGestao()) {
@@ -251,8 +250,12 @@ class Painel extends Component
 
         $eixos = $usuario->eixos()->orderBy('nome')->pluck('nome');
 
-        return $eixos->isEmpty()
-            ? 'Nenhum Eixo vinculado à sua conta'
-            : 'Eixos: '.$eixos->join(', ');
+        if ($eixos->isEmpty()) {
+            return 'Nenhum Eixo vinculado à sua conta';
+        }
+
+        // Tudo nesta tela está recortado por estes Eixos, então eles são
+        // a primeira coisa a dizer: sem isso, um número baixo parece erro.
+        return ($eixos->count() === 1 ? 'Eixo: ' : 'Eixos: ').$eixos->join(', ');
     }
 }

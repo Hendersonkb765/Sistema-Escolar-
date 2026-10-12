@@ -126,6 +126,69 @@ class SolicitacaoProva extends Model
     // Estado
     // ------------------------------------------------------------------
 
+    /*
+    |--------------------------------------------------------------------------
+    | Escopos de prazo e envio
+    |--------------------------------------------------------------------------
+    |
+    | O envio é de cada PARTE, não da solicitação: `enviada_em` mora em
+    | `solicitacao_partes`. Consultar `enviada_em` direto aqui não
+    | reclama no SQLite — um identificador que não resolve para coluna
+    | vira texto literal, e `'enviada_em' IS NULL` é apenas falso. O
+    | contador zerava em silêncio; no MySQL seria "Unknown column".
+    |
+    | Por isso os dois recortes moram aqui, e não copiados na listagem e
+    | no painel: é o painel apontando para a tela com o mesmo número.
+    */
+
+    /**
+     * Com alguma parte ainda não enviada.
+     *
+     * Dado um professor, só a parte dele conta: a solicitação do colega
+     * em atraso não é pendência de quem já entregou.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeComPartePendente(Builder $query, ?User $professor = null): Builder
+    {
+        return $query->whereHas('partes', fn (Builder $parte) => $parte
+            ->whereNull('enviada_em')
+            ->when($professor !== null, fn (Builder $q) => $q->where('professor_id', $professor->getKey())));
+    }
+
+    /**
+     * Pendente com prazo vencido, ou entregue depois do combinado.
+     *
+     * Atraso é estado de prazo, não de fluxo — e nunca bloqueia o envio.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeAtrasadas(Builder $query, ?User $professor = null): Builder
+    {
+        return $query->whereHas('partes', fn (Builder $parte) => $parte
+            ->when($professor !== null, fn (Builder $q) => $q->where('professor_id', $professor->getKey()))
+            ->where(fn (Builder $sub) => $sub
+                ->where('enviada_em_atraso', true)
+                ->orWhere(fn (Builder $pendente) => $pendente
+                    ->whereNull('enviada_em')
+                    ->whereHas('solicitacao', fn (Builder $s) => $s->where('prazo', '<', now())))));
+    }
+
+    /**
+     * Com a parte do professor já enviada.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeComParteEnviada(Builder $query, ?User $professor = null): Builder
+    {
+        return $query->whereHas('partes', fn (Builder $parte) => $parte
+            ->whereNotNull('enviada_em')
+            ->when($professor !== null, fn (Builder $q) => $q->where('professor_id', $professor->getKey())));
+    }
+
     /**
      * Prazo vencido não bloqueia: só o encerramento ou o cancelamento
      * manual pelo PAEET fecham o envio.
