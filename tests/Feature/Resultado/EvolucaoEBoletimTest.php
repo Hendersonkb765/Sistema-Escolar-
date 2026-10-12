@@ -26,6 +26,7 @@ use App\Models\Prova;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
 use App\Support\GraficoDeEvolucao;
+use Illuminate\Support\Arr;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -270,10 +271,15 @@ it('diz quem acertou e quem errou uma habilidade', function () {
     // Quem mais precisa de ajuda primeiro.
     expect($alunos->pluck('aluno')->all())->toBe(['Caio Prado', 'Marina Alves'])
         ->and($alunos->first()['percentual'])->toBe(50.0)
-        ->and($alunos->first()['questoes'])->toBe([
+        // O id vai junto: na tela cada questão é um botão que a abre.
+        ->and(array_map(
+            fn (array $q) => Arr::except($q, 'id'),
+            $alunos->first()['questoes'],
+        ))->toBe([
             ['numero' => 1, 'prova' => 'Bimestral', 'acertou' => false],
             ['numero' => 2, 'prova' => 'Bimestral', 'acertou' => true],
         ])
+        ->and($alunos->first()['questoes'][0]['id'])->toBeInt()
         ->and($alunos->last()['percentual'])->toBe(100.0);
 });
 

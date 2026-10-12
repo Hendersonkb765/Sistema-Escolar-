@@ -120,8 +120,15 @@ beforeEach(function () {
         foreach ($this->prova->questoes()->get() as $questao) {
             $acertou = ($questao->numero + $indice) % 2 === 0;
 
+            // Com a letra marcada: é ela que faz a aba das alternativas
+            // desenhar barra, e barra tem atributo montado em PHP.
+            $erradas = array_values(array_diff($questao->letrasValidas(), [$questao->letra_correta]));
+
             $resultado->respostas()->create([
                 'prova_questao_id' => $questao->id, 'acertou' => $acertou,
+                'alternativa_marcada' => $acertou
+                    ? $questao->letra_correta
+                    : ($erradas[$indice % max(1, count($erradas))] ?? null),
                 'peso' => $questao->peso, 'pontuacao' => $acertou ? $questao->peso : 0,
             ]);
         }
@@ -178,6 +185,24 @@ it('não deixa diretiva crua nas telas com parâmetro', function () {
         expect(($this->sobras)($como($rota, $parametro)))->toBe([]);
     }
 });
+
+/*
+ * Uma aba por vez, e o painel da questão aberto: cada aba da análise é
+ * uma tela diferente, e nenhuma delas aparece na varredura sem
+ * parâmetro — ali só a primeira é desenhada.
+ */
+it('não deixa diretiva crua nas abas da análise', function (string $aba) {
+    $questao = $this->prova->questoes()->orderBy('numero')->first();
+
+    foreach ([[], ['questao' => $questao->id]] as $extra) {
+        $html = $this->actingAs($this->admin)
+            ->get(route('analises.index', ['aba' => $aba, ...$extra]))
+            ->assertOk()
+            ->getContent();
+
+        expect(($this->sobras)($html))->toBe([]);
+    }
+})->with(['turma', 'evolucao', 'habilidades', 'questoes', 'alternativas', 'alunos']);
 
 it('não deixa diretiva crua na tela do professor', function () {
     $solicitacao = SolicitacaoProva::query()->sole();

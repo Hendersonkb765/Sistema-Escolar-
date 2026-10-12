@@ -369,8 +369,17 @@
                                 <td class="hidden px-4 py-3 text-slate-600 md:table-cell dark:text-slate-300">
                                     {{ implode(', ', $item['disciplinas']) }}
                                 </td>
-                                <td class="hidden px-4 py-3 tabular-nums text-slate-500 lg:table-cell dark:text-slate-400">
-                                    {{ implode(', ', $item['questoes']) }}
+                                <td class="hidden px-4 py-3 lg:table-cell">
+                                    {{-- Cada número abre a questão: quem lê
+                                         "questões 1, 2" quer saber quais eram. --}}
+                                    <span class="flex flex-wrap gap-1">
+                                        @foreach ($item['questoes'] as $daHabilidade)
+                                            <x-ref-questao :id="$daHabilidade['id']"
+                                                           :numero="$daHabilidade['numero']"
+                                                           :prova="$daHabilidade['prova']"
+                                                           :aberta="$questaoAberta === $daHabilidade['id']"/>
+                                        @endforeach
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3 text-center tabular-nums text-slate-600 dark:text-slate-300">
                                     {{ $item['acertos'] }}/{{ $item['respostas'] }}
@@ -414,15 +423,19 @@
                                                                 <span class="block text-xs text-slate-400">RA {{ $aluno['ra'] }}</span>
                                                             </td>
                                                             <td class="py-1.5 pr-4">
-                                                                @foreach ($aluno['questoes'] as $questao)
-                                                                    <span @class([
-                                                                        'mr-1 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs',
-                                                                        'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' => $questao['acertou'],
-                                                                        'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300' => ! $questao['acertou'],
-                                                                    ]) title="{{ $questao['prova'] }}">
-                                                                        {{ $questao['acertou'] ? '✓' : '✗' }} {{ $questao['numero'] }}
-                                                                    </span>
-                                                                @endforeach
+                                                                {{-- O ✗ abre a questão com a resposta
+                                                                     deste aluno: é o que o professor
+                                                                     quer ver depois de encontrá-lo. --}}
+                                                                <span class="flex flex-wrap gap-1">
+                                                                    @foreach ($aluno['questoes'] as $questao)
+                                                                        <x-ref-questao :id="$questao['id']"
+                                                                                       :numero="$questao['numero']"
+                                                                                       :prova="$questao['prova']"
+                                                                                       :acertou="$questao['acertou']"
+                                                                                       :aluno="$aluno['aluno_id']"
+                                                                                       :aberta="$questaoAberta === $questao['id'] && $alunoAberto === $aluno['aluno_id']"/>
+                                                                    @endforeach
+                                                                </span>
                                                             </td>
                                                             <td class="py-1.5 pr-4 text-center tabular-nums text-slate-600 dark:text-slate-300">
                                                                 {{ $aluno['acertos'] }}/{{ $aluno['respostas'] }}
@@ -535,116 +548,6 @@
                 </div>
             </div>
 
-            @if ($questaoEmDetalhe)
-                <div class="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950/40">
-                    <div class="flex flex-wrap items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <p class="font-medium text-slate-900 dark:text-slate-100">
-                                Questão {{ $questaoEmDetalhe['numero'] }} · {{ $questaoEmDetalhe['prova'] }}
-                            </p>
-                            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                                {{ $questaoEmDetalhe['disciplina'] }} · {{ $questaoEmDetalhe['habilidade'] }}
-                                · peso {{ number_format($questaoEmDetalhe['peso'], 2, ',', '.') }}
-                            </p>
-                        </div>
-                        <x-botao variante="discreto" wire:click="verQuestao({{ $questaoEmDetalhe['id'] }})">
-                            Fechar
-                        </x-botao>
-                    </div>
-
-                    {{--
-                        A questão como o aluno a viu: enunciado, blocos de
-                        apoio e as alternativas, com a correta assinalada.
-                        Sai do snapshot da prova — uma análise de prova
-                        antiga mostra o que estava no papel naquele dia.
-                    --}}
-                    @if ($questaoCompleta)
-                        <div class="mt-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                            <x-questao-completa :questao="$questaoCompleta"/>
-                        </div>
-                    @else
-                        <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
-                            {{ $questaoEmDetalhe['enunciado'] }}
-                        </p>
-                    @endif
-
-                    <dl class="mt-4 grid gap-3 sm:grid-cols-4">
-                        @foreach ([
-                            ['Responderam', $questaoEmDetalhe['respostas'].' de '.$questaoEmDetalhe['alunos'].' aluno(s)'],
-                            ['Acertos', $questaoEmDetalhe['acertos'].' · erros '.$questaoEmDetalhe['erros']],
-                            ['Pontos', number_format($questaoEmDetalhe['pontos_obtidos'], 2, ',', '.').' de '.number_format($questaoEmDetalhe['pontos_maximos'], 2, ',', '.')],
-                            ['Aproveitamento', number_format($questaoEmDetalhe['percentual'], 1, ',', '.').'%'],
-                        ] as [$rotulo, $valor])
-                            <div>
-                                <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $rotulo }}</dt>
-                                <dd class="mt-0.5 text-sm tabular-nums text-slate-900 dark:text-slate-100">{{ $valor }}</dd>
-                            </div>
-                        @endforeach
-                    </dl>
-
-                    {{--
-                        Hipótese, e não conclusão. Muita gente errar uma
-                        questão não prova que o conteúdo não foi aprendido:
-                        pode ser enunciado ambíguo, alternativa mal escrita
-                        ou gabarito trocado. Quem decide é quem dá a aula.
-                    --}}
-                    @if ($questaoEmDetalhe['situacao'] === 'atencao')
-                        <x-alerta tipo="atencao" class="mt-4">
-                            <p class="font-medium">Vale investigar</p>
-                            <p class="mt-0.5">
-                                O aproveitamento ficou abaixo do critério de
-                                {{ number_format($criterios->criterioEsperado, 0) }}%. Isso pode ser dificuldade
-                                com “{{ $questaoEmDetalhe['habilidade'] }}”, mas também enunciado ambíguo,
-                                alternativa mal formulada ou gabarito trocado — a leitura é de quem deu a aula.
-                            </p>
-                        </x-alerta>
-                    @elseif ($questaoEmDetalhe['falta_evidencia'] !== '')
-                        <x-alerta tipo="info" class="mt-4">
-                            Evidências insuficientes para concluir:
-                            {{ $questaoEmDetalhe['falta_evidencia'] }}.
-                        </x-alerta>
-                    @endif
-
-                    {{--
-                        Quem errou primeiro: é com esses que o professor
-                        vai falar. A grade diz que a questão teve 33% de
-                        acerto; esta lista diz quem são os dois terços.
-                    --}}
-                    @if ($respostasDaQuestao->isNotEmpty())
-                        <div class="mt-4">
-                            <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Quem acertou e quem errou
-                            </p>
-                            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                @foreach ($respostasDaQuestao as $resposta)
-                                    <div class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                                        <span @class([
-                                            'font-semibold',
-                                            'text-emerald-600 dark:text-emerald-400' => $resposta['acertou'],
-                                            'text-rose-500' => ! $resposta['acertou'],
-                                        ])>{{ $resposta['acertou'] ? '✓' : '✗' }}</span>
-                                        <span class="min-w-0">
-                                            <span class="block truncate text-slate-900 dark:text-slate-100">{{ $resposta['aluno'] }}</span>
-                                            <span class="block text-xs text-slate-400">
-                                                RA {{ $resposta['ra'] }} ·
-                                                {{ $resposta['acertou']
-                                                    ? 'marcou '.$questaoCompleta?->letra_correta
-                                                    : 'marcou outra' }}
-                                            </span>
-                                        </span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <p class="mt-3 text-xs text-slate-400">
-                        De quem errou, a planilha do leitor não diz qual alternativa marcou — ela traz
-                        apenas acerto ou erro. Quem acertou marcou a correta, e isso está assinalado.
-                    </p>
-                </div>
-            @endif
-
             {{-- A grade é o atalho; a tabela é a consulta, e ela ordena. --}}
             <details class="border-t border-slate-200 px-4 py-3 sm:px-6 dark:border-slate-800">
                 <summary class="cursor-pointer text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
@@ -674,7 +577,9 @@
                             @foreach ($questoesOrdenadas as $item)
                                 <tr wire:key="linha-q-{{ $item['id'] }}">
                                     <td class="px-4 py-2 sm:px-6">
-                                        <span class="text-slate-900 dark:text-slate-100">{{ $item['numero'] }}</span>
+                                        <x-ref-questao :id="$item['id']" :numero="$item['numero']"
+                                                       :prova="$item['prova']"
+                                                       :aberta="$questaoAberta === $item['id']"/>
                                         <span class="block text-xs text-slate-400">{{ $item['prova'] }}</span>
                                     </td>
                                     <td class="px-4 py-2 text-slate-700 dark:text-slate-200">{{ $item['habilidade'] }}</td>
@@ -695,6 +600,190 @@
             </details>
         </x-cartao>
 
+        </div>
+    @endif
+
+
+    {{--
+        A alternativa que mais atraiu, questão a questão.
+
+        "A turma errou a 7" diz que houve erro. "Dois terços marcaram a C"
+        diz qual é o erro — e é a diferença entre repetir a aula e desfazer
+        a confusão. Por isso a lista vem ordenada pela errada que mais
+        atraiu, e não pelo aproveitamento: o que se procura aqui é a pista.
+
+        Só existe quando a planilha do leitor trouxe a letra marcada. Sem
+        ela o banco guarda `null`, e a tela diz isso em vez de desenhar uma
+        barra de dado nenhum.
+    --}}
+    @if ($aba === 'alternativas')
+        <div role="tabpanel" id="painel-alternativas" aria-labelledby="aba-alternativas" class="space-y-4">
+            @php
+                $comMarcacao = $porAlternativa->where('tem_marcacao', true)->values();
+                // Na ordem da prova: esta lista é inventário, não
+                // prioridade — não há nada aqui para priorizar.
+                $semMarcacao = $porAlternativa->where('tem_marcacao', false)
+                    ->sortBy([['prova', 'asc'], ['numero', 'asc']])
+                    ->values();
+            @endphp
+
+            @if ($porAlternativa->isEmpty())
+                <x-cartao>
+                    <x-vazio titulo="Nenhuma questão neste recorte"
+                             descricao="Escolha outra prova, outro bimestre ou outra disciplina no recorte acima."/>
+                </x-cartao>
+            @else
+                @if ($comMarcacao->isNotEmpty())
+                    <x-cartao titulo="Onde a turma errou">
+                        <x-slot:descricao>
+                            Da errada que mais atraiu para a que menos.
+                            Clique na questão, na letra ou na barra para ver o enunciado e as alternativas.
+                        </x-slot:descricao>
+
+                        <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($comMarcacao as $questao)
+                                @php
+                                    $distrator = $questao['distrator'];
+                                    $letras = array_map(fn (array $d) => $d['letra'], $questao['distratores']);
+                                @endphp
+
+                                <li wire:key="alt-{{ $questao['id'] }}" data-alternativas class="px-4 py-4 sm:px-6">
+                                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                                        <p class="flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
+                                            <x-ref-questao :id="$questao['id']" :numero="$questao['numero']"
+                                                           :prova="$questao['prova']"
+                                                           :aberta="$questaoAberta === $questao['id']">
+                                                Questão {{ $questao['numero'] }}
+                                            </x-ref-questao>
+                                            <span class="text-slate-500 dark:text-slate-400">
+                                                {{ $questao['prova'] }} · {{ $questao['disciplina'] }}
+                                            </span>
+                                        </p>
+                                        <p class="shrink-0 tabular-nums text-xs text-slate-500 dark:text-slate-400">
+                                            {{ $questao['acertos'] }}/{{ $questao['respostas'] }} acertos ·
+                                            {{ number_format($questao['percentual'], 0) }}%
+                                        </p>
+                                    </div>
+
+                                    <p class="mt-0.5 truncate text-xs text-slate-400">{{ $questao['habilidade'] }}</p>
+
+                                    {{--
+                                        Uma faixa por questão: cada pedaço é
+                                        uma alternativa, com a letra escrita
+                                        dentro. A cor é atalho, nunca o único
+                                        canal — a letra, o número e o `title`
+                                        dizem o mesmo em texto.
+                                    --}}
+                                    <div class="faixa-alternativas mt-2">
+                                        @foreach ($questao['alternativas'] as $alternativa)
+                                            @continue($alternativa['total'] === 0)
+
+                                            @php
+                                                $ehDistrator = in_array($alternativa['letra'], $letras, true);
+                                            @endphp
+
+                                            <button type="button"
+                                                    wire:click="verQuestao({{ $questao['id'] }})"
+                                                    style="flex: 1 1 {{ $alternativa['percentual'] }}%"
+                                                    @class([
+                                                        'segmento-alternativa',
+                                                        'correta' => $alternativa['correta'],
+                                                        'distrator' => $ehDistrator,
+                                                    ])
+                                                    title="{{ $alternativa['letra'] }}) {{ $alternativa['texto'] }} — {{ $alternativa['total'] }} aluno(s), {{ number_format($alternativa['percentual'], 0) }}%{{ $alternativa['correta'] ? ' (correta)' : '' }}">
+                                                {{ $alternativa['letra'] }}
+                                            </button>
+                                        @endforeach
+
+                                        @if ($questao['em_branco'] > 0)
+                                            <span class="segmento-alternativa branco"
+                                                  style="flex: 1 1 {{ round(100 * $questao['em_branco'] / max(1, $questao['respostas'])) }}%"
+                                                  title="{{ $questao['em_branco'] }} aluno(s) não marcaram nada">—</span>
+                                        @endif
+                                    </div>
+
+                                    {{--
+                                        A frase, e não só a barra: é ela que
+                                        diz o que fazer com o desenho.
+                                    --}}
+                                    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                        @if ($distrator === null)
+                                            Ninguém marcou alternativa errada nesta questão.
+                                        @else
+                                            @if (count($questao['distratores']) > 1)
+                                                Empatadas como mais marcadas entre as erradas:
+                                            @else
+                                                A mais marcada entre as erradas foi
+                                            @endif
+
+                                            @foreach ($questao['distratores'] as $errada)
+                                                <x-ref-questao :id="$questao['id']" :numero="$questao['numero']"
+                                                               :prova="$questao['prova']"
+                                                               :aberta="$questaoAberta === $questao['id']">
+                                                    {{ $errada['letra'] }}
+                                                </x-ref-questao>@if (! $loop->last), @endif
+                                            @endforeach
+
+                                            — {{ $distrator['total'] }} de {{ $questao['respostas'] }}
+                                            ({{ number_format($distrator['percentual'], 0) }}%).
+                                            <span class="text-slate-400">A correta era {{ $questao['letra_correta'] }}.</span>
+                                        @endif
+
+                                        @if ($questao['em_branco'] > 0)
+                                            <span class="text-slate-400">
+                                                {{ $questao['em_branco'] }} deixaram em branco.
+                                            </span>
+                                        @endif
+                                    </p>
+
+                                    {{--
+                                        Hipótese, e não conclusão: metade da
+                                        turma na mesma errada pode ser confusão
+                                        de conteúdo, enunciado ambíguo ou
+                                        gabarito trocado. Quem decide é quem
+                                        deu a aula.
+                                    --}}
+                                    @if ($distrator && $distrator['total'] > $questao['acertos'])
+                                        <p class="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                                            Mais alunos marcaram {{ $distrator['letra'] }} do que a correta.
+                                            Vale abrir a questão: pode ser confusão de conteúdo, enunciado
+                                            ambíguo ou gabarito trocado.
+                                        </p>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 sm:px-6 dark:border-slate-800 dark:text-slate-400">
+                            @foreach ([['correta', 'Correta'], ['distrator', 'Mais marcada entre as erradas'], ['', 'Outras'], ['branco', 'Em branco']] as [$classe, $rotulo])
+                                <span class="flex items-center gap-1.5">
+                                    <span class="amostra-alternativa {{ $classe }}"></span>{{ $rotulo }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </x-cartao>
+                @endif
+
+                @if ($semMarcacao->isNotEmpty())
+                    <x-cartao>
+                        <x-alerta tipo="info" titulo="Sem a letra marcada em {{ $semMarcacao->count() }} questão(ões)">
+                            A planilha destas foi importada no formato de acerto e erro, que traz
+                            apenas acerto ou erro — nunca a letra que o aluno marcou. Para estas
+                            questões não há distribuição que se possa mostrar, e inventá-la seria
+                            desenhar um dado que não existe. Se o leitor de folhas permitir, exporte
+                            com a resposta de cada aluno e importe de novo.
+                        </x-alerta>
+
+                        <div class="flex flex-wrap gap-1.5 px-4 pb-4 sm:px-6">
+                            @foreach ($semMarcacao as $questao)
+                                <x-ref-questao :id="$questao['id']" :numero="$questao['numero']"
+                                               :prova="$questao['prova']"
+                                               :aberta="$questaoAberta === $questao['id']"/>
+                            @endforeach
+                        </div>
+                    </x-cartao>
+                @endif
+            @endif
         </div>
     @endif
 
@@ -729,9 +818,12 @@
                             <tr class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                                 <th class="px-4 py-2 text-left sm:px-6">Aluno</th>
                                 @foreach ($acertoNominal['questoes'] as $questao)
-                                    <th class="px-1 py-2 text-center font-normal"
-                                        title="{{ $questao['disciplina'] }} · {{ $questao['habilidade'] ?: 'sem habilidade' }} · peso {{ number_format($questao['peso'], 2, ',', '.') }}">
-                                        {{ $questao['numero'] }}
+                                    {{-- O cabeçalho também é referência à questão:
+                                         quem lê a coluna 7 quer saber qual era. --}}
+                                    <th class="px-1 py-2 text-center font-normal">
+                                        <x-ref-questao :id="$questao['id']" :numero="$questao['numero']"
+                                                       :aberta="$questaoAberta === $questao['id'] && $alunoAberto === null"
+                                                       dica="{{ $questao['disciplina'] }} · {{ $questao['habilidade'] ?: 'sem habilidade' }} · peso {{ number_format($questao['peso'], 2, ',', '.') }}"/>
                                     </th>
                                 @endforeach
                                 <th class="px-4 py-2 text-center">Acertos</th>
@@ -778,44 +870,160 @@
                         </tbody>
                     </table>
                 </div>
-
-                {{--
-                    O ✗ sozinho não diz o que o aluno não soube. Clicar
-                    nele abre a questão como ela estava no papel, com a
-                    correta assinalada e — quando ele acertou — a marca de
-                    que foi essa que ele escolheu.
-                --}}
-                @if ($questaoCompleta && $alunoAberto)
-                    @php
-                        $linhaDoAluno = collect($acertoNominal['alunos'])->firstWhere('aluno_id', $alunoAberto);
-                        $acertouEsta = $linhaDoAluno['acertou'][$questaoCompleta->id] ?? null;
-                    @endphp
-
-                    <div class="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 dark:border-slate-800 dark:bg-slate-950/40">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="font-medium text-slate-900 dark:text-slate-100">
-                                    Questão {{ $questaoCompleta->numero }} · {{ $linhaDoAluno['aluno'] }}
-                                </p>
-                                <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
-                                    RA {{ $linhaDoAluno['ra'] }} ·
-                                    {{ $questaoCompleta->habilidade_snapshot ?: 'Sem habilidade informada' }}
-                                </p>
-                            </div>
-                            <x-botao variante="discreto"
-                                     wire:click="verRespostaDoAluno({{ $questaoCompleta->id }}, {{ $alunoAberto }})">
-                                Fechar
-                            </x-botao>
-                        </div>
-
-                        <div class="mt-3">
-                            <x-questao-completa :questao="$questaoCompleta"
-                                                :acertou="$acertouEsta"
-                                                :aluno="$linhaDoAluno['aluno']"/>
-                        </div>
-                    </div>
-                @endif
             @endif
         </x-cartao>
+        </div>
+    @endif
+
+    {{--
+        O painel da questão, único para a página inteira.
+
+        Antes cada aba tinha o seu, embutido no fim do cartão: clicar num
+        ✗ no alto de uma tabela de trinta linhas abria um bloco lá
+        embaixo, fora da vista, e não havia painel nenhum nas abas de
+        habilidade e de alternativa. Agora qualquer referência a uma
+        questão — o número, a letra, a barra, o ✓ de um aluno — abre o
+        mesmo painel por cima, e fechá-lo devolve a pessoa exatamente
+        onde ela estava.
+
+        Escape fecha, o clique fora fecha, e o foco vai para o painel.
+    --}}
+    @if ($questaoCompleta && $foco)
+        @php
+            $doAluno = $alunoAberto === null
+                ? null
+                : $foco['nominais']->firstWhere('aluno_id', $alunoAberto);
+        @endphp
+
+        <div class="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/60 backdrop-blur-sm sm:items-center sm:p-6"
+             role="dialog" aria-modal="true" aria-labelledby="titulo-da-questao"
+             wire:key="painel-{{ $foco['id'] }}-{{ $alunoAberto ?? 0 }}"
+             x-data
+             x-on:keydown.escape.window="$wire.fecharQuestao()"
+             x-on:click.self="$wire.fecharQuestao()">
+            <div class="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl dark:bg-slate-900"
+                 tabindex="-1" x-init="$el.focus()">
+                <div class="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-slate-800">
+                    <div class="min-w-0">
+                        <p id="titulo-da-questao" class="font-medium text-slate-900 dark:text-slate-100">
+                            Questão {{ $foco['numero'] }} · {{ $foco['prova'] }}
+                        </p>
+                        <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                            {{ $foco['disciplina'] }} · {{ $foco['habilidade'] }}
+                            · peso {{ number_format($foco['peso'], 2, ',', '.') }}
+                            @if ($doAluno)
+                                · {{ $doAluno['aluno'] }} (RA {{ $doAluno['ra'] }})
+                            @endif
+                        </p>
+                    </div>
+                    <x-botao variante="discreto" wire:click="fecharQuestao">Fechar</x-botao>
+                </div>
+
+                <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
+                    <x-questao-completa :questao="$questaoCompleta"
+                                        :alternativas="$foco['alternativas']"
+                                        :distratores="$foco['distratores']"
+                                        :acertou="$doAluno['acertou'] ?? null"
+                                        :marcada="$doAluno['marcada'] ?? null"
+                                        :aluno="$doAluno['aluno'] ?? null"/>
+
+                    @if ($foco['tem_marcacao'] && $foco['em_branco'] > 0)
+                        <p class="text-xs text-slate-400">
+                            {{ $foco['em_branco'] }} aluno(s) não marcaram nenhuma alternativa.
+                        </p>
+                    @endif
+
+                    <dl class="grid gap-3 sm:grid-cols-4">
+                        @foreach ([
+                            ['Responderam', $foco['respostas'].' de '.$foco['alunos'].' aluno(s)'],
+                            ['Acertos', $foco['acertos'].' · erros '.$foco['erros']],
+                            ['Pontos', number_format($foco['pontos_obtidos'], 2, ',', '.').' de '.number_format($foco['pontos_maximos'], 2, ',', '.')],
+                            ['Aproveitamento', number_format($foco['percentual'], 1, ',', '.').'%'],
+                        ] as [$rotulo, $valor])
+                            <div>
+                                <dt class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $rotulo }}</dt>
+                                <dd class="mt-0.5 text-sm tabular-nums text-slate-900 dark:text-slate-100">{{ $valor }}</dd>
+                            </div>
+                        @endforeach
+                    </dl>
+
+                    {{--
+                        Hipótese, e não conclusão. Muita gente errar uma
+                        questão não prova que o conteúdo não foi aprendido:
+                        pode ser enunciado ambíguo, alternativa mal escrita
+                        ou gabarito trocado. Quem decide é quem dá a aula.
+                    --}}
+                    @if ($foco['situacao'] === 'atencao')
+                        <x-alerta tipo="atencao">
+                            <p class="font-medium">Vale investigar</p>
+                            <p class="mt-0.5">
+                                O aproveitamento ficou abaixo do critério de
+                                {{ number_format($criterios->criterioEsperado, 0) }}%. Isso pode ser dificuldade
+                                com “{{ $foco['habilidade'] }}”, mas também enunciado ambíguo,
+                                alternativa mal formulada ou gabarito trocado — a leitura é de quem deu a aula.
+                            </p>
+                        </x-alerta>
+                    @elseif ($foco['falta_evidencia'] !== '')
+                        <x-alerta tipo="info">
+                            Evidências insuficientes para concluir: {{ $foco['falta_evidencia'] }}.
+                        </x-alerta>
+                    @endif
+
+                    {{--
+                        Quem errou primeiro: é com esses que o professor
+                        vai falar. A grade diz que a questão teve 33% de
+                        acerto; esta lista diz quem são os dois terços.
+                    --}}
+                    <div>
+                        <p class="mb-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Quem acertou e quem errou
+                        </p>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            @foreach ($foco['nominais'] as $resposta)
+                                <div @class([
+                                    'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm',
+                                    'border-marca-400 ring-1 ring-marca-400' => $resposta['aluno_id'] === $alunoAberto,
+                                    'border-slate-200 dark:border-slate-800' => $resposta['aluno_id'] !== $alunoAberto,
+                                ])>
+                                    <span @class([
+                                        'font-semibold',
+                                        'text-emerald-600 dark:text-emerald-400' => $resposta['acertou'],
+                                        'text-rose-500' => ! $resposta['acertou'],
+                                    ])>{{ $resposta['acertou'] ? '✓' : '✗' }}</span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-slate-900 dark:text-slate-100">{{ $resposta['aluno'] }}</span>
+                                        <span class="block text-xs text-slate-400">
+                                            {{--
+                                                Sem letra há dois casos, e eles não
+                                                são o mesmo: nesta importação o aluno
+                                                não marcou nada, ou a planilha nunca
+                                                soube dizer o que ele marcou.
+                                            --}}
+                                            RA {{ $resposta['ra'] }} ·
+                                            @if ($resposta['marcada'])
+                                                marcou {{ $resposta['marcada'] }}
+                                            @elseif ($foco['tem_marcacao'])
+                                                não marcou nada
+                                            @elseif ($resposta['acertou'])
+                                                marcou {{ $foco['letra_correta'] }}
+                                            @else
+                                                marcou outra
+                                            @endif
+                                        </span>
+                                    </span>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    @unless ($foco['tem_marcacao'])
+                        <p class="text-xs text-slate-400">
+                            De quem errou, esta planilha não diz qual alternativa marcou — ela traz
+                            apenas acerto ou erro. Quem acertou marcou a correta, e isso está assinalado.
+                        </p>
+                    @endunless
+                </div>
+            </div>
+        </div>
     @endif
 </div>

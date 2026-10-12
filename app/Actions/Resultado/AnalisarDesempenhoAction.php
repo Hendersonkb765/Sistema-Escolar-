@@ -46,9 +46,17 @@ class AnalisarDesempenhoAction
                     'disciplinas' => $respostas
                         ->map(fn (RespostaAluno $r) => $r->provaQuestao->disciplina->nome)
                         ->unique()->sort()->values()->all(),
+                    // Com o id junto: na tela cada número é um botão que
+                    // abre a questão, e o número sozinho não abre nada.
                     'questoes' => $respostas
-                        ->map(fn (RespostaAluno $r) => $r->provaQuestao->numero)
-                        ->unique()->sort()->values()->all(),
+                        ->map(fn (RespostaAluno $r) => [
+                            'id' => $r->provaQuestao->id,
+                            'numero' => $r->provaQuestao->numero,
+                            'prova' => $r->provaQuestao->prova->titulo,
+                        ])
+                        ->unique('id')
+                        ->sortBy('numero')
+                        ->values()->all(),
                     ...$this->contagem($respostas),
                 ];
             })
@@ -86,6 +94,213 @@ class AnalisarDesempenhoAction
             })
             ->sortBy('percentual')
             ->values();
+    }
+
+    /**
+     * Qual alternativa cada questão atraiu — e qual **errada** atraiu mais.
+     *
+     * "A turma errou a 7" diz que houve erro; "dois terços marcaram a C,
+     * que é o resultado de somar antes de multiplicar" diz qual é o erro.
+     * É a diferença entre repetir a aula e desfazer a confusão.
+     *
+     * Só existe quando a planilha trouxe a letra marcada. No formato de
+     * acerto e erro o banco guarda `null`, e inventar uma distribuição a
+     * partir disso seria desenhar um gráfico de dado nenhum — por isso a
+     * questão sai marcada como sem marcação, e a tela diz por quê.
+     *
+     * Ordenado pela errada que mais atraiu: é por onde se começa.
+     *
+     * @param  Collection<int, Prova>  $provas
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function porAlternativa(Collection $provas, User $leitor, ?int $disciplinaId = null): Collection
+    {
+        $respostas = $this->respostas($provas, $leitor, $disciplinaId, comAlternativas: true);
+
+        // O formato é decidido por prova, e não por questão: uma questão
+        // que a turma inteira deixou em branco também chega sem letra
+        // nenhuma, e as duas coisas não são a mesma.
+        $provasComMarcacao = $respostas
+            ->filter(fn (RespostaAluno $r) => $r->alternativa_marcada !== null)
+            ->map(fn (RespostaAluno $r) => $r->provaQuestao->prova_id)
+            ->unique()
+            ->flip();
+
+        return $respostas
+            ->groupBy('prova_questao_id')
+            ->map(function (Collection $daQuestao) use ($provasComMarcacao) {
+                $questao = $daQuestao->first()->provaQuestao;
+
+                return [
+                    'id' => $questao->id,
+                    'numero' => $questao->numero,
+                    'prova_id' => $questao->prova_id,
+                    'prova' => $questao->prova->titulo,
+                    'bimestre' => $questao->prova->bimestre,
+                    'disciplina' => $questao->disciplina->nome,
+                    'habilidade' => $questao->habilidade_snapshot ?: 'Sem habilidade informada',
+                    'enunciado' => $questao->enunciado_snapshot,
+                    ...$this->contagem($daQuestao, agregaQuestoes: false),
+                    ...$this->escolhas($daQuestao, $provasComMarcacao->has($questao->prova_id)),
+                ];
+            })
+            // A errada que mais atraiu primeiro; depois, a que teve mais
+            // erro. Questão sem marcação vai para o fim: não há o que ler.
+            ->sortByDesc(fn (array $item) => [
+                $item['tem_marcacao'] ? 1 : 0,
+                $item['distrator']['total'] ?? -1,
+                100 - $item['percentual'],
+            ])
+            ->values();
+    }
+
+    /**
+     * Tudo o que o painel de uma questão mostra, numa consulta só.
+     *
+     * O painel abre de qualquer aba — da grade, da lista por habilidade,
+     * do ✓ de um aluno —, e recalcular a análise inteira para desenhar
+     * uma questão seria percorrer o recorte à toa.
+     *
+     * Devolve `null` quando a questão está fora do alcance do leitor: o
+     * escopo é o mesmo das outras leituras, e um id na URL não abre
+     * questão de outro Eixo nem questão de colega.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function questaoEmFoco(ProvaQuestao $questao, User $leitor): ?array
+    {
+        $visivel = Prova::query()
+            ->visivelPara($leitor)
+            ->whereKey($questao->prova_id)
+            ->exists();
+
+        if (! $visivel) {
+            return null;
+        }
+
+        if (! $leitor->ehGestao() && (int) $questao->professor_id !== $leitor->getKey()) {
+            return null;
+        }
+
+        $respostas = RespostaAluno::query()
+            ->where('prova_questao_id', $questao->getKey())
+            ->with(['resultado:id,aluno_id', 'resultado.aluno:id,nome,ra'])
+            ->get();
+
+        if ($respostas->isEmpty()) {
+            return null;
+        }
+
+        $questao->loadMissing(['prova:id,titulo,bimestre', 'disciplina:id,nome']);
+
+        // Aqui a pergunta é da questão, e não da prova: é a única
+        // resposta que o painel tem à mão.
+        $temMarcacao = $respostas->contains(fn (RespostaAluno $r) => $r->alternativa_marcada !== null);
+
+        return [
+            'id' => $questao->id,
+            'numero' => $questao->numero,
+            'prova_id' => $questao->prova_id,
+            'prova' => $questao->prova->titulo,
+            'bimestre' => $questao->prova->bimestre,
+            'disciplina' => $questao->disciplina->nome,
+            'habilidade' => $questao->habilidade_snapshot ?: 'Sem habilidade informada',
+            'peso' => (float) $questao->peso,
+            'enunciado' => $questao->enunciado_snapshot,
+            ...$this->contagem($respostas, agregaQuestoes: false),
+            ...$this->escolhas($respostas, $temMarcacao, $questao),
+            'nominais' => $respostas
+                ->map(fn (RespostaAluno $r) => [
+                    'aluno_id' => $r->resultado->aluno_id,
+                    'aluno' => $r->resultado->aluno->nome,
+                    'ra' => $r->resultado->aluno->ra,
+                    'acertou' => (bool) $r->acertou,
+                    'marcada' => $r->alternativa_marcada,
+                ])
+                // Quem errou primeiro: é com esses que o professor vai falar.
+                ->sortBy([['acertou', 'asc'], ['aluno', 'asc']])
+                ->values(),
+        ];
+    }
+
+    /**
+     * A contagem por alternativa de um conjunto de respostas da **mesma**
+     * questão.
+     *
+     * `em_branco` é quem não marcou nada tendo a folha sido lida por
+     * letra; `tem_marcacao` falso é a planilha que não trouxe letra
+     * alguma. Os dois chegam como `null` no banco, e separá-los é o que
+     * evita dizer "12 alunos deixaram em branco" sobre uma importação
+     * que nunca soube quem marcou o quê.
+     *
+     * @param  Collection<int, RespostaAluno>  $respostas
+     * @return array<string, mixed>
+     */
+    protected function escolhas(Collection $respostas, bool $temMarcacao, ?ProvaQuestao $questao = null): array
+    {
+        $questao ??= $respostas->first()->provaQuestao;
+
+        $correta = mb_strtoupper((string) $questao->letra_correta);
+        $total = $respostas->count();
+
+        $contagem = [];
+
+        foreach ($questao->alternativas_snapshot ?? [] as $alternativa) {
+            $contagem[mb_strtoupper((string) $alternativa['letra'])] = 0;
+        }
+
+        $emBranco = 0;
+
+        foreach ($respostas as $resposta) {
+            $letra = $resposta->alternativa_marcada === null
+                ? null
+                : mb_strtoupper($resposta->alternativa_marcada);
+
+            if ($letra === null) {
+                $emBranco++;
+
+                continue;
+            }
+
+            // Letra que não existe entre as alternativas: leitura errada
+            // da folha. A conferência já avisou; aqui ela entra assim
+            // mesmo, para a soma fechar com o total de respostas.
+            $contagem[$letra] = ($contagem[$letra] ?? 0) + 1;
+        }
+
+        $alternativas = [];
+
+        foreach ($questao->alternativas_snapshot ?? [] as $alternativa) {
+            $letra = mb_strtoupper((string) $alternativa['letra']);
+
+            $alternativas[] = [
+                'letra' => $alternativa['letra'],
+                'texto' => $alternativa['texto'] ?? '',
+                'correta' => $letra === $correta,
+                'total' => $temMarcacao ? $contagem[$letra] : 0,
+                'percentual' => $temMarcacao && $total > 0
+                    ? round(100 * $contagem[$letra] / $total, 1)
+                    : 0.0,
+            ];
+        }
+
+        $escolhidas = collect($alternativas)->where('total', '>', 0);
+        $erradas = $escolhidas->where('correta', false);
+        $maiorErrada = (int) $erradas->max('total');
+
+        $distratores = $erradas->where('total', $maiorErrada)->values();
+
+        return [
+            'letra_correta' => $questao->letra_correta,
+            'tem_marcacao' => $temMarcacao,
+            'em_branco' => $temMarcacao ? $emBranco : 0,
+            'alternativas' => $alternativas,
+            'mais_escolhida' => $escolhidas->sortByDesc('total')->first()['letra'] ?? null,
+            // A errada que mais atraiu. Empate não se desempata no
+            // chute: as duas vão, e a tela mostra as duas.
+            'distrator' => $distratores->first(),
+            'distratores' => $distratores->all(),
+        ];
     }
 
     /**
@@ -294,8 +509,12 @@ class AnalisarDesempenhoAction
      * @param  Collection<int, Prova>  $provas
      * @return Collection<int, RespostaAluno>
      */
-    protected function respostas(Collection $provas, User $leitor, ?int $disciplinaId): Collection
-    {
+    protected function respostas(
+        Collection $provas,
+        User $leitor,
+        ?int $disciplinaId,
+        bool $comAlternativas = false,
+    ): Collection {
         if ($provas->isEmpty()) {
             return collect();
         }
@@ -317,9 +536,15 @@ class AnalisarDesempenhoAction
                 $disciplinaId !== null,
                 fn ($q) => $q->whereHas('provaQuestao', fn ($p) => $p->where('disciplina_id', $disciplinaId))
             )
-            ->with(['provaQuestao:id,prova_id,numero,disciplina_id,habilidade_snapshot,peso,enunciado_snapshot,professor_id',
+            ->with([
+                // O snapshot das alternativas é um JSON por questão, e
+                // só a leitura por alternativa precisa dele: fora dela,
+                // carregá-lo seria arrastar a prova inteira por engano.
+                'provaQuestao:id,prova_id,numero,disciplina_id,habilidade_snapshot,peso,enunciado_snapshot,professor_id'
+                    .($comAlternativas ? ',letra_correta,alternativas_snapshot' : ''),
                 'provaQuestao.disciplina:id,nome', 'provaQuestao.prova:id,titulo,turma_id,bimestre',
-                'resultado:id,prova_id,aluno_id', 'resultado.aluno:id,nome,ra'])
+                'resultado:id,prova_id,aluno_id', 'resultado.aluno:id,nome,ra',
+            ])
             ->get();
     }
 
@@ -428,11 +653,13 @@ class AnalisarDesempenhoAction
                 $aluno = $respostas->first()->resultado->aluno;
 
                 return [
+                    'aluno_id' => $aluno->getKey(),
                     'aluno' => $aluno->nome,
                     'ra' => $aluno->ra,
                     'questoes' => $respostas
                         ->sortBy(fn (RespostaAluno $r) => $r->provaQuestao->numero)
                         ->map(fn (RespostaAluno $r) => [
+                            'id' => $r->provaQuestao->id,
                             'numero' => $r->provaQuestao->numero,
                             'prova' => $r->provaQuestao->prova->titulo,
                             'acertou' => (bool) $r->acertou,
@@ -479,9 +706,12 @@ class AnalisarDesempenhoAction
             ->with(['resultado:id,aluno_id', 'resultado.aluno:id,nome,ra'])
             ->get()
             ->map(fn (RespostaAluno $resposta) => [
+                'aluno_id' => $resposta->resultado->aluno_id,
                 'aluno' => $resposta->resultado->aluno->nome,
                 'ra' => $resposta->resultado->aluno->ra,
                 'acertou' => (bool) $resposta->acertou,
+                // Nula quando a planilha veio no formato de acerto e erro.
+                'marcada' => $resposta->alternativa_marcada,
             ])
             // Quem errou primeiro: é com esses que o professor vai falar.
             ->sortBy([['acertou', 'asc'], ['aluno', 'asc']])

@@ -236,3 +236,188 @@
         .celula-questao { border: 1px solid ButtonBorder; }
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Referência clicável a uma questão
+|--------------------------------------------------------------------------
+|
+| Um número de questão escrito no meio de uma tabela não parece clicável,
+| e quem não descobre que é não abre a questão nunca. O sublinhado
+| pontilhado é a convenção de "há mais aqui dentro" — e o alvo tem altura
+| de toque, não de texto.
+*/
+@layer components {
+    .ref-questao {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        min-height: 1.5rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        text-decoration: underline dotted;
+        text-underline-offset: 2px;
+        background: theme('colors.slate.100');
+        color: theme('colors.slate.700');
+        transition: background-color 120ms, outline-color 120ms;
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+
+    .dark .ref-questao {
+        background: theme('colors.slate.800');
+        color: theme('colors.slate.200');
+    }
+
+    .ref-questao:hover { background: theme('colors.slate.200'); }
+    .dark .ref-questao:hover { background: theme('colors.slate.700'); }
+
+    .ref-questao:focus-visible,
+    .ref-questao.aberta { outline-color: theme('colors.marca.500'); }
+
+    .ref-questao.acertou {
+        background: theme('colors.emerald.100');
+        color: theme('colors.emerald.800');
+    }
+
+    .dark .ref-questao.acertou {
+        background: theme('colors.emerald.900 / 40%');
+        color: theme('colors.emerald.300');
+    }
+
+    .ref-questao.errou {
+        background: theme('colors.rose.100');
+        color: theme('colors.rose.800');
+    }
+
+    .dark .ref-questao.errou {
+        background: theme('colors.rose.900 / 40%');
+        color: theme('colors.rose.300');
+    }
+
+    @media (forced-colors: active) {
+        .ref-questao { border: 1px solid ButtonBorder; }
+    }
+}
+
+/*
+|--------------------------------------------------------------------------
+| Distribuição das alternativas
+|--------------------------------------------------------------------------
+|
+| A barra diz quanto; a letra e o número dizem o quê e quantos. Verde é a
+| correta, âmbar a errada que mais atraiu — e âmbar, não vermelho: a
+| alternativa mais marcada não é um defeito, é uma pista.
+*/
+@layer components {
+    .barra-alternativa {
+        position: relative;
+        display: block;
+        height: 0.5rem;
+        border-radius: 999px;
+        background: theme('colors.slate.200');
+        overflow: hidden;
+    }
+
+    .dark .barra-alternativa { background: theme('colors.slate.800'); }
+
+    .barra-alternativa > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: theme('colors.slate.400');
+    }
+
+    .barra-alternativa.correta > span { background: theme('colors.emerald.500'); }
+    .barra-alternativa.distrator > span { background: theme('colors.amber.500'); }
+
+    /*
+        A faixa da lista: uma questão por linha, cada pedaço uma
+        alternativa. A largura é a proporção; a letra escrita dentro é o
+        segundo canal, e o `title` é o terceiro. Pedaço com zero aluno não
+        é desenhado — o que não foi marcado não ocupa espaço.
+    */
+    .faixa-alternativas {
+        display: flex;
+        width: 100%;
+        height: 1.5rem;
+        border-radius: 0.375rem;
+        overflow: hidden;
+        background: theme('colors.slate.100');
+    }
+
+    .dark .faixa-alternativas { background: theme('colors.slate.800'); }
+
+    .segmento-alternativa {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.5rem;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        background: theme('colors.slate.300');
+        color: theme('colors.slate.800');
+        outline: 2px solid transparent;
+        outline-offset: -2px;
+    }
+
+    .dark .segmento-alternativa {
+        background: theme('colors.slate.600');
+        color: theme('colors.slate.100');
+    }
+
+    .segmento-alternativa + .segmento-alternativa { border-left: 1px solid rgb(255 255 255 / 0.6); }
+    .dark .segmento-alternativa + .segmento-alternativa { border-left-color: rgb(15 23 42 / 0.6); }
+
+    .segmento-alternativa:focus-visible { outline-color: theme('colors.marca.600'); }
+
+    .segmento-alternativa.correta { background: theme('colors.emerald.500'); color: #042f2e; }
+    .segmento-alternativa.distrator { background: theme('colors.amber.400'); color: #451a03; }
+
+    /* Em branco não é uma escolha: a hachura evita lê-lo como alternativa. */
+    .segmento-alternativa.branco {
+        background: repeating-linear-gradient(
+            45deg,
+            theme('colors.slate.200') 0 4px,
+            theme('colors.slate.300') 4px 8px
+        );
+        color: theme('colors.slate.600');
+    }
+
+    .dark .segmento-alternativa.branco {
+        background: repeating-linear-gradient(
+            45deg,
+            theme('colors.slate.700') 0 4px,
+            theme('colors.slate.600') 4px 8px
+        );
+        color: theme('colors.slate.200');
+    }
+
+    .amostra-alternativa {
+        display: inline-block;
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 0.25rem;
+        background: theme('colors.slate.300');
+    }
+
+    .dark .amostra-alternativa { background: theme('colors.slate.600'); }
+
+    .amostra-alternativa.correta { background: theme('colors.emerald.500'); }
+    .amostra-alternativa.distrator { background: theme('colors.amber.400'); }
+
+    .amostra-alternativa.branco {
+        background: repeating-linear-gradient(
+            45deg,
+            theme('colors.slate.200') 0 3px,
+            theme('colors.slate.400') 3px 6px
+        );
+    }
+
+    @media (forced-colors: active) {
+        .segmento-alternativa { border: 1px solid ButtonBorder; }
+        .barra-alternativa { border: 1px solid CanvasText; }
+    }
+}

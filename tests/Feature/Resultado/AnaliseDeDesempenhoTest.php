@@ -55,9 +55,14 @@ beforeEach(function () {
      * Monta uma prova cujas questões de Lógica compartilham a mesma
      * habilidade, e grava um resultado por aluno.
      *
+     * `$marcadas` é a planilha que traz a letra: quando vem, o acerto
+     * deixa de ser dado e passa a sair da conferência contra o gabarito —
+     * exatamente como na importação. A correta é sempre "A".
+     *
      * @param  array<int, array<int, bool>>  $acertos  índice do aluno => acertos por número
+     * @param  array<int, array<int, ?string>>|null  $marcadas  índice do aluno => letra por número
      */
-    $this->provaCom = function (Bimestre $bimestre, string $titulo, array $acertos) {
+    $this->provaCom = function (Bimestre $bimestre, string $titulo, array $acertos, ?array $marcadas = null) {
         $solicitacao = solicitacaoCom($this->paeet, $this->turma, [
             ['disciplina' => $this->disciplinas['Lógica'], 'professor' => $this->profLogica, 'questoes' => 2],
             ['disciplina' => $this->disciplinas['Redes'], 'professor' => $this->profRedes, 'questoes' => 1],
@@ -103,10 +108,15 @@ beforeEach(function () {
             ]);
 
             foreach ($questoes as $questao) {
-                $acertou = $acertos[$indice][$questao->numero] ?? false;
+                $letra = $marcadas === null ? null : ($marcadas[$indice][$questao->numero] ?? null);
+
+                $acertou = $marcadas === null
+                    ? ($acertos[$indice][$questao->numero] ?? false)
+                    : $letra === $questao->letra_correta;
 
                 $resultado->respostas()->create([
                     'prova_questao_id' => $questao->id, 'acertou' => $acertou,
+                    'alternativa_marcada' => $letra,
                     'peso' => $questao->peso, 'pontuacao' => $acertou ? $questao->peso : 0,
                 ]);
             }
@@ -131,7 +141,7 @@ it('agrupa as questões que avaliam a mesma habilidade', function () {
 
     $repeticao = $linhas->firstWhere('habilidade', 'Interpretar estruturas de repetição');
 
-    expect($repeticao['questoes'])->toBe([1, 2])
+    expect(array_column($repeticao['questoes'], 'numero'))->toBe([1, 2])
         ->and($repeticao['respostas'])->toBe(4)
         ->and($repeticao['acertos'])->toBe(2)
         ->and($repeticao['percentual'])->toBe(50.0)
@@ -773,7 +783,7 @@ it('abre e fecha o detalhe de uma questão', function () {
         ->call('verQuestao', $questao->id)
         ->assertSet('questaoAberta', $questao->id);
 
-    expect($componente->viewData('questaoEmDetalhe')['numero'])->toBe(2);
+    expect($componente->viewData('foco')['numero'])->toBe(2);
 
     $componente->call('verQuestao', $questao->id)->assertSet('questaoAberta', null);
 });
@@ -1130,4 +1140,305 @@ it('não abre ao professor a questão que não é dele', function () {
         ->call('verQuestao', $deRedes->id);
 
     expect($componente->viewData('questaoCompleta'))->toBeNull();
+});
+
+/*
+|--------------------------------------------------------------------------
+| A alternativa mais escolhida
+|--------------------------------------------------------------------------
+|
+| "A turma errou a 7" diz que houve erro; "três de cinco marcaram a C"
+| diz qual é o erro. A leitura só existe quando a planilha trouxe a letra
+| marcada — e quando não trouxe, a tela diz isso em vez de desenhar uma
+| barra de dado nenhum.
+*/
+
+/** Cinco alunos: com dois, nenhuma distribuição se distingue de outra. */
+function cincoAlunos($caso): void
+{
+    $caso->alunos = $caso->alunos->concat(
+        collect(['Bruno Dias', 'Elisa Moraes', 'Nair Fontes'])->map(
+            fn (string $nome, int $i) => Aluno::factory()->naTurma($caso->turma)
+                ->create(['nome' => $nome, 'ra' => '200'.$i])
+        )
+    );
+}
+
+/**
+ * Cinco alunos e três questões, montadas para separar as duas leituras.
+ * A correta é sempre a A.
+ *
+ *   1 — 1 acerto (20%), erradas espalhadas: B=2, C=1, D=1
+ *   2 — 2 acertos (40%), erradas concentradas: C=3
+ *   3 — 3 acertos (60%), B=1 e um em branco
+ *
+ * A 1 é a de pior aproveitamento; a 2 é a que concentra erro na mesma
+ * alternativa. É a 2 que esta leitura procura, e a ordem tem de dizer
+ * isso — senão ela é só a grade de acerto outra vez.
+ */
+function provaComLetras($caso): Prova
+{
+    cincoAlunos($caso);
+
+    return ($caso->provaCom)(Bimestre::Segundo, 'Bimestral', [], marcadas: [
+        0 => [1 => 'B', 2 => 'A', 3 => 'A'],
+        1 => [1 => 'B', 2 => 'C', 3 => 'B'],
+        2 => [1 => 'C', 2 => 'C', 3 => 'A'],
+        3 => [1 => 'D', 2 => 'C', 3 => 'A'],
+        4 => [1 => 'A', 2 => 'A', 3 => null],
+    ]);
+}
+
+it('conta quantos marcaram cada alternativa', function () {
+    provaComLetras($this);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    $segunda = $linhas->firstWhere('numero', 2);
+
+    expect($segunda['tem_marcacao'])->toBeTrue()
+        ->and($segunda['respostas'])->toBe(5)
+        ->and($segunda['acertos'])->toBe(2)
+        ->and(collect($segunda['alternativas'])->pluck('total', 'letra')->all())
+        ->toBe(['A' => 2, 'B' => 0, 'C' => 3, 'D' => 0]);
+});
+
+it('aponta a errada que mais atraiu, e não a mais marcada de todas', function () {
+    provaComLetras($this);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    $segunda = $linhas->firstWhere('numero', 2);
+    $terceira = $linhas->firstWhere('numero', 3);
+
+    // Na 3 a mais marcada é a correta; o distrator é outro.
+    expect($terceira['mais_escolhida'])->toBe('A')
+        ->and($terceira['distrator']['letra'])->toBe('B')
+        ->and($segunda['distrator']['letra'])->toBe('C')
+        ->and($segunda['distrator']['total'])->toBe(3)
+        ->and($segunda['distrator']['percentual'])->toBe(60.0);
+});
+
+/*
+ * Pela errada que mais atraiu, e não pelo aproveitamento: ordenada por
+ * acerto, esta lista seria a grade de questões de novo. A 1 tem o pior
+ * aproveitamento e vem depois da 2, que concentra erro na mesma letra.
+ */
+it('começa pela questão cuja errada atraiu mais gente', function () {
+    provaComLetras($this);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    expect($linhas->pluck('numero')->all())->toBe([2, 1, 3])
+        ->and($linhas->firstWhere('numero', 1)['percentual'])
+        ->toBeLessThan($linhas->first()['percentual']);
+});
+
+it('conta em branco à parte das alternativas', function () {
+    provaComLetras($this);
+
+    $terceira = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->paeet)
+        ->firstWhere('numero', 3);
+
+    expect($terceira['em_branco'])->toBe(1)
+        ->and(collect($terceira['alternativas'])->sum('total'))->toBe(4);
+});
+
+/*
+ * O que o sistema não sabe, ele não desenha. Uma planilha no formato de
+ * acerto e erro grava `null` em todas as marcações — e isso chega igual
+ * a "o aluno deixou em branco". Separar os dois é o que evita dizer "5
+ * alunos não marcaram nada" sobre uma importação que nunca soube quem
+ * marcou o quê.
+ */
+it('não inventa distribuição para a prova importada sem as letras', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->paeet);
+
+    expect($linhas)->toHaveCount(3)
+        ->and($linhas->pluck('tem_marcacao')->unique()->all())->toBe([false])
+        ->and($linhas->pluck('distrator')->filter()->all())->toBeEmpty()
+        ->and($linhas->pluck('em_branco')->unique()->all())->toBe([0]);
+});
+
+it('mostra na tela a letra que mais atraiu, com a correta ao lado', function () {
+    provaComLetras($this);
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'alternativas')
+        ->assertSee('A mais marcada entre as erradas')
+        ->assertSee('3 de 5')
+        ->assertSee('A correta era A')
+        ->html();
+
+    // A questão que mais atraiu errada vem primeiro na lista.
+    preg_match_all('/<li[^>]*data-alternativas.*?<\/li>/s', $html, $itens);
+
+    expect($itens[0])->toHaveCount(3)
+        ->and(strip_tags($itens[0][0]))->toContain('Questão 2');
+});
+
+it('avisa, em vez de desenhar, quando a planilha não trouxe as letras', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'alternativas')
+        ->assertSee('Sem a letra marcada em 3 questão(ões)')
+        ->assertSee('apenas acerto ou erro')
+        ->assertDontSee('A mais marcada entre as erradas');
+});
+
+/*
+|--------------------------------------------------------------------------
+| A questão abre de qualquer lugar
+|--------------------------------------------------------------------------
+|
+| Toda vez que a tela escreve "questão 7", o próximo pensamento de quem lê
+| é "qual era mesmo a 7?". O painel é um só, e abre da aba em que a pessoa
+| estiver — sem levá-la para outra.
+*/
+
+it('abre a questão a partir da lista por habilidade', function () {
+    provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'habilidades')
+        ->call('verQuestao', $questao->id)
+        ->assertSet('aba', 'habilidades')
+        ->assertSee('Enunciado da questão 2')
+        ->assertSee('Quem acertou e quem errou');
+});
+
+it('abre a questão a partir da aba das alternativas', function () {
+    provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('abrir', 'alternativas')
+        ->call('verQuestao', $questao->id)
+        ->assertSet('aba', 'alternativas')
+        ->assertSee('Enunciado da questão 2')
+        // A contagem por alternativa aparece junto do texto de cada uma.
+        ->assertSee('Alternativa C');
+});
+
+it('diz qual letra o aluno marcou quando a planilha trouxe', function () {
+    $prova = provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+    $caio = Aluno::query()->where('nome', 'Caio Prado')->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('provasEscolhidas', [(string) $prova->id])
+        ->call('abrir', 'alunos')
+        ->call('verRespostaDoAluno', $questao->id, $caio->id)
+        ->assertSee('Caio Prado marcou')
+        ->assertSee('marcou C');
+});
+
+it('fecha o painel da questão', function () {
+    provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $questao->id)
+        ->assertSet('questaoAberta', $questao->id)
+        ->call('fecharQuestao')
+        ->assertSet('questaoAberta', null)
+        ->assertSet('alunoAberto', null);
+});
+
+it('não devolve o foco de questão fora do escopo de quem olha', function () {
+    provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 1)->sole();
+    $intruso = paeet(Eixo::factory()->create(['codigo' => 'OUT']));
+
+    expect(app(AnalisarDesempenhoAction::class)->questaoEmFoco($questao, $intruso))->toBeNull()
+        ->and(app(AnalisarDesempenhoAction::class)->questaoEmFoco($questao, $this->profRedes))->toBeNull();
+});
+
+/*
+ * "Não marcou nada" e "não sabemos o que marcou" chegam iguais ao banco,
+ * como `null`, e dizer um pelo outro é inventar. O que separa os dois é
+ * a planilha: se ela trouxe letra para alguém, quem está sem letra
+ * deixou em branco.
+ */
+it('separa quem deixou em branco de quem a planilha não soube ler', function () {
+    provaComLetras($this);
+
+    $terceira = ProvaQuestao::query()->where('numero', 3)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $terceira->id)
+        ->assertSee('não marcou nada')
+        ->assertSee('não marcaram nenhuma alternativa')
+        ->assertDontSee('marcou outra');
+});
+
+it('continua dizendo “marcou outra” quando a planilha não trouxe letra', function () {
+    ($this->provaCom)(Bimestre::Segundo, 'Bimestral', [
+        0 => [1 => true, 2 => false, 3 => true],
+        1 => [1 => true, 2 => false, 3 => true],
+    ]);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->call('verQuestao', $questao->id)
+        ->assertSee('marcou outra')
+        ->assertDontSee('não marcou nada');
+});
+
+it('abre a questão pelo cabeçalho da grade nominal, sem aluno nenhum', function () {
+    $prova = provaComLetras($this);
+
+    $questao = ProvaQuestao::query()->where('numero', 2)->sole();
+    $caio = Aluno::query()->where('nome', 'Caio Prado')->sole();
+
+    Livewire::actingAs($this->paeet)
+        ->test(Desempenho::class)
+        ->set('provasEscolhidas', [(string) $prova->id])
+        ->call('abrir', 'alunos')
+        ->call('verRespostaDoAluno', $questao->id, $caio->id)
+        ->assertSet('alunoAberto', $caio->id)
+        // O cabeçalho é a leitura da turma: tira o aluno do foco.
+        ->call('verQuestao', $questao->id)
+        ->assertSet('questaoAberta', $questao->id)
+        ->assertSet('alunoAberto', null)
+        ->assertDontSee('Caio Prado marcou');
+});
+
+it('não mostra ao professor a alternativa das questões que não são dele', function () {
+    provaComLetras($this);
+
+    $linhas = app(AnalisarDesempenhoAction::class)
+        ->porAlternativa(Prova::whereHas('resultados')->get(), $this->profRedes);
+
+    // A 3 é de Redes; as outras duas, de Lógica.
+    expect($linhas->pluck('numero')->all())->toBe([3]);
 });

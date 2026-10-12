@@ -84,6 +84,7 @@ class Desempenho extends Component
         'evolucao' => 'Evolução',
         'habilidades' => 'Habilidades',
         'questoes' => 'Questões',
+        'alternativas' => 'Alternativas',
         'alunos' => 'Alunos',
     ];
 
@@ -224,9 +225,21 @@ class Desempenho extends Component
         $this->aba = array_key_exists($aba, self::ABAS) ? $aba : 'turma';
     }
 
-    /** Abre e fecha o detalhe de uma questão da grade. */
+    /** Abre e fecha o painel de uma questão. */
     public function verQuestao(int $id): void
     {
+        /*
+         * Aberta com a resposta de um aluno, o clique numa referência da
+         * turma tira o aluno do foco em vez de fechar: quem clica no
+         * cabeçalho da coluna quer a leitura da turma, não fechar o que
+         * acabou de abrir.
+         */
+        if ($this->questaoAberta === $id && $this->alunoAberto !== null) {
+            $this->alunoAberto = null;
+
+            return;
+        }
+
         $this->questaoAberta = $this->questaoAberta === $id ? null : $id;
         $this->alunoAberto = null;
     }
@@ -264,6 +277,13 @@ class Desempenho extends Component
         return $questao;
     }
 
+    /** Fecha o painel da questão, venha o clique de onde vier. */
+    public function fecharQuestao(): void
+    {
+        $this->questaoAberta = null;
+        $this->alunoAberto = null;
+    }
+
     public function ordenarQuestoes(string $por): void
     {
         $this->ordemDasQuestoes = in_array($por, ['erro', 'numero', 'habilidade'], true)
@@ -292,14 +312,6 @@ class Desempenho extends Component
             ])
             ->values()
             ->all();
-    }
-
-    /** @param  ColecaoSimples<int, array<string, mixed>>  $porQuestao */
-    public function questaoEmDetalhe(ColecaoSimples $porQuestao): ?array
-    {
-        return $this->questaoAberta === null
-            ? null
-            : $porQuestao->firstWhere('id', $this->questaoAberta);
     }
 
     public function verAlunos(string $habilidade): void
@@ -363,12 +375,26 @@ class Desempenho extends Component
             'evolucao' => $this->dadosDaEvolucao($analisar, $disciplina, $leitor),
             'habilidades' => $this->dadosDasHabilidades($analisar, $provas, $disciplina, $leitor),
             'questoes' => $this->dadosDasQuestoes($analisar, $provas, $disciplina, $leitor),
+            'alternativas' => ['porAlternativa' => $analisar->porAlternativa($provas, $leitor, $disciplina)],
             'alunos' => $this->dadosDosAlunos($analisar, $disciplina, $leitor),
             default => [],
         };
 
+        /*
+         * O painel da questão fica fora do `match`: ele abre de qualquer
+         * aba — do número na lista por habilidade, do ✓ de um aluno, da
+         * barra de uma alternativa — e quem clica num número quer ver a
+         * questão sem ser levado para outro lugar da página.
+         */
+        $completa = $this->questaoCompleta();
+        $foco = $completa === null ? null : $analisar->questaoEmFoco($completa, $leitor);
+
         return view('analises.desempenho', [
             ...$dados,
+            'questaoCompleta' => $completa,
+            'foco' => $foco,
+            'alunoAberto' => $this->alunoAberto,
+            'respostasDaQuestao' => $foco['nominais'] ?? collect(),
             'provas' => $provas,
             'abas' => self::ABAS,
             'turmaDoRecorte' => $this->turmaDoRecorte(),
@@ -430,16 +456,9 @@ class Desempenho extends Component
     ): array {
         $porQuestao = $analisar->porQuestao($provas, $leitor, $disciplina);
 
-        $completa = $this->questaoCompleta();
-
         return [
             'porQuestao' => $porQuestao,
             'questoesPorProva' => $this->questoesPorProva($porQuestao),
-            'questaoEmDetalhe' => $this->questaoEmDetalhe($porQuestao),
-            'questaoCompleta' => $completa,
-            'respostasDaQuestao' => $completa === null
-                ? collect()
-                : $analisar->respostasDaQuestao($completa, $leitor),
             'questoesOrdenadas' => match ($this->ordemDasQuestoes) {
                 'numero' => $porQuestao->sortBy([['prova', 'asc'], ['numero', 'asc']])->values(),
                 'habilidade' => $porQuestao->sortBy([['habilidade', 'asc'], ['percentual', 'asc']])->values(),
@@ -453,15 +472,11 @@ class Desempenho extends Component
     {
         $prova = $this->provaDoRecorte();
 
-        $completa = $this->questaoCompleta();
-
         return [
             'provaDoRecorte' => $prova,
             'acertoNominal' => $prova === null
                 ? null
                 : $analisar->acertoDeCadaAluno($prova, $leitor, $disciplina),
-            'questaoCompleta' => $completa,
-            'alunoAberto' => $this->alunoAberto,
         ];
     }
 }

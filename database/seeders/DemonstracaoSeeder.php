@@ -28,6 +28,7 @@ use App\Models\Importacao;
 use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
 use App\Models\Prova;
+use App\Models\ProvaQuestao;
 use App\Models\Questao;
 use App\Models\QuestaoBloco;
 use App\Models\ResultadoAluno;
@@ -599,6 +600,15 @@ class DemonstracaoSeeder extends Seeder
         $calcular = app(CalcularNotasAction::class);
         $sorteio = mt_rand(...);
 
+        /*
+         * Do segundo bimestre em diante a planilha traz a letra marcada,
+         * e não só acerto e erro. É o que acontece na escola quando
+         * alguém troca a exportação do leitor — e deixa a demonstração
+         * com os dois casos na tela: a leitura por alternativa onde há
+         * letra, e o aviso de que ela não existe onde não há.
+         */
+        $comLetras = $bimestre->value >= 2;
+
         mt_srand(($bimestre->value * 100) + $prova->id);
 
         foreach ($alunos->values() as $posicao => $aluno) {
@@ -617,7 +627,9 @@ class DemonstracaoSeeder extends Seeder
 
                 $resultado->respostas()->create([
                     'prova_questao_id' => $questao->id,
-                    'alternativa_marcada' => null,
+                    'alternativa_marcada' => $comLetras
+                        ? $this->letraMarcada($questao, $acertou, $sorteio)
+                        : null,
                     'acertou' => $acertou,
                     'peso' => $questao->peso,
                     'pontuacao' => $acertou ? $questao->peso : 0,
@@ -628,6 +640,40 @@ class DemonstracaoSeeder extends Seeder
         }
 
         $this->command?->info("Bimestre {$bimestre->value}: prova montada e resultados importados.");
+    }
+
+    /**
+     * A letra que o aluno marcou.
+     *
+     * Quem acertou marcou a correta. Quem errou não erra ao acaso: cada
+     * questão tem uma errada que atrai mais — é justamente o que a
+     * leitura por alternativa existe para mostrar, e com erro uniforme
+     * não haveria nada para ver.
+     */
+    protected function letraMarcada(ProvaQuestao $questao, bool $acertou, callable $sorteio): ?string
+    {
+        if ($acertou) {
+            return $questao->letra_correta;
+        }
+
+        $erradas = array_values(array_filter(
+            $questao->letrasValidas(),
+            fn (string $letra) => $letra !== $questao->letra_correta,
+        ));
+
+        if ($erradas === []) {
+            return null;
+        }
+
+        // Um em cada dez não marca nada: a folha em branco existe.
+        if ($sorteio(1, 10) === 1) {
+            return null;
+        }
+
+        $preferida = $erradas[$questao->id % count($erradas)];
+
+        // Dois terços caem na preferida; o resto se espalha.
+        return $sorteio(1, 3) <= 2 ? $preferida : $erradas[$sorteio(0, count($erradas) - 1)];
     }
 
     /**
