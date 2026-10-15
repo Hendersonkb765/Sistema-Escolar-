@@ -2,17 +2,23 @@
 
 namespace App\Livewire;
 
+use App\Enums\StatusImportacao;
+use App\Enums\StatusProva;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Models\Aluno;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\Importacao;
+use App\Models\Prova;
 use App\Models\Questao;
+use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
@@ -29,6 +35,10 @@ class Painel extends Component
         return view('painel.index', [
             'usuario' => $usuario,
             'indicadores' => $this->indicadores($usuario),
+            // O número diz quantos; a lista diz quais, e é com ela que
+            // se faz alguma coisa sem passar por três telas antes.
+            'pendencias' => $this->pendencias($usuario),
+            'estrutura' => $usuario->ehGestao() ? $this->estrutura($usuario) : [],
         ])->layout('components.layouts.app', [
             'titulo' => 'Painel',
             'subtitulo' => $this->descricaoDoEscopo($usuario),
@@ -42,60 +52,68 @@ class Painel extends Component
             return $this->indicadoresDoProfessor($usuario);
         }
 
+        return $this->indicadoresDeAvaliacao($usuario);
+    }
+
+    /**
+     * A estrutura acadêmica: referência, não pendência.
+     *
+     * Ficava na mesma fileira das pendências, e "Disciplinas: 8" não
+     * compete por atenção com "3 solicitações atrasadas" — só empurra a
+     * segunda para longe do olho. Desce para o pé da página, menor.
+     *
+     * @return array<int, array{rotulo: string, valor: int|string, href: ?string}>
+     */
+    protected function estrutura(User $usuario): array
+    {
         /*
          * "Eixos no meu escopo: 1" não informa nada a quem tem um Eixo
-         * só — e é o caso do PAEET. O subtítulo já diz qual é. O cartão
+         * só — e é o caso do PAEET. O subtítulo já diz qual é. O item
          * fica para quem tem mais de um, onde o número é notícia.
          */
-        $indicadores = count($usuario->eixoIds()) > 1 ? [
+        $itens = count($usuario->eixoIds()) > 1 ? [
             [
                 'rotulo' => 'Eixos no meu escopo',
                 'valor' => count($usuario->eixoIds()),
-                'cor' => 'roxo',
                 'href' => Gate::allows('viewAny', Eixo::class) ? route('eixos.index') : null,
             ],
         ] : [];
 
-        $indicadores = [
-            ...$indicadores,
+        $itens = [
+            ...$itens,
             [
                 'rotulo' => 'Cursos',
                 'valor' => Curso::query()->visivelPara($usuario)->count(),
-                'cor' => 'azul',
                 'href' => route('cursos.index'),
             ],
             [
                 'rotulo' => 'Disciplinas',
                 'valor' => Disciplina::query()->visivelPara($usuario)->count(),
-                'cor' => 'azul',
-                'href' => null,
+                'href' => route('disciplinas.index'),
             ],
             [
                 'rotulo' => 'Turmas ativas',
                 'valor' => Turma::query()->visivelPara($usuario)->where('status', 'ativa')->count(),
-                'cor' => 'verde',
-                'href' => null,
+                'href' => route('turmas.index'),
             ],
             [
                 'rotulo' => 'Alunos',
                 'valor' => Aluno::query()->visivelPara($usuario)->count(),
-                'cor' => 'cinza',
-                'href' => null,
+                'href' => route('alunos.index'),
             ],
         ];
 
         if (Gate::allows('viewAny', User::class)) {
-            $indicadores[] = [
+            $itens[] = [
                 'rotulo' => 'Usuários',
                 // Pelo mesmo escopo da tela de usuários, que é para
                 // onde este número leva: se divergirem, o painel mente.
                 'valor' => User::query()->visivelPara($usuario)->count(),
-                'cor' => 'cinza',
                 'href' => route('usuarios.index'),
             ];
         }
 
-        return [...$this->indicadoresDeAvaliacao($usuario), ...$indicadores];
+        return $itens;
     }
 
     /**
@@ -138,6 +156,25 @@ class Painel extends Component
             'detalhe' => 'Aguardando correção',
         ]];
 
+        /*
+         * O ciclo não termina na análise das questões: a prova é
+         * montada, aplicada, e a folha é importada. As duas pontas
+         * seguintes não apareciam em lugar nenhum — uma prova aplicada
+         * em abril podia passar o ano sem resultado, e ninguém era
+         * avisado.
+         */
+        $semResultado = Prova::query()
+            ->visivelPara($usuario)
+            ->whereIn('status', [StatusProva::Gerada->value, StatusProva::Aplicada->value])
+            ->whereDoesntHave('resultados')
+            ->count();
+
+        // Conferida e abandonada: o relatório existe e ninguém confirmou.
+        $aConfirmar = Importacao::query()
+            ->visivelPara($usuario)
+            ->where('status', StatusImportacao::Validada)
+            ->count();
+
         return [
             ...$extras,
             [
@@ -159,7 +196,117 @@ class Painel extends Component
                 'cor' => $aguardandoAnalise > 0 ? 'azul' : 'cinza',
                 'href' => route('solicitacoes.index', ['situacao' => StatusSolicitacao::Enviada->value]),
             ],
+            [
+                'rotulo' => 'Provas sem resultado',
+                'valor' => $semResultado,
+                'cor' => $semResultado > 0 ? 'amarelo' : 'verde',
+                // Para a importação, que é o que se faz com elas — e não
+                // para a lista de provas, que não sabe filtrar por isto.
+                'href' => route('importacoes.criar'),
+                'detalhe' => 'Geradas ou aplicadas, sem folha importada',
+            ],
+            [
+                'rotulo' => 'Importações a confirmar',
+                'valor' => $aConfirmar,
+                'cor' => $aConfirmar > 0 ? 'amarelo' : 'cinza',
+                'href' => route('importacoes.index', ['situacao' => StatusImportacao::Validada->value]),
+                'detalhe' => 'Conferidas, ainda não gravadas',
+            ],
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | O que precisa de você
+    |--------------------------------------------------------------------------
+    |
+    | O número diz quantos; a lista diz quais. Sem ela, "3 atrasadas"
+    | custa três telas até chegar na primeira — e o painel vira um lugar
+    | por onde se passa, não onde se começa.
+    */
+
+    /** @return Collection<int, array<string, mixed>> */
+    protected function pendencias(User $usuario): Collection
+    {
+        return $usuario->ehGestao()
+            ? $this->pendenciasDaGestao($usuario)
+            : $this->pendenciasDoProfessor($usuario);
+    }
+
+    /**
+     * As solicitações que esperam alguém, da mais urgente para a menos.
+     *
+     * Atrasadas primeiro, depois as de prazo mais próximo. Quem falta
+     * vai junto: "esperando o professor X" é o que permite agir sem
+     * abrir a solicitação para descobrir.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function pendenciasDaGestao(User $usuario): Collection
+    {
+        return SolicitacaoProva::query()
+            ->visivelPara($usuario)
+            ->comPartePendente()
+            ->whereIn('status', [
+                StatusSolicitacao::Aberta->value,
+                StatusSolicitacao::Enviada->value,
+                StatusSolicitacao::EmAnalise->value,
+            ])
+            ->with(['turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id'])
+            ->withCount(['partes as partes_pendentes' => fn ($q) => $q->whereNull('enviada_em')])
+            ->orderBy('prazo')
+            ->limit(5)
+            ->get()
+            ->map(fn (SolicitacaoProva $solicitacao) => [
+                'id' => $solicitacao->getKey(),
+                'titulo' => $solicitacao->titulo ?: 'Solicitação sem título',
+                'turma' => $solicitacao->turma->nome.' · '.$solicitacao->turma->curso->nome,
+                'prazo' => $solicitacao->prazo,
+                'atrasada' => $solicitacao->prazo->isPast(),
+                'faltam' => (int) $solicitacao->partes_pendentes,
+                'href' => route('solicitacoes.show', $solicitacao),
+            ]);
+    }
+
+    /**
+     * O que foi pedido ao professor e ele ainda não enviou.
+     *
+     * Só a parte dele: a do colega não é pendência de quem já entregou.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    protected function pendenciasDoProfessor(User $usuario): Collection
+    {
+        return SolicitacaoParte::query()
+            ->whereNull('enviada_em')
+            ->where('professor_id', $usuario->getKey())
+            ->whereHas('solicitacao', fn ($q) => $q
+                ->visivelPara($usuario)
+                ->where('status', StatusSolicitacao::Aberta))
+            ->with([
+                'disciplina:id,nome',
+                // `quantidade_alternativas` entra porque
+                // `questoesCompletas()` a lê para saber o que é uma
+                // questão pronta — sem ela, o modo estrito reclama.
+                'solicitacao:id,titulo,prazo,turma_id,quantidade_alternativas',
+                'solicitacao.turma:id,nome,curso_id',
+                'solicitacao.turma.curso:id,nome,eixo_id',
+            ])
+            ->get()
+            ->sortBy(fn (SolicitacaoParte $parte) => $parte->solicitacao->prazo)
+            ->take(5)
+            ->values()
+            ->map(fn (SolicitacaoParte $parte) => [
+                'id' => $parte->getKey(),
+                'titulo' => $parte->disciplina->nome,
+                'turma' => $parte->solicitacao->turma->nome
+                    .' · '.$parte->solicitacao->turma->curso->nome,
+                'prazo' => $parte->solicitacao->prazo,
+                'atrasada' => $parte->solicitacao->prazo->isPast(),
+                // Quantas ainda faltam para a parte ficar completa.
+                'faltam' => max(0, $parte->quantidade_questoes - $parte->questoesCompletas()),
+                'href' => route('solicitacoes.responder', $parte->solicitacao),
+            ]);
     }
 
     /**

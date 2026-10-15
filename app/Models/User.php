@@ -200,6 +200,28 @@ class User extends Authenticatable
             ->orWhere('usuarios.id', $usuario->getKey()));
     }
 
+    /**
+     * O primeiro nome, pulando o tratamento.
+     *
+     * O cadastro guarda o nome como ele vem da escola, e lá vem
+     * "Prof. Renato Lima". Cortar no primeiro espaço dava
+     * "Bem-vindo, Prof.".
+     */
+    public function primeiroNome(): string
+    {
+        $tratamentos = ['prof', 'profa', 'dr', 'dra', 'sr', 'sra', 'srta'];
+
+        foreach (preg_split('/\s+/', trim($this->nome)) ?: [] as $parte) {
+            $limpo = mb_strtolower(rtrim($parte, '.'));
+
+            if ($parte !== '' && ! in_array($limpo, $tratamentos, true)) {
+                return $parte;
+            }
+        }
+
+        return $this->nome;
+    }
+
     public function temAcessoAoEixo(?int $eixoId): bool
     {
         return $eixoId !== null
