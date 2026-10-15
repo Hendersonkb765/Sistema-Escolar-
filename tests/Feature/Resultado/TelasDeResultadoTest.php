@@ -21,10 +21,12 @@ use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
+use App\Models\NotaDisciplina;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
+use App\Support\CriteriosDaAnalise;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -807,4 +809,218 @@ it('leva a letra marcada da planilha até a análise de desempenho', function ()
         ->assertSee('A mais marcada entre as erradas')
         ->assertSee('A correta era '.$certas[2])
         ->assertDontSee('Sem a letra marcada');
+});
+
+/*
+|--------------------------------------------------------------------------
+| A tela serve para conferir e lançar
+|--------------------------------------------------------------------------
+|
+| O professor abre esta tela para olhar as notas das disciplinas dele e
+| digitá-las noutro sistema. Tudo aqui se mede por isso: a caixa precisa
+| dizer a verdade sobre o que está marcado, o número precisa estar perto
+| do nome, e a coluna precisa sair daqui sem ser redigitada.
+*/
+
+/** O `<input>` de uma disciplina, como ele sai do servidor. */
+function caixaDaDisciplina(string $html, int $disciplinaId): string
+{
+    preg_match('/<input[^>]*value="'.$disciplinaId.'"[^>]*>/', $html, $achado);
+
+    return $achado[0] ?? '';
+}
+
+/*
+ * O cartão dizia "1 de 3 marcadas" e as três caixas saíam vazias: sem
+ * `@checked`, o estado do componente não chega ao HTML. Quem via a
+ * própria disciplina desmarcada clicava nela — e desmarcava de verdade.
+ */
+it('marca no HTML as disciplinas que estão marcadas', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+    $redes = Disciplina::query()->where('nome', 'Redes')->sole();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('disciplinasEscolhidas', [(string) $logica->id])
+        ->html();
+
+    expect(caixaDaDisciplina($html, $logica->id))->toContain('checked')
+        ->and(caixaDaDisciplina($html, $redes->id))->not->toContain('checked');
+});
+
+it('acompanha no HTML a troca feita pelos atalhos', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+
+    $componente = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('disciplinasEscolhidas', []);
+
+    expect(caixaDaDisciplina($componente->html(), $logica->id))->not->toContain('checked');
+
+    $componente->call('mostrarTodasAsDisciplinas');
+
+    expect(caixaDaDisciplina($componente->html(), $logica->id))->toContain('checked');
+});
+
+/*
+ * Transcrever trinta números a olho é onde o erro acontece. A coluna sai
+ * pronta para colar: RA e nota separados por tabulação, na mesma ordem
+ * da tabela — se divergir, a conferência linha a linha deixa de valer.
+ */
+it('oferece a coluna pronta para colar, na ordem da tabela', function () {
+    ($this->importado)();
+
+    $secoes = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->viewData('secoes');
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+
+    $texto = $secoes[0]['paraCopiar'][$logica->id];
+
+    // Caio antes de Marina: a tabela ordena por nome.
+    expect($texto)->toBe("1002\t5,00\n1001\t10,00")
+        ->and(explode("\n", $texto))->toHaveCount($secoes[0]['resultados']->count());
+});
+
+it('deixa a nota vazia na coluna de quem não tem resultado na disciplina', function () {
+    ($this->importado)();
+    ($this->soLogicaNaSegunda)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+
+    $secoes = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->viewData('secoes');
+
+    foreach ($secoes as $secao) {
+        foreach ($secao['paraCopiar'] as $texto) {
+            foreach (explode("\n", $texto) as $linha) {
+                // Sempre duas colunas, mesmo quando a nota não existe.
+                expect(substr_count($linha, "\t"))->toBe(1);
+            }
+        }
+    }
+
+    expect($secoes[0]['paraCopiar'])->toHaveKey($logica->id);
+});
+
+it('mostra o botão de copiar em cada coluna de nota', function () {
+    ($this->importado)();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->html();
+
+    // Uma por disciplina da prova.
+    expect(substr_count($html, 'Copiar coluna'))->toBe(2);
+});
+
+/*
+ * Coluna inteira fora do esperado costuma ser planilha trocada, não a
+ * turma indo mal de uma vez. Quem não tem nota na disciplina fica de
+ * fora da conta: somar o zero de quem não fez rebaixaria a turma por um
+ * dado que não existe.
+ */
+it('fecha cada coluna com a média da turma', function () {
+    ($this->importado)();
+
+    $secoes = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->viewData('secoes');
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+
+    // Marina 10, Caio 5.
+    expect($secoes[0]['medias'][$logica->id])->toBe(7.5);
+});
+
+it('não conta como zero quem não tem nota na disciplina', function () {
+    ($this->importado)();
+
+    $logica = Disciplina::query()->where('nome', 'Lógica')->sole();
+
+    // Caio perde a nota de Lógica: sobra só a 10 de Marina.
+    NotaDisciplina::query()
+        ->where('disciplina_id', $logica->id)
+        ->whereHas('resultado', fn ($q) => $q->where('aluno_id', $this->caio->id))
+        ->delete();
+
+    $secoes = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->viewData('secoes');
+
+    expect($secoes[0]['medias'][$logica->id])->toBe(10.0);
+});
+
+/*
+ * O 6 não é lei: é o critério que a escola adotou, e mora na
+ * configuração junto com o da análise. Escrito na view, esta tela
+ * passaria a mentir no dia em que a escola mudasse o número.
+ */
+/** As notas que a tela marcou como abaixo do critério. */
+function notasEmVermelho(string $html): array
+{
+    preg_match_all('/<span class="[^"]*rose[^"]*"[^>]*>\s*([\d,]+)\s*<\/span>/', $html, $achados);
+
+    sort($achados[1]);
+
+    return array_values(array_unique($achados[1]));
+}
+
+it('usa o critério da escola para marcar a nota abaixo do esperado', function () {
+    ($this->importado)();
+
+    $tela = fn () => Livewire::actingAs($this->paeet)->test(ListaResultados::class)->html();
+
+    // No critério da escola, 6: o 5,00 de Caio fica abaixo, o 10,00 não.
+    expect(notasEmVermelho($tela()))->toBe(['5,00'])
+        ->and($tela())->toContain('abaixo de 6,0');
+
+    /*
+     * Baixando o critério para 3, nada mais fica abaixo. É este sentido
+     * que prova que o número vem da configuração: subindo o critério, um
+     * 6 escrito na view daria o mesmo resultado.
+     */
+    app()->forgetInstance(CriteriosDaAnalise::class);
+    config()->set('analise.nota_esperada', 3);
+
+    expect(notasEmVermelho($tela()))->toBeEmpty()
+        ->and($tela())->not->toContain('abaixo de');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Encontrar a prova numa página longa
+|--------------------------------------------------------------------------
+*/
+
+it('lista as provas da página quando há mais de uma', function () {
+    ($this->importado)();
+    $recuperacao = ($this->soLogicaNaSegunda)();
+
+    $html = Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('filtroTurma', (string) $this->turma->id)
+        ->assertSee('2 provas neste recorte')
+        ->html();
+
+    // Cada item do índice aponta para a âncora da sua seção.
+    foreach ([$this->prova->id, $recuperacao->id] as $id) {
+        expect($html)->toContain('href="#prova-'.$id.'"')
+            ->and($html)->toContain('id="prova-'.$id.'"');
+    }
+});
+
+it('não mostra índice quando há uma prova só', function () {
+    ($this->importado)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(ListaResultados::class)
+        ->set('prova_id', (string) $this->prova->id)
+        ->assertDontSee('provas neste recorte');
 });

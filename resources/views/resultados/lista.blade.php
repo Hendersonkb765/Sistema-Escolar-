@@ -60,7 +60,17 @@
                 @foreach ($disciplinasDaProva as $id => $nome)
                     <label wire:key="disc-{{ $id }}"
                            class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                        {{--
+                            `@checked` aqui, num `<input>` de verdade — é
+                            dentro da TAG DE UM COMPONENTE que a diretiva
+                            não compila. Sem ele o HTML saía do servidor
+                            com todas as caixas vazias enquanto o cartão
+                            dizia "1 de 3 marcadas": a tela mentia sobre o
+                            próprio estado, e o professor marcava de novo
+                            a que já estava marcada — desmarcando-a.
+                        --}}
                         <input type="checkbox" value="{{ $id }}" wire:model.live="disciplinasEscolhidas"
+                               @checked(in_array((string) $id, $disciplinasEscolhidas, true))
                                class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
                         <span class="min-w-0">
                             <span class="block truncate text-slate-900 dark:text-slate-100">{{ $nome }}</span>
@@ -71,6 +81,31 @@
                     </label>
                 @endforeach
             </div>
+        </x-cartao>
+    @endif
+
+    {{--
+        Com mais de uma prova a página passa de dois mil pixels, e até
+        aqui não havia como saber o que vinha abaixo nem pular para a
+        prova certa — só rolar. O índice é também o resumo: diz quantas
+        provas o recorte trouxe antes de a pessoa rolar para descobrir.
+    --}}
+    @if (count($secoes) > 1)
+        <x-cartao titulo="{{ count($secoes) }} provas neste recorte"
+                  descricao="Cada uma na sua seção, da mais recente para a mais antiga.">
+            <nav class="flex flex-wrap gap-2 p-4 sm:p-6" aria-label="Provas desta página">
+                @foreach ($secoes as $secao)
+                    <a href="#prova-{{ $secao['prova']->id }}"
+                       class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm transition hover:border-marca-400 hover:bg-marca-50 dark:border-slate-800 dark:hover:border-marca-500 dark:hover:bg-marca-950/30">
+                        <x-badge cor="azul" :rotulo="$secao['prova']->bimestre->rotulo()"/>
+                        <span class="text-slate-700 dark:text-slate-200">{{ $secao['prova']->titulo }}</span>
+                        <span class="text-xs text-slate-400">
+                            {{ $secao['prova']->turma->nome }} ·
+                            {{ $secao['disciplinas']->count() }} disciplina(s)
+                        </span>
+                    </a>
+                @endforeach
+            </nav>
         </x-cartao>
     @endif
 
@@ -98,7 +133,7 @@
         @foreach ($secoes as $secao)
             @php $prova = $secao['prova']; @endphp
 
-            <div wire:key="secao-{{ $prova->id }}" class="space-y-4">
+            <div wire:key="secao-{{ $prova->id }}" id="prova-{{ $prova->id }}" class="scroll-mt-4 space-y-4">
                 {{--
                     Cada seção diz de que prova ela é. Com várias na
                     página, uma tabela sem cabeçalho próprio é um bloco de
@@ -139,45 +174,100 @@
                                     : 'Importe a planilha do leitor de folhas para trazer os acertos.'"/>
                     @else
                         <div class="-mx-4 overflow-x-auto sm:-mx-6">
-                            <table data-notas="{{ $prova->id }}" class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                            <table data-notas="{{ $prova->id }}" class="min-w-full text-sm">
                                 <thead>
-                                    <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                        <th class="px-4 py-2 sm:px-6">Aluno</th>
-                                        @foreach ($secao['disciplinas'] as $nome)
-                                            <th class="px-4 py-2 text-center">{{ $nome }}</th>
+                                    <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                                        <th class="px-4 py-2 text-left sm:px-6">Aluno</th>
+                                        @foreach ($secao['disciplinas'] as $disciplinaId => $nome)
+                                            {{--
+                                                Largura fixa nas colunas de nota, e uma coluna
+                                                de sobra no fim: sem ela, uma disciplina só se
+                                                espalhava pela largura inteira e o número
+                                                ficava a meio metro do nome do aluno.
+                                            --}}
+                                            <th class="w-32 px-3 py-2 text-center align-bottom">
+                                                <span class="block truncate" title="{{ $nome }}">{{ $nome }}</span>
+                                                <x-botao-copiar class="mt-1"
+                                                                :texto="$secao['paraCopiar'][$disciplinaId] ?? ''"
+                                                                rotulo="Copiar coluna"
+                                                                :titulo="'Copia RA e nota de '.$nome.', uma linha por aluno, para colar numa planilha.'"/>
+                                            </th>
                                         @endforeach
+                                        <th class="w-full"></th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                <tbody>
                                     @foreach ($secao['resultados'] as $resultado)
-                                        <tr wire:key="nota-{{ $resultado->id }}">
-                                            <td class="px-4 py-3 sm:px-6">
+                                        {{--
+                                            Listrado e com realce ao passar o mouse: a linha é
+                                            longa, e conferir nota a nota é justamente onde se
+                                            pula de linha sem perceber.
+                                        --}}
+                                        <tr wire:key="nota-{{ $resultado->id }}"
+                                            class="border-b border-slate-100 odd:bg-slate-50/60 hover:bg-marca-50 dark:border-slate-800 dark:odd:bg-slate-950/30 dark:hover:bg-marca-950/30">
+                                            <td class="whitespace-nowrap px-4 py-2 sm:px-6">
                                                 <span class="font-medium text-slate-900 dark:text-slate-100">{{ $resultado->aluno->nome }}</span>
-                                                <span class="block text-xs text-slate-400">RA {{ $resultado->aluno->ra }}</span>
+                                                {{-- Com o rótulo: é por RA que o outro sistema casa a linha. --}}
+                                                <span class="ml-2 text-xs tabular-nums text-slate-400">RA {{ $resultado->aluno->ra }}</span>
                                             </td>
                                             @foreach ($secao['disciplinas'] as $disciplinaId => $nome)
-                                                @php $nota = $resultado->notas->firstWhere('disciplina_id', $disciplinaId); @endphp
-                                                <td class="px-4 py-3 text-center">
+                                                @php
+                                                    $nota = $resultado->notas->firstWhere('disciplina_id', $disciplinaId);
+                                                    $abaixo = $nota !== null && (float) $nota->nota < $notaEsperada;
+                                                @endphp
+                                                <td class="px-3 py-2 text-center">
                                                     @if ($nota)
+                                                        {{--
+                                                            Só o que está abaixo do critério ganha cor.
+                                                            Antes todo número era verde ou vermelho, e
+                                                            com metade da tabela em vermelho a cor
+                                                            deixava de apontar alguma coisa.
+                                                        --}}
                                                         <span @class([
                                                             'text-base font-semibold tabular-nums',
-                                                            'text-emerald-700 dark:text-emerald-400' => (float) $nota->nota >= 6,
-                                                            'text-rose-700 dark:text-rose-400' => (float) $nota->nota < 6,
-                                                        ])>
+                                                            'text-rose-700 dark:text-rose-400' => $abaixo,
+                                                            'text-slate-900 dark:text-slate-100' => ! $abaixo,
+                                                        ])
+                                                        title="{{ $nome }}: {{ number_format((float) $nota->soma_pesos_acertos, 2, ',', '.') }} de {{ number_format((float) $nota->soma_pesos_total, 2, ',', '.') }} ponto(s){{ $abaixo ? ' · abaixo de '.number_format($notaEsperada, 1, ',', '.') : '' }}">
                                                             {{ number_format((float) $nota->nota, 2, ',', '.') }}
                                                         </span>
-                                                        <span class="block text-xs text-slate-400 tabular-nums">
-                                                            {{ number_format((float) $nota->soma_pesos_acertos, 2, ',', '.') }}
-                                                            de {{ number_format((float) $nota->soma_pesos_total, 2, ',', '.') }}
-                                                        </span>
                                                     @else
-                                                        <span class="text-slate-400">—</span>
+                                                        <span class="text-slate-300 dark:text-slate-600"
+                                                              title="Sem resultado importado para este aluno nesta disciplina.">—</span>
                                                     @endif
                                                 </td>
                                             @endforeach
+                                            <td></td>
                                         </tr>
                                     @endforeach
                                 </tbody>
+                                {{--
+                                    A média fecha a coluna. Coluna inteira fora do
+                                    esperado costuma ser planilha trocada, não a turma
+                                    indo mal de uma vez — e é aqui que isso aparece.
+                                --}}
+                                <tfoot>
+                                    <tr class="border-t-2 border-slate-200 text-xs dark:border-slate-700">
+                                        <th class="px-4 py-2 text-left font-medium uppercase tracking-wide text-slate-500 sm:px-6 dark:text-slate-400">
+                                            Média da turma
+                                        </th>
+                                        @foreach ($secao['disciplinas'] as $disciplinaId => $nome)
+                                            @php $media = $secao['medias'][$disciplinaId] ?? null; @endphp
+                                            <td class="px-3 py-2 text-center">
+                                                @if ($media === null)
+                                                    <span class="text-slate-300 dark:text-slate-600">—</span>
+                                                @else
+                                                    <span @class([
+                                                        'font-semibold tabular-nums',
+                                                        'text-rose-700 dark:text-rose-400' => $media < $notaEsperada,
+                                                        'text-slate-600 dark:text-slate-300' => $media >= $notaEsperada,
+                                                    ])>{{ number_format($media, 2, ',', '.') }}</span>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     @endif

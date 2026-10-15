@@ -16,6 +16,12 @@
     branco destoaria.
 */
 @layer base {
+    /*
+        Elemento com `x-cloak` fica escondido até o Alpine iniciar. Sem
+        isto, o estado "depois do clique" pisca na tela a cada carga.
+    */
+    [x-cloak] { display: none !important; }
+
     html {
         scrollbar-width: thin;
         scrollbar-color: theme('colors.slate.300') transparent;

@@ -7,6 +7,7 @@ use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
 use App\Models\Turma;
+use App\Support\CriteriosDaAnalise;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -265,6 +266,9 @@ class ListaResultados extends Component
         );
 
         return view('resultados.lista', [
+            // Da configuração, e não um 6 escrito na view: é o mesmo
+            // número que a análise usa, e a escola pode mudá-lo.
+            'notaEsperada' => app(CriteriosDaAnalise::class)->notaEsperada,
             'turmas' => $this->turmasDisponiveis(),
             'provas' => $this->provasDisponiveis(),
             'bimestres' => Bimestre::opcoes(),
@@ -322,13 +326,81 @@ class ListaResultados extends Component
         foreach ($provas as $prova) {
             $daProva = ($porProva[$prova->getKey()] ?? collect())->pluck('disciplina_id')->unique();
 
+            $disciplinasDaSecao = $mostradas->filter(fn ($nome, $id) => $daProva->contains($id));
+            $daSecao = ($resultados[$prova->getKey()] ?? collect())->values();
+
             $secoes[] = [
                 'prova' => $prova,
-                'disciplinas' => $mostradas->filter(fn ($nome, $id) => $daProva->contains($id)),
-                'resultados' => ($resultados[$prova->getKey()] ?? collect())->values(),
+                'disciplinas' => $disciplinasDaSecao,
+                'resultados' => $daSecao,
+                'medias' => $this->medias($disciplinasDaSecao, $daSecao),
+                'paraCopiar' => $this->paraCopiar($disciplinasDaSecao, $daSecao),
             ];
         }
 
         return $secoes;
+    }
+
+    /**
+     * A média da turma em cada disciplina da seção.
+     *
+     * Serve para conferir: uma coluna inteira fora do esperado costuma
+     * ser a planilha trocada, não a turma inteira indo mal de uma vez.
+     * Aluno sem nota na disciplina fica de fora da conta — somar o zero
+     * de quem não fez rebaixaria a turma por um dado que não existe.
+     *
+     * @param  ColecaoSimples<int, string>  $disciplinas
+     * @param  ColecaoSimples<int, ResultadoAluno>  $resultados
+     * @return array<int, float|null> disciplina_id => média
+     */
+    protected function medias(ColecaoSimples $disciplinas, ColecaoSimples $resultados): array
+    {
+        $medias = [];
+
+        foreach ($disciplinas->keys() as $disciplinaId) {
+            $notas = $resultados
+                ->map(fn (ResultadoAluno $r) => $r->notas->firstWhere('disciplina_id', $disciplinaId))
+                ->filter()
+                ->map(fn ($nota) => (float) $nota->nota);
+
+            $medias[$disciplinaId] = $notas->isEmpty() ? null : round($notas->avg(), 2);
+        }
+
+        return $medias;
+    }
+
+    /**
+     * Uma coluna pronta para colar no outro sistema.
+     *
+     * RA e nota separados por tabulação, uma linha por aluno: é o que
+     * cola direto numa planilha em duas colunas. A tela existe para
+     * transcrever, e transcrever trinta números a olho é onde o erro
+     * acontece.
+     *
+     * A ordem é a mesma da tabela — se divergir, a conferência linha a
+     * linha deixa de valer.
+     *
+     * @param  ColecaoSimples<int, string>  $disciplinas
+     * @param  ColecaoSimples<int, ResultadoAluno>  $resultados
+     * @return array<int, string> disciplina_id => texto
+     */
+    protected function paraCopiar(ColecaoSimples $disciplinas, ColecaoSimples $resultados): array
+    {
+        $colunas = [];
+
+        foreach ($disciplinas->keys() as $disciplinaId) {
+            $linhas = $resultados->map(function (ResultadoAluno $resultado) use ($disciplinaId) {
+                $nota = $resultado->notas->firstWhere('disciplina_id', $disciplinaId);
+
+                // Vírgula decimal: é o que a planilha em português espera.
+                return $resultado->aluno->ra."\t".($nota === null
+                    ? ''
+                    : number_format((float) $nota->nota, 2, ',', ''));
+            });
+
+            $colunas[$disciplinaId] = $linhas->implode("\n");
+        }
+
+        return $colunas;
     }
 }
