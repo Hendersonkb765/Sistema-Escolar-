@@ -174,6 +174,42 @@ mesma coisa, e a tela nunca desenha o primeiro como se fosse o segundo.
 - abaixo do mínimo de evidência a leitura é "inconclusivo", que não é um
   meio-termo entre bom e ruim: é a recusa de classificar sem base.
 
+## Arquivo que vem de fora
+
+A planilha do leitor de folhas e o escopo-sequência chegam prontos: a
+escola os recebe e não os escreve. Duas regras saem disso.
+
+O cabeçalho é procurado **por nome normalizado** — sem caixa, sem acento,
+sem depender da ordem, e aceitando a grafia torta que o arquivo real
+traz (`Habildades socioemocionais`). Recusar por isso devolveria à escola
+um problema que o sistema sabe resolver.
+
+O conteúdo entra **como veio**, e só se interpreta o que a tela precisa
+para ordenar e filtrar. `CH teórica/prática` é "2/1", não dois números;
+`Aula complementar` é "Sim", não um booleano. Decidir o que significa uma
+coluna que ninguém daqui controla é como o texto do arquivo vira um dado
+errado que parece certo.
+
+A importação é em dois passos — conferir sem gravar, depois confirmar —,
+e a conferência diz o que vai acontecer: quantas linhas entram, quantas
+são substituídas, o que não casou. `ImportarEscopoAction` e
+`ConferirImportacaoAction` seguem o mesmo desenho.
+
+## O estado do componente não chega ao HTML sozinho
+
+`@checked(...)` e `@selected(...)` são escritos à mão em todo `<input
+type="checkbox">` e `<option>` ligados a `wire:model`. Sem eles o HTML
+sai do servidor com a caixa vazia e a opção não marcada, enquanto o
+componente diz outra coisa — e um link com filtro no endereço abre a tela
+filtrada com o select mostrando "Todos".
+
+Nada quebra em voz alta: a página está certa, só os controles mentem. E
+quem vê a própria disciplina desmarcada clica nela, desmarcando-a de
+verdade.
+
+Vale para `<input>` e `<option>` de verdade. Dentro da **tag de um
+componente** a diretiva não compila, como as outras.
+
 ## Histórico nunca é reescrito
 
 `turma_historicos`, `aluno_historicos` e `questao_feedbacks` são append-only:

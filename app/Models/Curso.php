@@ -82,6 +82,12 @@ class Curso extends Model
         return $this->hasMany(Turma::class);
     }
 
+    /** @return HasMany<EscopoAula, $this> */
+    public function escopoAulas(): HasMany
+    {
+        return $this->hasMany(EscopoAula::class);
+    }
+
     /** @return HasMany<Disciplina, $this> */
     public function disciplinas(): HasMany
     {

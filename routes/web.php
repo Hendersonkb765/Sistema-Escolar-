@@ -15,6 +15,8 @@ use App\Livewire\Documentos\FormularioModeloDocumento;
 use App\Livewire\Documentos\GerarDocumentos;
 use App\Livewire\Documentos\ListaCompartilhamentos;
 use App\Livewire\Documentos\ListaModelosDocumento;
+use App\Livewire\Escopo\ImportarEscopo;
+use App\Livewire\Escopo\VisaoDoEscopo;
 use App\Livewire\Eixos\FormularioEixo;
 use App\Livewire\Eixos\ListaEixos;
 use App\Livewire\Grades\DetalheGrade;
@@ -81,6 +83,11 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     // aqui só se consulta.
     Route::get('/grades', ListaGrades::class)->name('grades.index');
     Route::get('/grades/{grade}', DetalheGrade::class)->name('grades.show');
+
+    // Consulta para todo mundo; importar é da coordenação, e a Policy
+    // de cada componente é quem decide.
+    Route::get('/escopo', VisaoDoEscopo::class)->name('escopo.index');
+    Route::get('/escopo/importar', ImportarEscopo::class)->name('escopo.importar');
 
     Route::get('/turmas', ListaTurmas::class)->name('turmas.index');
     Route::get('/turmas/criar', FormularioTurma::class)->name('turmas.criar');

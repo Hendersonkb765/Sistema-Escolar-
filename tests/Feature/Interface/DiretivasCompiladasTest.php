@@ -39,6 +39,7 @@ const TELAS_VARRIDAS = [
     'painel', 'eixos.index', 'eixos.criar', 'cursos.index', 'cursos.criar',
     'disciplinas.index', 'disciplinas.criar', 'grades.index',
     'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar',
+    'escopo.index', 'escopo.importar',
     'usuarios.index', 'usuarios.criar', 'auditoria.index',
     'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
     'provas.index', 'provas.criar', 'modelos-prova.index', 'modelos-prova.criar',
