@@ -97,7 +97,7 @@ final class PlanilhaDeEscopo
             $celulas = $leitor->load($caminho)->getActiveSheet()->toArray(null, true, false, false);
         } catch (ExcecaoDeLeitura $excecao) {
             throw RegraDeNegocioException::porque(
-                'Não foi possível ler o arquivo. Envie o escopo em XLSX ou CSV.'
+                'Não foi possível ler o arquivo. Envie o escopo em XLSX, ODS ou CSV.'
             );
         }
 
@@ -246,6 +246,44 @@ final class PlanilhaDeEscopo
     public function recusadas(): array
     {
         return array_values(array_filter($this->linhas, fn (array $linha) => $linha['erro'] !== null));
+    }
+
+    /**
+     * Códigos de componente que aparecem com mais de um nome.
+     *
+     * Um código identifica um componente: as 112 linhas de C1 dizem
+     * todas "Programação Mobile". Quando o nome muda de linha para
+     * linha, o que mudou não foi o componente — foi a coluna. Num
+     * arquivo real, C5 apareceu com treze nomes porque três colunas
+     * estavam rodadas uma casa, e o "Nome do componente" trazia o texto
+     * da competência socioemocional.
+     *
+     * Sem este reparo a importação aceitaria tudo, e a tela mostraria um
+     * parágrafo de competência onde devia estar o nome da matéria.
+     *
+     * A comparação é pela forma normalizada: acento ou caixa diferentes
+     * entre duas linhas é desencontro de digitação, não troca de coluna.
+     *
+     * @return array<string, array<int, string>> código => nomes encontrados
+     */
+    public function codigosComNomesTrocados(): array
+    {
+        $porCodigo = [];
+
+        foreach ($this->aproveitaveis() as $linha) {
+            $codigo = $linha['componente_codigo'];
+
+            if ($codigo === null) {
+                continue;
+            }
+
+            $porCodigo[$codigo][self::normalizar($linha['componente_nome'])] = $linha['componente_nome'];
+        }
+
+        return array_filter(
+            array_map(fn (array $nomes) => array_values($nomes), $porCodigo),
+            fn (array $nomes) => count($nomes) > 1
+        );
     }
 
     /** Os códigos de componente distintos que a planilha traz. @return array<int, string> */

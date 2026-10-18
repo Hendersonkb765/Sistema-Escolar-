@@ -22,6 +22,7 @@ use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Csv;
+use PhpOffice\PhpSpreadsheet\Writer\Ods;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Activitylog\Models\Activity;
 
@@ -97,7 +98,13 @@ beforeEach(function () {
 
         $caminho = tempnam(sys_get_temp_dir(), 'escopo').'.'.$formato;
 
-        ($formato === 'csv' ? new Csv($planilha) : new Xlsx($planilha))->save($caminho);
+        $escritor = match ($formato) {
+            'csv' => new Csv($planilha),
+            'ods' => new Ods($planilha),
+            default => new Xlsx($planilha),
+        };
+
+        $escritor->save($caminho);
 
         return $caminho;
     };
@@ -450,4 +457,129 @@ it('nomeia a coluna que falta como ela aparece no arquivo', function () {
 
     expect(fn () => $this->action->conferir($caminho, $this->curso, 1, $this->paeet))
         ->toThrow(RegraDeNegocioException::class, 'Título da aula');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Colunas deslocadas na planilha
+|--------------------------------------------------------------------------
+|
+| Num arquivo real, três colunas estavam rodadas uma casa em parte das
+| linhas: "Nome do componente" trazia o texto da competência
+| socioemocional, e o nome da matéria tinha ido parar na competência
+| técnica. O sistema importou tudo sem reclamar, e o erro só apareceu na
+| tela — um parágrafo de competência onde devia estar "Programação
+| Mobile".
+|
+| O sinal que denuncia isso não é o tamanho do texto: é o código. Um
+| código identifica um componente, e as 112 linhas do C1 dizem todas o
+| mesmo nome. Quando o nome muda de linha para linha, o que mudou foi a
+| coluna.
+*/
+
+it('recusa a planilha em que um código traz vários nomes', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(),
+        linhaDoEscopo(['Semana' => 2]),
+        // Mesmo código, nome vindo da coluna errada.
+        linhaDoEscopo([
+            'Semana' => 3,
+            'Nome do componente' => 'Curiosidade: Interessar-se por ideias novas e inovadoras.',
+        ]),
+    ]);
+
+    expect(fn () => $this->action->conferir($caminho, $this->curso, 1, $this->paeet))
+        ->toThrow(RegraDeNegocioException::class, 'código com vários nomes');
+
+    expect(EscopoAula::query()->count())->toBe(0);
+});
+
+it('diz qual código e mostra os nomes que encontrou', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(),
+        linhaDoEscopo(['Nome do componente' => 'Tolerância ao estresse: ter eficácia na modulação.']),
+    ]);
+
+    try {
+        $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+    } catch (RegraDeNegocioException $excecao) {
+        expect($excecao->getMessage())->toContain('LLP (2 nomes')
+            ->toContain('Lógica de Programação')
+            ->toContain('Tolerância ao estresse')
+            // Uma pista do que costuma ser, sem afirmar o que está certo.
+            ->toContain('colunas costumam estar deslocadas');
+
+        return;
+    }
+
+    $this->fail('A planilha com nomes trocados foi aceita.');
+});
+
+/*
+ * Acento e caixa diferentes entre duas linhas é desencontro de
+ * digitação, não troca de coluna — recusar o arquivo por isso seria
+ * devolver à escola um problema que o sistema sabe absorver.
+ */
+it('não recusa por diferença de acento ou caixa no nome', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Nome do componente' => 'Lógica de Programação']),
+        linhaDoEscopo(['Semana' => 2, 'Nome do componente' => 'LOGICA DE PROGRAMACAO']),
+    ]);
+
+    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+
+    expect($relatorio['aulas'])->toBe(2);
+});
+
+it('não confunde códigos diferentes com nomes diferentes', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(),
+        linhaDoEscopo(['Nome do componente' => 'Redes', 'Código componente' => 'RED']),
+    ]);
+
+    expect($this->action->conferir($caminho, $this->curso, 1, $this->paeet)['aulas'])->toBe(2);
+});
+
+it('deixa passar a planilha sem código de componente nenhum', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Código componente' => '']),
+        linhaDoEscopo(['Código componente' => '', 'Nome do componente' => 'Outro componente']),
+    ]);
+
+    // Sem código não há o que conferir: dois nomes são dois componentes.
+    expect($this->action->conferir($caminho, $this->curso, 1, $this->paeet)['aulas'])->toBe(2);
+});
+
+it('aceita o escopo em ODS', function () {
+    $caminho = ($this->arquivo)([linhaDoEscopo()], formato: 'ods');
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    expect(EscopoAula::query()->sole()->titulo_aula)->toBe('O que é um algoritmo');
+});
+
+/*
+ * Cortados no mesmo ponto, dois parágrafos de competência saem
+ * idênticos na mensagem — e quem lê conclui que o sistema se enganou.
+ */
+it('escolhe exemplos que se distinguem depois do corte', function () {
+    $comum = str_repeat('Texto longo que se repete no começo das duas. ', 3);
+
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Nome do componente' => $comum.'Primeira ponta']),
+        linhaDoEscopo(['Semana' => 2, 'Nome do componente' => $comum.'Segunda ponta']),
+        linhaDoEscopo(['Semana' => 3, 'Nome do componente' => 'Começa diferente de todas']),
+    ]);
+
+    try {
+        $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+    } catch (RegraDeNegocioException $excecao) {
+        // O segundo exemplo é o que se distingue, não o que vem depois.
+        expect($excecao->getMessage())->toContain('Começa diferente de todas')
+            ->and(substr_count($excecao->getMessage(), 'Texto longo que se repete'))->toBe(1);
+
+        return;
+    }
+
+    $this->fail('A planilha com nomes trocados foi aceita.');
 });

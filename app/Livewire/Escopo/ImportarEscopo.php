@@ -53,7 +53,9 @@ class ImportarEscopo extends Component
         return [
             'curso_id' => ['required', Rule::in($this->cursosDisponiveis()->pluck('id')->all())],
             'periodo' => ['required', 'integer', 'min:1', 'max:'.$this->maximoDePeriodos()],
-            'planilha' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
+            // ODS junto: o PhpSpreadsheet lê, e quem baixa o escopo e
+            // abre no LibreOffice salva nesse formato sem pensar.
+            'planilha' => ['required', 'file', 'mimes:xlsx,xls,ods,csv', 'max:10240'],
         ];
     }
 
@@ -69,7 +71,7 @@ class ImportarEscopo extends Component
         return [
             'curso_id.required' => 'Escolha o curso a que este escopo pertence.',
             'periodo.required' => 'Escolha o período do curso que a planilha cobre.',
-            'planilha.mimes' => 'Envie o escopo-sequência em XLSX, XLS ou CSV.',
+            'planilha.mimes' => 'Envie o escopo-sequência em XLSX, XLS, ODS ou CSV.',
             'planilha.max' => 'O arquivo passa de 10 MB. Envie só a aba do escopo.',
         ];
     }

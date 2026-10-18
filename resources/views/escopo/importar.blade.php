@@ -1,7 +1,7 @@
 <div class="space-y-4">
     <x-cartao titulo="O arquivo">
         <x-slot:descricao>
-            O escopo-sequência como a rede o publica, em XLSX ou CSV. Conferir não grava nada.
+            O escopo-sequência como a rede o publica, em XLSX, ODS ou CSV. Conferir não grava nada.
         </x-slot:descricao>
 
         <div class="space-y-4 p-4 sm:p-6">
@@ -33,7 +33,7 @@
             </div>
 
             <x-campo rotulo="Planilha do escopo" para="planilha" :erro="$errors->first('planilha')"
-                     ajuda="XLSX, XLS ou CSV, até 10 MB.">
+                     ajuda="XLSX, XLS, ODS ou CSV, até 10 MB.">
                 <input type="file" id="planilha" wire:model="planilha"
                        class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 dark:text-slate-300 dark:file:bg-slate-800 dark:file:text-slate-200">
             </x-campo>

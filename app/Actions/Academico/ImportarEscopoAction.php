@@ -11,6 +11,7 @@ use App\Support\PlanilhaDeEscopo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * Traz o escopo-sequência de um período para dentro do sistema.
@@ -53,6 +54,8 @@ class ImportarEscopoAction
                 .'o nome do componente e o título da aula.'
             );
         }
+
+        $this->recusarNomesTrocados($planilha);
 
         $porDisciplina = $this->disciplinasPorCodigo($curso);
 
@@ -137,6 +140,63 @@ class ImportarEscopoAction
 
             return ['aulas' => $relatorio['aulas'], 'substituidas' => $substituidas];
         });
+    }
+
+    /**
+     * Recusa a planilha em que um código traz vários nomes.
+     *
+     * Isso não é linha ruim solta: é coluna deslocada, e o que entraria
+     * no banco seria o texto de outra coluna no lugar do nome da
+     * matéria. Importar metade certa e metade embaralhada é pior que
+     * não importar — o erro só apareceria na tela, dias depois, sem
+     * nada que o ligasse ao arquivo.
+     */
+    protected function recusarNomesTrocados(PlanilhaDeEscopo $planilha): void
+    {
+        $trocados = $planilha->codigosComNomesTrocados();
+
+        if ($trocados === []) {
+            return;
+        }
+
+        $detalhe = collect($trocados)
+            ->map(fn (array $nomes, string $codigo) => $codigo.' ('.count($nomes).' nomes: '
+                .collect($this->exemplos($nomes))->map(fn (string $nome) => '"'.$nome.'"')->join(' e ')
+                .')')
+            ->join('; ');
+
+        throw RegraDeNegocioException::porque(
+            'Um código de componente identifica um componente só, e nesta planilha há código '
+            .'com vários nomes: '.$detalhe.'. Quando isso acontece, as colunas costumam estar '
+            .'deslocadas — confira se "Nome do componente" não está com o texto de outra coluna. '
+            .'Corrija a planilha e envie de novo.'
+        );
+    }
+
+    /**
+     * Dois nomes que se distingam na tela.
+     *
+     * Cortados no mesmo ponto, dois parágrafos de competência saem
+     * idênticos — "Tolerância ao estresse: Ter eficácia na…" duas
+     * vezes, e quem lê a mensagem conclui que o sistema se enganou. O
+     * segundo exemplo é o primeiro que fica diferente depois do corte.
+     *
+     * @param  array<int, string>  $nomes
+     * @return array<int, string>
+     */
+    protected function exemplos(array $nomes): array
+    {
+        $limite = 60;
+        $primeiro = Str::limit($nomes[0], $limite);
+
+        foreach (array_slice($nomes, 1) as $nome) {
+            if (Str::limit($nome, $limite) !== $primeiro) {
+                return [$primeiro, Str::limit($nome, $limite)];
+            }
+        }
+
+        // Todos começam igual: mostrar o mesmo texto duas vezes não diz nada.
+        return [$primeiro];
     }
 
     protected function validarPeriodo(Curso $curso, int $periodo): void
