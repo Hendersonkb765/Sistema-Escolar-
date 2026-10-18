@@ -583,3 +583,79 @@ it('escolhe exemplos que se distinguem depois do corte', function () {
 
     $this->fail('A planilha com nomes trocados foi aceita.');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Recomposição da aprendizagem
+|--------------------------------------------------------------------------
+|
+| A coluna "Aula complementar" traz "X" no arquivo da rede, e a própria
+| planilha diz o que o X significa numa linha de legenda: "Recomposição
+| da Aprendizagem". São aulas para recompor a aprendizagem do aluno, e
+| no escopo real vêm em semanas inteiras, uma por bimestre.
+*/
+
+it('conta as aulas de recomposição na conferência', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Aula complementar' => '']),
+        linhaDoEscopo(['Semana' => 7, 'Aula complementar' => 'X']),
+        linhaDoEscopo(['Semana' => 7, 'Aula complementar' => 'X', 'Título da aula' => 'Revisão']),
+    ]);
+
+    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+
+    expect($relatorio['aulas'])->toBe(3)
+        ->and($relatorio['recomposicao'])->toBe(2);
+});
+
+it('guarda a marcação como veio e a lê como recomposição', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Aula complementar' => 'X']),
+        linhaDoEscopo(['Semana' => 2, 'Aula complementar' => '']),
+    ]);
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    $aulas = EscopoAula::query()->orderBy('semana')->get();
+
+    expect($aulas[0]->aula_complementar)->toBe('X')
+        ->and($aulas[0]->ehRecomposicao())->toBeTrue()
+        ->and($aulas[1]->aula_complementar)->toBeNull()
+        ->and($aulas[1]->ehRecomposicao())->toBeFalse();
+});
+
+/*
+ * A coluna vem de fora: amanhã pode chegar "Sim" no lugar do "X", e um
+ * "Não" não pode virar aula de recomposição por ser texto preenchido.
+ */
+it('entende o que nega e o que marca na coluna complementar', function () {
+    foreach (['X', 'Sim', 'Recomposição da Aprendizagem'] as $marca) {
+        expect((new EscopoAula(['aula_complementar' => $marca]))->ehRecomposicao())
+            ->toBeTrue("'{$marca}' devia marcar recomposição");
+    }
+
+    foreach (['', 'Não', 'nao', '-', '0'] as $nega) {
+        expect((new EscopoAula(['aula_complementar' => $nega]))->ehRecomposicao())
+            ->toBeFalse("'{$nega}' não devia marcar recomposição");
+    }
+});
+
+/*
+ * A legenda da planilha — uma linha só com "Recomposição da
+ * Aprendizagem" na coluna complementar e nada mais — não é aula.
+ */
+it('não importa a linha de legenda como se fosse aula', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(),
+        array_map(
+            fn (string $coluna) => $coluna === 'Aula complementar' ? 'Recomposição da Aprendizagem' : '',
+            array_combine(CABECALHO_DO_ESCOPO, CABECALHO_DO_ESCOPO)
+        ),
+        linhaDoEscopo(['Semana' => 2]),
+    ]);
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    expect(EscopoAula::query()->count())->toBe(2)
+        ->and(EscopoAula::query()->pluck('semana')->all())->toBe([1, 2]);
+});

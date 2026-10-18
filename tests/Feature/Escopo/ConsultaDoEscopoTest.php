@@ -428,3 +428,150 @@ it('diz ao professor que a coordenação ainda não importou', function () {
         // Importar não é dele, e o botão não aparece.
         ->assertDontSee('>Importar escopo<');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Recomposição da aprendizagem
+|--------------------------------------------------------------------------
+|
+| No escopo real são semanas inteiras, uma por bimestre. "Quando é a
+| semana de recomposição" é pergunta que se faz ao planejar o bimestre,
+| e a tela precisa respondê-la sem abrir oito semanas atrás de um selo.
+*/
+
+it('marca a semana de recomposição sem precisar abri-la', function () {
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'Revisão']);
+    ($this->aula)(['semana' => 8]);
+
+    $semanas = Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->viewData('porSemana')[0]['semanas'];
+
+    $sete = collect($semanas)->firstWhere('semana', 7);
+    $oito = collect($semanas)->firstWhere('semana', 8);
+
+    expect($sete['recomposicao'])->toBe(2)
+        ->and($oito['recomposicao'])->toBe(0);
+});
+
+it('diz na lista que a semana inteira é de recomposição', function () {
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'Revisão']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertSee('Recomposição da aprendizagem');
+});
+
+it('filtra só as aulas de recomposição', function () {
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'De recomposição']);
+    ($this->aula)(['semana' => 8, 'titulo_aula' => 'Aula normal']);
+    ($this->aula)(['semana' => 9, 'aula_complementar' => 'Não', 'titulo_aula' => 'Também normal']);
+
+    $titulos = collect(
+        Livewire::actingAs($this->paeet)
+            ->test(VisaoDoEscopo::class)
+            ->set('filtroCurso', (string) $this->curso->id)
+            ->set('soRecomposicao', true)
+            ->viewData('porSemana')
+    )->flatMap(fn (array $b) => $b['semanas'])
+        ->flatMap(fn (array $s) => $s['aulas']->pluck('titulo_aula'))
+        ->all();
+
+    expect($titulos)->toBe(['De recomposição']);
+});
+
+/*
+ * Planilha sem a coluna preenchida não ganha uma caixa que não faz
+ * nada: um filtro que nunca muda o resultado é ruído na tela.
+ */
+it('só oferece o filtro quando há aula de recomposição', function () {
+    ($this->aula)();
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertDontSee('Só as aulas de recomposição');
+
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertSee('Só as aulas de recomposição');
+});
+
+it('mostra o valor cru da coluna junto do selo', function () {
+    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->call('abrirSemana', '1-7')
+        // A tela não afirma mais do que o arquivo disse.
+        ->assertSee('Aula complementar: X');
+});
+
+/*
+|--------------------------------------------------------------------------
+| O tema é de cada componente
+|--------------------------------------------------------------------------
+|
+| "Tema da semana" é o tema da semana DAQUELE componente. No escopo real
+| a semana 1 tem seis — um por componente. Eleger o primeiro como tema
+| da semana põe "Introdução a Aplicações Móveis" em cima de uma semana
+| que também é de banco de dados e inteligência artificial.
+*/
+
+it('não elege o tema de um componente como tema da semana', function () {
+    ($this->aula)(['tema_semana' => 'Introdução a aplicações móveis']);
+    ($this->aula)([
+        'componente_nome' => 'Redes', 'componente_codigo' => 'RED',
+        'disciplina_id' => $this->redes->id, 'titulo_aula' => 'Cabeamento',
+        'tema_semana' => 'Fundamentos de redes',
+    ]);
+
+    $semana = Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->viewData('porSemana')[0]['semanas'][0];
+
+    expect($semana['tema'])->toBeNull()
+        ->and($semana['temasPorComponente'])->toBe([
+            'Lógica de Programação (LLP)' => 'Introdução a aplicações móveis',
+            'Redes (RED)' => 'Fundamentos de redes',
+        ]);
+});
+
+it('mostra o tema na linha da semana quando só há um', function () {
+    ($this->aula)(['tema_semana' => 'Primeiros algoritmos']);
+    ($this->aula)(['tema_semana' => 'Primeiros algoritmos', 'titulo_aula' => 'Variáveis']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertSee('Primeiros algoritmos')
+        ->assertDontSee('temas, um por componente');
+});
+
+it('avisa quantos temas a semana tem, e põe cada um na sua aula', function () {
+    ($this->aula)(['tema_semana' => 'Introdução a aplicações móveis']);
+    ($this->aula)([
+        'componente_nome' => 'Redes', 'disciplina_id' => $this->redes->id,
+        'titulo_aula' => 'Cabeamento', 'tema_semana' => 'Fundamentos de redes',
+    ]);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertSee('2 temas, um por componente')
+        // Fechada, a linha não escolhe nenhum dos dois.
+        ->assertDontSee('Fundamentos de redes')
+        ->call('abrirSemana', '1-1')
+        // Aberta, cada aula traz o seu.
+        ->assertSee('Fundamentos de redes')
+        ->assertSee('Introdução a aplicações móveis');
+});

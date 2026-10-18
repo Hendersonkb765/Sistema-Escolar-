@@ -66,6 +66,18 @@
                 ver. Mas a semana do colega não é segredo — é o que a
                 turma viu antes da aula dele —, então dá para desligar.
             --}}
+            @if ($temRecomposicao)
+                <div class="flex items-end sm:col-span-2">
+                    <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
+                        <input type="checkbox" wire:model.live="soRecomposicao" @checked($soRecomposicao)
+                               class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
+                        <span class="text-slate-700 dark:text-slate-200">
+                            Só as aulas de recomposição da aprendizagem
+                        </span>
+                    </label>
+                </div>
+            @endif
+
             @if ($temDisciplinas)
                 <div class="flex items-end sm:col-span-2">
                     <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
@@ -153,10 +165,31 @@
                                         <span class="text-xs text-slate-400">
                                             {{ $semana['aulas']->count() }} aula(s)
                                         </span>
+                                        {{--
+                                            No escopo real a semana inteira é de
+                                            recomposição, uma por bimestre. Dizer
+                                            isso na linha fechada evita abrir oito
+                                            semanas até achar a certa.
+                                        --}}
+                                        @if ($semana['recomposicao'] > 0)
+                                            <x-badge cor="amarelo" :rotulo="$semana['recomposicao'] === $semana['aulas']->count()
+                                                ? 'Recomposição da aprendizagem'
+                                                : $semana['recomposicao'].' de recomposição'"/>
+                                        @endif
                                     </span>
                                     @if ($semana['tema'])
                                         <span class="mt-0.5 block text-sm text-slate-600 dark:text-slate-300">
                                             {{ $semana['tema'] }}
+                                        </span>
+                                    @elseif (count($semana['temasPorComponente']) > 1)
+                                        {{--
+                                            Cada componente tem o seu tema nesta
+                                            semana. Eleger um deles seria pôr
+                                            "Aplicações Móveis" em cima de uma
+                                            semana que também é de banco de dados.
+                                        --}}
+                                        <span class="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">
+                                            {{ count($semana['temasPorComponente']) }} temas, um por componente
                                         </span>
                                     @endif
                                     <span class="mt-1 block truncate text-xs text-slate-400">
@@ -179,6 +212,16 @@
                                                     {{ $aula->titulo_aula }}
                                                 </h3>
                                                 <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                                    {{--
+                                                        O valor cru vai no `title`: a coluna é de
+                                                        fora, e o selo não pode afirmar mais do que
+                                                        o arquivo disse.
+                                                    --}}
+                                                    @if ($aula->ehRecomposicao())
+                                                        <span title="Aula complementar: {{ $aula->aula_complementar }}">
+                                                            <x-badge cor="amarelo" rotulo="Recomposição da aprendizagem"/>
+                                                        </span>
+                                                    @endif
                                                     @if ($aula->disciplina)
                                                         <x-badge cor="azul" :rotulo="$aula->disciplina->nome"/>
                                                     @endif
@@ -194,6 +237,13 @@
                                                     · {{ $aula->unidade_nome }}
                                                 @endif
                                             </p>
+
+                                            {{-- O tema fica aqui quando a semana tem vários. --}}
+                                            @if ($aula->tema_semana && ! $semana['tema'])
+                                                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                                    {{ $aula->tema_semana }}
+                                                </p>
+                                            @endif
 
                                             {{--
                                                 Só o que veio preenchido. O arquivo chega de
@@ -219,15 +269,9 @@
                                                 @endforeach
                                             </dl>
 
-                                            @if ($aula->aula_complementar || $aula->aulas_semanais)
+                                            @if ($aula->aulas_semanais)
                                                 <p class="mt-3 border-t border-slate-100 pt-2 text-xs text-slate-400 dark:border-slate-800">
-                                                    @if ($aula->aula_complementar)
-                                                        Aula complementar: {{ $aula->aula_complementar }}
-                                                    @endif
-                                                    @if ($aula->aula_complementar && $aula->aulas_semanais) · @endif
-                                                    @if ($aula->aulas_semanais)
-                                                        Aulas semanais: {{ $aula->aulas_semanais }}
-                                                    @endif
+                                                    Aulas semanais: {{ $aula->aulas_semanais }}
                                                 </p>
                                             @endif
                                         </article>

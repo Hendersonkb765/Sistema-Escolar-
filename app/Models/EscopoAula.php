@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Uma aula do escopo-sequência: o que se ensina na semana tal.
@@ -77,6 +78,37 @@ class EscopoAula extends Model
     public function disciplina(): BelongsTo
     {
         return $this->belongsTo(Disciplina::class);
+    }
+
+    /**
+     * Aula para recompor a aprendizagem do aluno.
+     *
+     * Vem da coluna "Aula complementar", que no arquivo da rede traz um
+     * "X" — e a própria planilha diz o que o X significa, numa linha de
+     * legenda: "Recomposição da Aprendizagem". No escopo real elas vêm
+     * em semanas inteiras, uma por bimestre.
+     *
+     * Qualquer valor conta, menos os que negam: a coluna é de fora, e
+     * amanhã pode vir "Sim" no lugar do "X". O valor cru fica guardado
+     * e aparece no `title`, para a tela nunca afirmar mais do que o
+     * arquivo disse.
+     */
+    public function ehRecomposicao(): bool
+    {
+        $valor = mb_strtolower(trim((string) $this->aula_complementar));
+
+        return $valor !== '' && ! in_array($valor, ['não', 'nao', 'n', '-', '0', 'false'], true);
+    }
+
+    /** @param  Builder<static>  $query */
+    public function scopeDeRecomposicao(Builder $query): Builder
+    {
+        return $query
+            ->whereNotNull('aula_complementar')
+            ->whereNotIn(
+                DB::raw('lower(trim(aula_complementar))'),
+                ['', 'não', 'nao', 'n', '-', '0', 'false']
+            );
     }
 
     /**

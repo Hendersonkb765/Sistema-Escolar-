@@ -75,6 +75,14 @@ class ImportarEscopoAction
 
         return [
             'aulas' => count($aproveitaveis),
+            // Contadas na conferência para quem importa poder desconfiar:
+            // no escopo real são semanas inteiras, uma por bimestre, e um
+            // número muito fora disso costuma ser coluna trocada.
+            'recomposicao' => collect($aproveitaveis)
+                ->filter(fn (array $linha) => (new EscopoAula(
+                    ['aula_complementar' => $linha['aula_complementar']]
+                ))->ehRecomposicao())
+                ->count(),
             'recusadas' => $planilha->recusadas(),
             'substituira' => EscopoAula::query()
                 ->where('curso_id', $curso->getKey())

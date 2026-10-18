@@ -52,6 +52,16 @@ class VisaoDoEscopo extends Component
     #[Url(as: 'meus', except: false)]
     public bool $soOsMeus = false;
 
+    /**
+     * Só as aulas de recomposição da aprendizagem.
+     *
+     * No escopo real elas vêm em semanas inteiras, uma por bimestre —
+     * e "quando é a semana de recomposição" é pergunta que se faz ao
+     * planejar o bimestre, não rolando a página atrás de um selo.
+     */
+    #[Url(as: 'recomposicao', except: false)]
+    public bool $soRecomposicao = false;
+
     /** A semana aberta, para ver as aulas dela. */
     public ?string $semanaAberta = null;
 
@@ -167,6 +177,7 @@ class VisaoDoEscopo extends Component
             ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
             ->when($this->filtroComponente !== '', fn (Builder $q) => $q->where('componente_nome', $this->filtroComponente))
             ->when($this->soOsMeus && $minhas !== [], fn (Builder $q) => $q->whereIn('disciplina_id', $minhas))
+            ->when($this->soRecomposicao, fn (Builder $q) => $q->deRecomposicao())
             /*
              * A busca cobre o que se procura de verdade: o título da
              * aula, o tema da semana e o objeto de conhecimento. Quem
@@ -192,8 +203,28 @@ class VisaoDoEscopo extends Component
                     ->map(fn (Collection $daSemana, int $semana) => [
                         'semana' => $semana,
                         'chave' => $bimestre.'-'.$semana,
-                        // O tema é da semana: a primeira aula que o traz responde pelas outras.
-                        'tema' => $daSemana->pluck('tema_semana')->filter()->first(),
+                        // Quantas da semana são de recomposição: no escopo
+                        // real a semana inteira costuma ser, e saber disso
+                        // sem abrir é o que a lista precisa dizer.
+                        'recomposicao' => $daSemana->filter->ehRecomposicao()->count(),
+                        /*
+                         * "Tema da semana" é da semana DAQUELE componente:
+                         * na semana 1 do escopo real há seis temas, um por
+                         * componente. Mostrar o primeiro como se fosse o da
+                         * semana põe "Introdução a Aplicações Móveis" em
+                         * cima de uma semana que também tem banco de dados
+                         * e inteligência artificial. Com mais de um, a
+                         * linha cala — e cada aula diz o seu.
+                         */
+                        'tema' => $daSemana->pluck('tema_semana')->filter()->unique()->count() === 1
+                            ? $daSemana->pluck('tema_semana')->filter()->first()
+                            : null,
+                        'temasPorComponente' => $daSemana
+                            ->filter(fn (EscopoAula $aula) => $aula->tema_semana !== null)
+                            ->groupBy(fn (EscopoAula $aula) => $aula->componente())
+                            ->map(fn (Collection $aulas) => $aulas->first()->tema_semana)
+                            ->sortKeys()
+                            ->all(),
                         'componentes' => $daSemana->map->componente()->unique()->sort()->values()->all(),
                         'aulas' => $daSemana->values(),
                     ])
@@ -218,6 +249,9 @@ class VisaoDoEscopo extends Component
                 ->flatMap(fn (array $b) => $b['semanas'])
                 ->sum(fn (array $s) => $s['aulas']->count()),
             'temDisciplinas' => auth()->user()->disciplinaIds() !== [],
+            // Só oferece o filtro quando há o que filtrar: planilha sem
+            // a coluna preenchida não ganha uma caixa que não faz nada.
+            'temRecomposicao' => $this->filtroCurso !== '' && (clone $this->consulta())->deRecomposicao()->exists(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Escopo-sequência',
             'subtitulo' => 'O que se ensina em cada semana do curso',
