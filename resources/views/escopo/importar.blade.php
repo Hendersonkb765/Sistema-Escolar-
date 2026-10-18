@@ -58,12 +58,11 @@
             </x-slot:descricao>
 
             <div class="space-y-4 p-4 sm:p-6">
-                <dl class="grid grid-cols-2 gap-4 sm:grid-cols-5">
+                <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     @foreach ([
                         ['Aulas na planilha', $relatorio['aulas']],
                         ['Componentes', count($relatorio['componentes'])],
                         ['Linhas recusadas', count($relatorio['recusadas'])],
-                        ['De recomposição', $relatorio['recomposicao']],
                         ['Aulas substituídas', $relatorio['substituira']],
                     ] as [$rotulo, $valor])
                         <div>

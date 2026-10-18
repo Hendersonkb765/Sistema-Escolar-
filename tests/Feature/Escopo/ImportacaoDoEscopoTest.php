@@ -269,15 +269,65 @@ it('avisa na conferência quais componentes não casaram', function () {
 });
 
 /*
- * Sem código não há como casar, e casar no escuro é pior que não casar.
- * A disciplina de código vazio existe no cenário de propósito: é com
- * ela que uma chave "nada" colidiria, se a ausência virasse string
- * vazia em vez de um valor que nenhuma disciplina tem.
+ * O código do arquivo e o do cadastro raramente são o mesmo: no escopo
+ * real da rede os componentes vêm como C1 a C6 — numeração da planilha,
+ * não identificador de disciplina — e o cadastro usa PMOB, PBE, VCSM.
+ * Pelo código nenhum casaria.
  */
-it('não casa componente sem código com disciplina nenhuma', function () {
+it('casa pelo nome quando o código não bate com nenhuma disciplina', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(['Código componente' => 'C1']),
+    ]);
+
+    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+
+    expect($relatorio['componentes'][0]['disciplina'])->toBe('Lógica de Programação')
+        ->and($relatorio['componentes'][0]['casou_por'])->toBe('nome');
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    expect(EscopoAula::query()->sole()->disciplina_id)
+        ->toBe($this->disciplinas['Lógica de Programação']->id);
+});
+
+it('casa pelo nome também quando a planilha não traz código', function () {
+    $caminho = ($this->arquivo)([linhaDoEscopo(['Código componente' => ''])]);
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    expect(EscopoAula::query()->sole()->disciplina_id)
+        ->toBe($this->disciplinas['Lógica de Programação']->id);
+});
+
+/*
+ * O código tem precedência: quando os dois sistemas usam o mesmo, é a
+ * identificação mais estável, e um nome divergente não a desfaz.
+ */
+it('prefere o código ao nome quando os dois apontam para lados diferentes', function () {
+    // Libera o código antes de passá-lo adiante: ele é único no curso.
+    $this->disciplinas['Lógica de Programação']->update(['codigo' => 'OUTRO']);
+    $this->disciplinas['Redes']->update(['codigo' => 'LLP']);
+
+    $caminho = ($this->arquivo)([linhaDoEscopo(['Código componente' => 'LLP'])]);
+
+    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+
+    expect($relatorio['componentes'][0]['disciplina'])->toBe('Redes')
+        ->and($relatorio['componentes'][0]['casou_por'])->toBe('código');
+});
+
+/*
+ * Sem código e sem nome que bata, não casa — e casar no escuro é pior
+ * que não casar. A disciplina de código vazio existe no cenário de
+ * propósito: é com ela que uma chave "nada" colidiria.
+ */
+it('não casa o componente que não tem código nem nome correspondente', function () {
     $this->disciplinas['Redes']->update(['codigo' => ' ']);
 
-    $caminho = ($this->arquivo)([linhaDoEscopo(['Código componente' => ''])]);
+    $caminho = ($this->arquivo)([linhaDoEscopo([
+        'Código componente' => '',
+        'Nome do componente' => 'Componente que não existe no cadastro',
+    ])]);
 
     $this->action->executar($caminho, $this->curso, 1, $this->paeet);
 
@@ -594,51 +644,6 @@ it('escolhe exemplos que se distinguem depois do corte', function () {
 | da Aprendizagem". São aulas para recompor a aprendizagem do aluno, e
 | no escopo real vêm em semanas inteiras, uma por bimestre.
 */
-
-it('conta as aulas de recomposição na conferência', function () {
-    $caminho = ($this->arquivo)([
-        linhaDoEscopo(['Aula complementar' => '']),
-        linhaDoEscopo(['Semana' => 7, 'Aula complementar' => 'X']),
-        linhaDoEscopo(['Semana' => 7, 'Aula complementar' => 'X', 'Título da aula' => 'Revisão']),
-    ]);
-
-    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
-
-    expect($relatorio['aulas'])->toBe(3)
-        ->and($relatorio['recomposicao'])->toBe(2);
-});
-
-it('guarda a marcação como veio e a lê como recomposição', function () {
-    $caminho = ($this->arquivo)([
-        linhaDoEscopo(['Aula complementar' => 'X']),
-        linhaDoEscopo(['Semana' => 2, 'Aula complementar' => '']),
-    ]);
-
-    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
-
-    $aulas = EscopoAula::query()->orderBy('semana')->get();
-
-    expect($aulas[0]->aula_complementar)->toBe('X')
-        ->and($aulas[0]->ehRecomposicao())->toBeTrue()
-        ->and($aulas[1]->aula_complementar)->toBeNull()
-        ->and($aulas[1]->ehRecomposicao())->toBeFalse();
-});
-
-/*
- * A coluna vem de fora: amanhã pode chegar "Sim" no lugar do "X", e um
- * "Não" não pode virar aula de recomposição por ser texto preenchido.
- */
-it('entende o que nega e o que marca na coluna complementar', function () {
-    foreach (['X', 'Sim', 'Recomposição da Aprendizagem'] as $marca) {
-        expect((new EscopoAula(['aula_complementar' => $marca]))->ehRecomposicao())
-            ->toBeTrue("'{$marca}' devia marcar recomposição");
-    }
-
-    foreach (['', 'Não', 'nao', '-', '0'] as $nega) {
-        expect((new EscopoAula(['aula_complementar' => $nega]))->ehRecomposicao())
-            ->toBeFalse("'{$nega}' não devia marcar recomposição");
-    }
-});
 
 /*
  * A legenda da planilha — uma linha só com "Recomposição da

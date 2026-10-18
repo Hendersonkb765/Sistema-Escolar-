@@ -57,32 +57,28 @@ class ImportarEscopoAction
 
         $this->recusarNomesTrocados($planilha);
 
-        $porDisciplina = $this->disciplinasPorCodigo($curso);
+        $disciplinas = $this->disciplinasDo($curso);
 
         $componentes = collect($aproveitaveis)
             ->groupBy(fn (array $linha) => $linha['componente_codigo'] ?? $linha['componente_nome'])
-            ->map(fn (Collection $aulas) => [
-                'codigo' => $aulas->first()['componente_codigo'],
-                'nome' => $aulas->first()['componente_nome'],
-                'aulas' => $aulas->count(),
-                'disciplina' => $porDisciplina->get(
-                    $this->chaveDoCodigo($aulas->first()['componente_codigo'])
-                )?->nome,
-            ])
+            ->map(function (Collection $aulas) use ($disciplinas) {
+                $primeira = $aulas->first();
+                [$disciplina, $por] = $this->casar($primeira, $disciplinas);
+
+                return [
+                    'codigo' => $primeira['componente_codigo'],
+                    'nome' => $primeira['componente_nome'],
+                    'aulas' => $aulas->count(),
+                    'disciplina' => $disciplina?->nome,
+                    'casou_por' => $por,
+                ];
+            })
             ->sortBy('nome')
             ->values()
             ->all();
 
         return [
             'aulas' => count($aproveitaveis),
-            // Contadas na conferência para quem importa poder desconfiar:
-            // no escopo real são semanas inteiras, uma por bimestre, e um
-            // número muito fora disso costuma ser coluna trocada.
-            'recomposicao' => collect($aproveitaveis)
-                ->filter(fn (array $linha) => (new EscopoAula(
-                    ['aula_complementar' => $linha['aula_complementar']]
-                ))->ehRecomposicao())
-                ->count(),
             'recusadas' => $planilha->recusadas(),
             'substituira' => EscopoAula::query()
                 ->where('curso_id', $curso->getKey())
@@ -108,9 +104,9 @@ class ImportarEscopoAction
         $relatorio = $this->conferir($caminho, $curso, $periodo, $autor);
 
         $planilha = PlanilhaDeEscopo::ler($caminho);
-        $porDisciplina = $this->disciplinasPorCodigo($curso);
+        $disciplinas = $this->disciplinasDo($curso);
 
-        return DB::transaction(function () use ($curso, $periodo, $autor, $planilha, $porDisciplina, $relatorio) {
+        return DB::transaction(function () use ($curso, $periodo, $autor, $planilha, $disciplinas, $relatorio) {
             $substituidas = EscopoAula::query()
                 ->where('curso_id', $curso->getKey())
                 ->where('periodo', $periodo)
@@ -120,8 +116,7 @@ class ImportarEscopoAction
                 EscopoAula::query()->create([
                     'curso_id' => $curso->getKey(),
                     'periodo' => $periodo,
-                    'disciplina_id' => $porDisciplina
-                        ->get($this->chaveDoCodigo($linha['componente_codigo']))?->getKey(),
+                    'disciplina_id' => $this->casar($linha, $disciplinas)[0]?->getKey(),
                     'bimestre' => $linha['bimestre'],
                     'semana' => $linha['semana'],
                     'ordem' => $linha['ordem'],
@@ -218,20 +213,55 @@ class ImportarEscopoAction
     }
 
     /**
-     * As disciplinas do curso, indexadas pelo código normalizado.
+     * As disciplinas do curso, indexadas por código e por nome.
      *
-     * Pelo código, e não pelo nome: "Programação Back-End" e
-     * "Programação Back End" são a mesma disciplina para a escola e duas
-     * para um `where`. O código é curto, estável e é o que a rede usa
-     * para identificar o componente.
+     * Pelos dois porque o código do arquivo e o do cadastro raramente
+     * são o mesmo: no escopo real da rede os componentes vêm como C1 a
+     * C6 — numeração da planilha, não identificador de disciplina — e o
+     * cadastro usa PMOB, PBE, VCSM. Pelo código nenhum casaria; pelo
+     * nome, os seis casam.
      *
-     * @return Collection<string, Disciplina>
+     * O código tem precedência: quando os dois sistemas usam o mesmo, é
+     * a identificação mais estável. O nome é a reserva, comparado sem
+     * acento nem caixa — "Programação Back-End" e "PROGRAMACAO
+     * BACK-END" são a mesma matéria para a escola.
+     *
+     * @return array{codigo: Collection<string, Disciplina>, nome: Collection<string, Disciplina>}
      */
-    protected function disciplinasPorCodigo(Curso $curso): Collection
+    protected function disciplinasDo(Curso $curso): array
     {
-        return $curso->disciplinas()
-            ->get(['id', 'curso_id', 'nome', 'codigo'])
-            ->keyBy(fn (Disciplina $disciplina) => $this->chaveDoCodigo($disciplina->codigo));
+        $disciplinas = $curso->disciplinas()->get(['id', 'curso_id', 'nome', 'codigo']);
+
+        return [
+            'codigo' => $disciplinas
+                ->filter(fn (Disciplina $d) => trim((string) $d->codigo) !== '')
+                ->keyBy(fn (Disciplina $d) => $this->chaveDoCodigo($d->codigo)),
+            'nome' => $disciplinas->keyBy(fn (Disciplina $d) => PlanilhaDeEscopo::normalizar($d->nome)),
+        ];
+    }
+
+    /**
+     * A disciplina de uma linha, e por qual caminho ela casou.
+     *
+     * @param  array<string, mixed>  $linha
+     * @param  array{codigo: Collection<string, Disciplina>, nome: Collection<string, Disciplina>}  $disciplinas
+     * @return array{0: ?Disciplina, 1: ?string}
+     */
+    protected function casar(array $linha, array $disciplinas): array
+    {
+        $codigo = $linha['componente_codigo'];
+
+        if ($codigo !== null) {
+            $pelaChave = $disciplinas['codigo']->get($this->chaveDoCodigo($codigo));
+
+            if ($pelaChave !== null) {
+                return [$pelaChave, 'código'];
+            }
+        }
+
+        $peloNome = $disciplinas['nome']->get(PlanilhaDeEscopo::normalizar($linha['componente_nome']));
+
+        return $peloNome === null ? [null, null] : [$peloNome, 'nome'];
     }
 
     protected function chaveDoCodigo(?string $codigo): string

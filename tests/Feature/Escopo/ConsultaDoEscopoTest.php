@@ -196,35 +196,11 @@ it('troca de curso limpa os filtros do curso anterior', function () {
 */
 
 /*
- * Ele veio ver a aula dele — e procurar os componentes dele entre seis é
- * o trabalho que esta tela existe para poupar.
+ * Ele veio ver a aula dele. O escopo de um curso tem seis componentes e
+ * mais de quinhentas aulas, e quem dá Programação Mobile não veio ler o
+ * percurso de banco de dados.
  */
-it('abre o professor já nos componentes que ele leciona', function () {
-    ($this->aula)(['titulo_aula' => 'Minha aula']);
-    ($this->aula)([
-        'componente_nome' => 'Redes', 'disciplina_id' => $this->redes->id,
-        'titulo_aula' => 'Aula do colega',
-    ]);
-
-    $componente = Livewire::actingAs($this->professor)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id);
-
-    expect($componente->get('soOsMeus'))->toBeTrue();
-
-    $titulos = collect($componente->viewData('porSemana'))
-        ->flatMap(fn (array $b) => $b['semanas'])
-        ->flatMap(fn (array $s) => $s['aulas']->pluck('titulo_aula'))
-        ->all();
-
-    expect($titulos)->toBe(['Minha aula']);
-});
-
-/*
- * A semana do colega não é segredo: é o que a turma viu antes da aula
- * dele, e saber disso é parte de dar a sua.
- */
-it('deixa o professor ver o percurso inteiro ao desligar o filtro', function () {
+it('mostra ao professor só as matérias que ele leciona', function () {
     ($this->aula)(['titulo_aula' => 'Minha aula']);
     ($this->aula)([
         'componente_nome' => 'Redes', 'disciplina_id' => $this->redes->id,
@@ -235,13 +211,64 @@ it('deixa o professor ver o percurso inteiro ao desligar o filtro', function () 
         Livewire::actingAs($this->professor)
             ->test(VisaoDoEscopo::class)
             ->set('filtroCurso', (string) $this->curso->id)
+            ->viewData('porSemana')
+    )->flatMap(fn (array $b) => $b['semanas'])
+        ->flatMap(fn (array $s) => $s['aulas']->pluck('titulo_aula'))
+        ->all();
+
+    expect($titulos)->toBe(['Minha aula']);
+});
+
+/*
+ * Não é preferência que se desliga: é o recorte do model, e por isso a
+ * caixa nem aparece para ele.
+ */
+it('não oferece ao professor a opção de ver o curso inteiro', function () {
+    ($this->aula)();
+
+    Livewire::actingAs($this->professor)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->assertDontSee('Só os componentes que eu leciono');
+
+    // Nem forçando pelo endereço: quem filtra é a consulta, não a caixa.
+    $titulos = collect(
+        Livewire::actingAs($this->professor)
+            ->test(VisaoDoEscopo::class)
+            ->set('filtroCurso', (string) $this->curso->id)
             ->set('soOsMeus', false)
             ->viewData('porSemana')
     )->flatMap(fn (array $b) => $b['semanas'])
         ->flatMap(fn (array $s) => $s['aulas']->pluck('titulo_aula'))
         ->all();
 
-    expect($titulos)->toBe(['Minha aula', 'Aula do colega']);
+    expect($titulos)->toBe(['Algoritmos']);
+});
+
+/*
+ * A aula só chega ao professor quando o componente da planilha casou
+ * com uma disciplina. Sem isso ele abre a tela vazia, e precisa saber
+ * que o conserto é da coordenação.
+ */
+it('não mostra ao professor a aula cujo componente não casou', function () {
+    ($this->aula)(['titulo_aula' => 'Minha aula']);
+    ($this->aula)(['disciplina_id' => null, 'titulo_aula' => 'Componente órfão']);
+
+    // Direto no escopo do model: a tela tem outros caminhos para ficar
+    // vazia, e é este recorte que precisa valer sozinho.
+    expect(EscopoAula::query()->visivelPara($this->professor)->pluck('titulo_aula')->all())
+        ->toBe(['Minha aula'])
+        // A gestão vê as duas, inclusive a órfã.
+        ->and(EscopoAula::query()->visivelPara($this->paeet)->count())->toBe(2);
+});
+
+it('explica ao professor sem escopo nenhum por que a tela está vazia', function () {
+    ($this->aula)(['disciplina_id' => null, 'titulo_aula' => 'Componente órfão']);
+
+    Livewire::actingAs($this->professor)
+        ->test(VisaoDoEscopo::class)
+        ->assertSee('Nenhum escopo-sequência para você aqui')
+        ->assertSee('não casou com a disciplina do cadastro');
 });
 
 it('abre a gestão com o percurso inteiro', function () {
@@ -415,104 +442,19 @@ it('marca no select o filtro que veio do endereço', function () {
 it('convida a coordenação a importar quando não há escopo nenhum', function () {
     Livewire::actingAs($this->paeet)
         ->test(VisaoDoEscopo::class)
-        ->assertSee('Nenhum escopo-sequência importado ainda')
+        ->assertSee('Nenhum escopo-sequência para você aqui')
         ->assertSee('Importar escopo')
         ->assertDontSee('Escolha acima para vê-lo');
 });
 
-it('diz ao professor que a coordenação ainda não importou', function () {
+it('explica ao professor os dois motivos de a tela estar vazia', function () {
     Livewire::actingAs($this->professor)
         ->test(VisaoDoEscopo::class)
-        ->assertSee('Nenhum escopo-sequência importado ainda')
-        ->assertSee('A coordenação ainda não importou')
+        ->assertSee('Nenhum escopo-sequência para você aqui')
+        ->assertSee('ainda não foi importado')
+        ->assertSee('não casou com a disciplina do cadastro')
         // Importar não é dele, e o botão não aparece.
         ->assertDontSee('>Importar escopo<');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Recomposição da aprendizagem
-|--------------------------------------------------------------------------
-|
-| No escopo real são semanas inteiras, uma por bimestre. "Quando é a
-| semana de recomposição" é pergunta que se faz ao planejar o bimestre,
-| e a tela precisa respondê-la sem abrir oito semanas atrás de um selo.
-*/
-
-it('marca a semana de recomposição sem precisar abri-la', function () {
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'Revisão']);
-    ($this->aula)(['semana' => 8]);
-
-    $semanas = Livewire::actingAs($this->paeet)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id)
-        ->viewData('porSemana')[0]['semanas'];
-
-    $sete = collect($semanas)->firstWhere('semana', 7);
-    $oito = collect($semanas)->firstWhere('semana', 8);
-
-    expect($sete['recomposicao'])->toBe(2)
-        ->and($oito['recomposicao'])->toBe(0);
-});
-
-it('diz na lista que a semana inteira é de recomposição', function () {
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'Revisão']);
-
-    Livewire::actingAs($this->paeet)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id)
-        ->assertSee('Recomposição da aprendizagem');
-});
-
-it('filtra só as aulas de recomposição', function () {
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X', 'titulo_aula' => 'De recomposição']);
-    ($this->aula)(['semana' => 8, 'titulo_aula' => 'Aula normal']);
-    ($this->aula)(['semana' => 9, 'aula_complementar' => 'Não', 'titulo_aula' => 'Também normal']);
-
-    $titulos = collect(
-        Livewire::actingAs($this->paeet)
-            ->test(VisaoDoEscopo::class)
-            ->set('filtroCurso', (string) $this->curso->id)
-            ->set('soRecomposicao', true)
-            ->viewData('porSemana')
-    )->flatMap(fn (array $b) => $b['semanas'])
-        ->flatMap(fn (array $s) => $s['aulas']->pluck('titulo_aula'))
-        ->all();
-
-    expect($titulos)->toBe(['De recomposição']);
-});
-
-/*
- * Planilha sem a coluna preenchida não ganha uma caixa que não faz
- * nada: um filtro que nunca muda o resultado é ruído na tela.
- */
-it('só oferece o filtro quando há aula de recomposição', function () {
-    ($this->aula)();
-
-    Livewire::actingAs($this->paeet)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id)
-        ->assertDontSee('Só as aulas de recomposição');
-
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
-
-    Livewire::actingAs($this->paeet)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id)
-        ->assertSee('Só as aulas de recomposição');
-});
-
-it('mostra o valor cru da coluna junto do selo', function () {
-    ($this->aula)(['semana' => 7, 'aula_complementar' => 'X']);
-
-    Livewire::actingAs($this->paeet)
-        ->test(VisaoDoEscopo::class)
-        ->set('filtroCurso', (string) $this->curso->id)
-        ->call('abrirSemana', '1-7')
-        // A tela não afirma mais do que o arquivo disse.
-        ->assertSee('Aula complementar: X');
 });
 
 /*

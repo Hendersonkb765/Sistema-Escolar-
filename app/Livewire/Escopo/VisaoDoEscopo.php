@@ -43,24 +43,15 @@ class VisaoDoEscopo extends Component
     public string $busca = '';
 
     /**
-     * Abrir só nos componentes de quem olha.
+     * Só os componentes de quem olha.
      *
-     * Liga sozinho para o professor — é o que ele veio ver —, e fica
-     * desligado para a gestão. Em qualquer dos dois dá para trocar: a
-     * semana do colega não é segredo, só não é o que se procurava.
+     * Para o professor isso não é escolha: o recorte do model já lhe
+     * entrega apenas as matérias que ele leciona, e a caixa some da
+     * tela. Para a gestão, que vê o curso inteiro, é um atalho — um
+     * PAEET que também dá aula pode querer só as dele.
      */
     #[Url(as: 'meus', except: false)]
     public bool $soOsMeus = false;
-
-    /**
-     * Só as aulas de recomposição da aprendizagem.
-     *
-     * No escopo real elas vêm em semanas inteiras, uma por bimestre —
-     * e "quando é a semana de recomposição" é pergunta que se faz ao
-     * planejar o bimestre, não rolando a página atrás de um selo.
-     */
-    #[Url(as: 'recomposicao', except: false)]
-    public bool $soRecomposicao = false;
 
     /** A semana aberta, para ver as aulas dela. */
     public ?string $semanaAberta = null;
@@ -68,10 +59,6 @@ class VisaoDoEscopo extends Component
     public function mount(): void
     {
         $this->authorize('viewAny', EscopoAula::class);
-
-        if (! auth()->user()->ehGestao() && auth()->user()->disciplinaIds() !== []) {
-            $this->soOsMeus = true;
-        }
 
         $this->escolherCursoSozinho();
     }
@@ -177,7 +164,6 @@ class VisaoDoEscopo extends Component
             ->when($this->filtroBimestre !== '', fn (Builder $q) => $q->where('bimestre', $this->filtroBimestre))
             ->when($this->filtroComponente !== '', fn (Builder $q) => $q->where('componente_nome', $this->filtroComponente))
             ->when($this->soOsMeus && $minhas !== [], fn (Builder $q) => $q->whereIn('disciplina_id', $minhas))
-            ->when($this->soRecomposicao, fn (Builder $q) => $q->deRecomposicao())
             /*
              * A busca cobre o que se procura de verdade: o título da
              * aula, o tema da semana e o objeto de conhecimento. Quem
@@ -203,10 +189,6 @@ class VisaoDoEscopo extends Component
                     ->map(fn (Collection $daSemana, int $semana) => [
                         'semana' => $semana,
                         'chave' => $bimestre.'-'.$semana,
-                        // Quantas da semana são de recomposição: no escopo
-                        // real a semana inteira costuma ser, e saber disso
-                        // sem abrir é o que a lista precisa dizer.
-                        'recomposicao' => $daSemana->filter->ehRecomposicao()->count(),
                         /*
                          * "Tema da semana" é da semana DAQUELE componente:
                          * na semana 1 do escopo real há seis temas, um por
@@ -248,10 +230,9 @@ class VisaoDoEscopo extends Component
             'totalDeAulas' => collect($porSemana)
                 ->flatMap(fn (array $b) => $b['semanas'])
                 ->sum(fn (array $s) => $s['aulas']->count()),
-            'temDisciplinas' => auth()->user()->disciplinaIds() !== [],
-            // Só oferece o filtro quando há o que filtrar: planilha sem
-            // a coluna preenchida não ganha uma caixa que não faz nada.
-            'temRecomposicao' => $this->filtroCurso !== '' && (clone $this->consulta())->deRecomposicao()->exists(),
+            // A caixa é da gestão: o professor já chega recortado.
+            'temDisciplinas' => auth()->user()->ehGestao() && auth()->user()->disciplinaIds() !== [],
+            'ehProfessor' => ! auth()->user()->ehGestao(),
         ])->layout('components.layouts.app', [
             'titulo' => 'Escopo-sequência',
             'subtitulo' => 'O que se ensina em cada semana do curso',

@@ -8,6 +8,12 @@
             </x-slot:acoes>
         @endif
 
+        @if ($ehProfessor)
+            <x-slot:descricao>
+                As matérias que você leciona, semana a semana.
+            </x-slot:descricao>
+        @endif
+
         <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
             {{--
                 `@selected` em cada opção: o estado do componente não
@@ -66,18 +72,6 @@
                 ver. Mas a semana do colega não é segredo — é o que a
                 turma viu antes da aula dele —, então dá para desligar.
             --}}
-            @if ($temRecomposicao)
-                <div class="flex items-end sm:col-span-2">
-                    <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
-                        <input type="checkbox" wire:model.live="soRecomposicao" @checked($soRecomposicao)
-                               class="rounded border-slate-300 text-marca-600 focus:ring-marca-500 dark:border-slate-700 dark:bg-slate-950">
-                        <span class="text-slate-700 dark:text-slate-200">
-                            Só as aulas de recomposição da aprendizagem
-                        </span>
-                    </label>
-                </div>
-            @endif
-
             @if ($temDisciplinas)
                 <div class="flex items-end sm:col-span-2">
                     <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800">
@@ -100,13 +94,23 @@
     --}}
     @if ($cursos->isEmpty())
         <x-cartao>
-            <x-vazio titulo="Nenhum escopo-sequência importado ainda">
+            <x-vazio titulo="Nenhum escopo-sequência para você aqui">
                 <x-slot:descricao>
                     @can('importar', App\Models\EscopoAula::class)
                         O escopo vem da rede como planilha, um arquivo por período de cada curso.
                         Importe o primeiro para que ele apareça aqui.
                     @else
-                        A coordenação ainda não importou o escopo dos cursos em que você leciona.
+                        {{--
+                            Dois motivos levam a esta tela, e o professor
+                            não tem como distinguir um do outro: ou nada
+                            foi importado, ou o componente do escopo não
+                            casou com a disciplina que ele leciona. A
+                            segunda é conserto da coordenação, e dizer isso
+                            evita que ele conclua que o sistema não serve.
+                        --}}
+                        Ou o escopo das suas matérias ainda não foi importado, ou o componente da
+                        planilha não casou com a disciplina do cadastro. Nos dois casos, quem
+                        resolve é a coordenação.
                     @endcan
                 </x-slot:descricao>
                 <x-slot:acoes>
@@ -165,17 +169,6 @@
                                         <span class="text-xs text-slate-400">
                                             {{ $semana['aulas']->count() }} aula(s)
                                         </span>
-                                        {{--
-                                            No escopo real a semana inteira é de
-                                            recomposição, uma por bimestre. Dizer
-                                            isso na linha fechada evita abrir oito
-                                            semanas até achar a certa.
-                                        --}}
-                                        @if ($semana['recomposicao'] > 0)
-                                            <x-badge cor="amarelo" :rotulo="$semana['recomposicao'] === $semana['aulas']->count()
-                                                ? 'Recomposição da aprendizagem'
-                                                : $semana['recomposicao'].' de recomposição'"/>
-                                        @endif
                                     </span>
                                     @if ($semana['tema'])
                                         <span class="mt-0.5 block text-sm text-slate-600 dark:text-slate-300">
@@ -212,16 +205,6 @@
                                                     {{ $aula->titulo_aula }}
                                                 </h3>
                                                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                                                    {{--
-                                                        O valor cru vai no `title`: a coluna é de
-                                                        fora, e o selo não pode afirmar mais do que
-                                                        o arquivo disse.
-                                                    --}}
-                                                    @if ($aula->ehRecomposicao())
-                                                        <span title="Aula complementar: {{ $aula->aula_complementar }}">
-                                                            <x-badge cor="amarelo" rotulo="Recomposição da aprendizagem"/>
-                                                        </span>
-                                                    @endif
                                                     @if ($aula->disciplina)
                                                         <x-badge cor="azul" :rotulo="$aula->disciplina->nome"/>
                                                     @endif

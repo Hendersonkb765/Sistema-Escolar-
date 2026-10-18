@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Uma aula do escopo-sequência: o que se ensina na semana tal.
@@ -53,19 +52,20 @@ class EscopoAula extends Model
     }
 
     /**
-     * O professor vê o escopo dos cursos em que leciona.
+     * O professor vê as aulas das matérias que leciona, e só elas.
      *
-     * Pelo curso, e não pela disciplina: o escopo é o percurso inteiro,
-     * e saber o que a turma viu em Matemática na semana passada é parte
-     * de dar a aula de Lógica desta semana. O filtro "só os meus
-     * componentes" fica na tela, onde se pode desligar.
+     * Pela disciplina, e não pelo curso: o escopo de um curso tem seis
+     * componentes e mais de quinhentas aulas, e quem dá Programação
+     * Mobile não veio ler o percurso de banco de dados.
+     *
+     * A aula só entra quando o componente da planilha casou com uma
+     * disciplina do cadastro. Componente que não casou fica invisível
+     * ao professor — por isso a conferência da importação lista quais
+     * não casaram, e a tela diz quando não há nada para mostrar.
      */
     protected function aplicarEscopoDeProfessor(Builder $query, User $usuario): Builder
     {
-        return $query->whereHas(
-            'curso.disciplinas',
-            fn (Builder $q) => $q->whereIn('disciplinas.id', $usuario->disciplinaIds())
-        );
+        return $query->whereIn('disciplina_id', $usuario->disciplinaIds());
     }
 
     /** @return BelongsTo<Curso, $this> */
@@ -78,37 +78,6 @@ class EscopoAula extends Model
     public function disciplina(): BelongsTo
     {
         return $this->belongsTo(Disciplina::class);
-    }
-
-    /**
-     * Aula para recompor a aprendizagem do aluno.
-     *
-     * Vem da coluna "Aula complementar", que no arquivo da rede traz um
-     * "X" — e a própria planilha diz o que o X significa, numa linha de
-     * legenda: "Recomposição da Aprendizagem". No escopo real elas vêm
-     * em semanas inteiras, uma por bimestre.
-     *
-     * Qualquer valor conta, menos os que negam: a coluna é de fora, e
-     * amanhã pode vir "Sim" no lugar do "X". O valor cru fica guardado
-     * e aparece no `title`, para a tela nunca afirmar mais do que o
-     * arquivo disse.
-     */
-    public function ehRecomposicao(): bool
-    {
-        $valor = mb_strtolower(trim((string) $this->aula_complementar));
-
-        return $valor !== '' && ! in_array($valor, ['não', 'nao', 'n', '-', '0', 'false'], true);
-    }
-
-    /** @param  Builder<static>  $query */
-    public function scopeDeRecomposicao(Builder $query): Builder
-    {
-        return $query
-            ->whereNotNull('aula_complementar')
-            ->whereNotIn(
-                DB::raw('lower(trim(aula_complementar))'),
-                ['', 'não', 'nao', 'n', '-', '0', 'false']
-            );
     }
 
     /**
