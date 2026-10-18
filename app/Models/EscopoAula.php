@@ -81,6 +81,28 @@ class EscopoAula extends Model
     }
 
     /**
+     * Teoria ou prática, por extenso.
+     *
+     * A coluna "CH teórica/prática" traz só a inicial — "T" ou "P", e
+     * um "p" minúsculo em três linhas do arquivo da rede. Na tela isso
+     * saía como "CH T", que não se lê: a sigla é do arquivo, não de
+     * quem vai dar a aula.
+     *
+     * Valor que não seja um dos dois é devolvido como veio. A coluna é
+     * de fora, e inventar tradução para o que não se conhece é como o
+     * texto do arquivo vira um rótulo errado que parece certo.
+     */
+    public function teoriaOuPratica(): ?string
+    {
+        return match (mb_strtoupper(trim((string) $this->carga_horaria))) {
+            '' => null,
+            'T' => 'Teoria',
+            'P' => 'Prática',
+            default => $this->carga_horaria,
+        };
+    }
+
+    /**
      * Um rótulo para o componente, com o código quando ele veio.
      *
      * É por ele que a tela agrupa: dois componentes de nomes parecidos

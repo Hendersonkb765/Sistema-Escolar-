@@ -208,8 +208,14 @@
                                                     @if ($aula->disciplina)
                                                         <x-badge cor="azul" :rotulo="$aula->disciplina->nome"/>
                                                     @endif
-                                                    @if ($aula->carga_horaria)
-                                                        <span class="text-xs text-slate-400">CH {{ $aula->carga_horaria }}</span>
+                                                    {{--
+                                                        Por extenso: "CH T" é a sigla do arquivo,
+                                                        não uma palavra que alguém leia.
+                                                    --}}
+                                                    @if ($aula->teoriaOuPratica())
+                                                        <span class="rounded border border-slate-200 px-1.5 py-0.5 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                                            {{ $aula->teoriaOuPratica() }}
+                                                        </span>
                                                     @endif
                                                 </div>
                                             </div>

@@ -517,3 +517,41 @@ it('avisa quantos temas a semana tem, e põe cada um na sua aula', function () {
         ->assertSee('Fundamentos de redes')
         ->assertSee('Introdução a aplicações móveis');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Teoria ou prática
+|--------------------------------------------------------------------------
+|
+| A coluna "CH teórica/prática" traz só a inicial — "T" ou "P", e um
+| "p" minúsculo em três linhas do arquivo real. Na tela isso saía como
+| "CH T", que não se lê: a sigla é do arquivo, não de quem dá a aula.
+*/
+
+it('escreve teoria e prática por extenso', function () {
+    ($this->aula)(['carga_horaria' => 'T', 'titulo_aula' => 'Conceitos']);
+    ($this->aula)(['carga_horaria' => 'P', 'titulo_aula' => 'Laboratório']);
+
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->set('filtroCurso', (string) $this->curso->id)
+        ->call('abrirSemana', '1-1')
+        ->assertSee('Teoria')
+        ->assertSee('Prática')
+        ->assertDontSee('CH T');
+});
+
+it('entende a inicial em minúscula, como vem no arquivo', function () {
+    expect((new EscopoAula(['carga_horaria' => 'p']))->teoriaOuPratica())->toBe('Prática')
+        ->and((new EscopoAula(['carga_horaria' => ' t ']))->teoriaOuPratica())->toBe('Teoria');
+});
+
+/*
+ * A coluna é de fora: inventar tradução para o que não se conhece é
+ * como o texto do arquivo vira um rótulo errado que parece certo.
+ */
+it('devolve como veio o valor que não é T nem P', function () {
+    expect((new EscopoAula(['carga_horaria' => '2/1']))->teoriaOuPratica())->toBe('2/1')
+        ->and((new EscopoAula(['carga_horaria' => '']))->teoriaOuPratica())->toBeNull()
+        ->and((new EscopoAula(['carga_horaria' => null]))->teoriaOuPratica())->toBeNull();
+});
