@@ -17,8 +17,10 @@
                 página está mostrando.
             --}}
             <x-campo rotulo="Curso" para="filtro-curso">
-                <x-select id="filtro-curso" wire:model.live="filtroCurso">
-                    <option value="">Escolha um curso</option>
+                <x-select id="filtro-curso" wire:model.live="filtroCurso" :desabilitado="$cursos->isEmpty()">
+                    <option value="">
+                        {{ $cursos->isEmpty() ? 'Nenhum curso com escopo' : 'Escolha um curso' }}
+                    </option>
                     @foreach ($cursos as $curso)
                         <option value="{{ $curso->id }}" @selected((string) $curso->id === $filtroCurso)>{{ $curso->nome }}</option>
                     @endforeach
@@ -78,7 +80,31 @@
         </div>
     </x-cartao>
 
-    @if ($filtroCurso === '')
+    {{--
+        Nada importado ainda é o estado em que a tela nasce, e ele não
+        pode mandar escolher de uma lista vazia. Para a coordenação é um
+        convite a importar; para o professor, a notícia de que não há o
+        que ver — e de quem cobrar.
+    --}}
+    @if ($cursos->isEmpty())
+        <x-cartao>
+            <x-vazio titulo="Nenhum escopo-sequência importado ainda">
+                <x-slot:descricao>
+                    @can('importar', App\Models\EscopoAula::class)
+                        O escopo vem da rede como planilha, um arquivo por período de cada curso.
+                        Importe o primeiro para que ele apareça aqui.
+                    @else
+                        A coordenação ainda não importou o escopo dos cursos em que você leciona.
+                    @endcan
+                </x-slot:descricao>
+                <x-slot:acoes>
+                    @can('importar', App\Models\EscopoAula::class)
+                        <x-botao href="{{ route('escopo.importar') }}" wire:navigate>Importar escopo</x-botao>
+                    @endcan
+                </x-slot:acoes>
+            </x-vazio>
+        </x-cartao>
+    @elseif ($filtroCurso === '')
         <x-cartao>
             <x-vazio titulo="Escolha um curso"
                      descricao="O escopo-sequência é o percurso de um curso, semana a semana. Escolha acima para vê-lo."/>

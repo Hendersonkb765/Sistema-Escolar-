@@ -372,6 +372,10 @@ it('não escolhe sozinho quando há mais de um curso com escopo', function () {
 });
 
 it('diz que o curso ainda não tem escopo, em vez de uma tela vazia', function () {
+    // Outro curso já tem escopo: o caso aqui é o curso escolhido não ter,
+    // e não a escola inteira estar sem nada importado.
+    ($this->aula)();
+
     $semEscopo = Curso::factory()->noEixo($this->eixo)->create(['nome' => 'Curso novo']);
 
     Livewire::actingAs($this->paeet)
@@ -397,4 +401,30 @@ it('marca no select o filtro que veio do endereço', function () {
 
     expect($html)->toContain('value="'.$this->curso->id.'" selected')
         ->and($html)->toContain('value="2" selected');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Antes do primeiro arquivo
+|--------------------------------------------------------------------------
+|
+| É o estado em que a tela nasce — nenhum escopo importado —, e ele não
+| pode mandar escolher de uma lista vazia.
+*/
+
+it('convida a coordenação a importar quando não há escopo nenhum', function () {
+    Livewire::actingAs($this->paeet)
+        ->test(VisaoDoEscopo::class)
+        ->assertSee('Nenhum escopo-sequência importado ainda')
+        ->assertSee('Importar escopo')
+        ->assertDontSee('Escolha acima para vê-lo');
+});
+
+it('diz ao professor que a coordenação ainda não importou', function () {
+    Livewire::actingAs($this->professor)
+        ->test(VisaoDoEscopo::class)
+        ->assertSee('Nenhum escopo-sequência importado ainda')
+        ->assertSee('A coordenação ainda não importou')
+        // Importar não é dele, e o botão não aparece.
+        ->assertDontSee('>Importar escopo<');
 });

@@ -24,7 +24,6 @@ use App\Models\CompartilhamentoDeModelo;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
-use App\Models\EscopoAula;
 use App\Models\Importacao;
 use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
@@ -189,8 +188,6 @@ class DemonstracaoSeeder extends Seeder
                 ], $partes),
             );
         }
-
-        $this->escopoSequencia($curso);
 
         $this->modelosDeDocumento($tecnologia, $gestao, $admin, $paeetTecnologia, $paeetGestao);
 
@@ -643,67 +640,6 @@ class DemonstracaoSeeder extends Seeder
         }
 
         $this->command?->info("Bimestre {$bimestre->value}: prova montada e resultados importados.");
-    }
-
-    /**
-     * Um escopo-sequência pequeno, para a tela não abrir vazia.
-     *
-     * Duas semanas de cada bimestre, em dois componentes: o bastante
-     * para exercitar o agrupamento, o filtro por componente e o caso em
-     * que o código não casa com disciplina nenhuma.
-     */
-    protected function escopoSequencia(Curso $curso): void
-    {
-        if (EscopoAula::query()->where('curso_id', $curso->getKey())->exists()) {
-            return;
-        }
-
-        $componentes = [
-            ['Lógica de Programação', 'LOG', 'Algoritmos e estruturas'],
-            ['Redes de Computadores', 'RED', 'Infraestrutura e protocolos'],
-            // Sem disciplina correspondente de propósito: é o aviso que
-            // a conferência da importação dá, e ele precisa ter exemplo.
-            ['Projeto Integrador', 'PRJ', 'Projeto aplicado'],
-        ];
-
-        $ordem = 0;
-
-        foreach ([1, 2, 3, 4] as $bimestre) {
-            foreach ([1, 2] as $naSemana) {
-                $semana = ($bimestre - 1) * 10 + $naSemana;
-
-                foreach ($componentes as [$nome, $codigo, $unidade]) {
-                    EscopoAula::query()->create([
-                        'curso_id' => $curso->getKey(),
-                        'periodo' => 1,
-                        'disciplina_id' => Disciplina::query()
-                            ->where('curso_id', $curso->getKey())
-                            ->where('codigo', $codigo)
-                            ->value('id'),
-                        'bimestre' => $bimestre,
-                        'semana' => $semana,
-                        'ordem' => ++$ordem,
-                        'componente_nome' => $nome,
-                        'componente_codigo' => $codigo,
-                        'unidade_nome' => $unidade,
-                        'unidade_codigo' => 'UC'.str_pad((string) $bimestre, 2, '0', STR_PAD_LEFT),
-                        'titulo_aula' => "Aula {$naSemana} de {$nome} — {$bimestre}º bimestre",
-                        'tema_semana' => "Semana {$semana}: {$unidade}",
-                        'objetivos' => 'Reconhecer e aplicar os conceitos da semana em exercícios guiados.',
-                        'objeto_conhecimento' => $unidade,
-                        'habilidades_tecnicas' => 'Aplicar o conceito em um caso simples do dia a dia.',
-                        'habilidades_socioemocionais' => 'Trabalho em equipe e escuta ativa.',
-                        'competencia_tecnica' => 'Resolver problemas da área com os recursos estudados.',
-                        'competencias_socioemocionais' => 'Organização e responsabilidade.',
-                        'carga_horaria' => '2/1',
-                        'aula_complementar' => $naSemana === 2 ? 'Sim' : 'Não',
-                        'aulas_semanais' => '4',
-                    ]);
-                }
-            }
-        }
-
-        $this->command?->info('Escopo-sequência de demonstração: '.$ordem.' aulas.');
     }
 
     /**
