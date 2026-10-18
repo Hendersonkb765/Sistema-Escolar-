@@ -202,6 +202,56 @@ function enviarParte(SolicitacaoParte $parte, User $professor, array $habilidade
 
 /*
 |--------------------------------------------------------------------------
+| Planilha do escopo-sequência
+|--------------------------------------------------------------------------
+|
+| Mora aqui, e não num arquivo de teste, porque três deles montam a
+| mesma planilha: a importação, a consulta e o conserto de colunas.
+*/
+
+/** O cabeçalho do arquivo, como a rede o publica — com a grafia torta e tudo. */
+const CABECALHO_DO_ESCOPO = [
+    'Aula complementar', 'Bimestre', 'CH teórica/prática', 'Competência técnica',
+    'Competências socioemocionais', 'Nome do componente', 'Código componente',
+    'Componente de 3 ou 4 aulas semanais?', 'Unidade curricular',
+    'Código unidade curricular', 'Semana', 'Tema da semana', 'Título da aula',
+    'Habilidades técnicas', 'Habildades socioemocionais', 'Objetivos da aula',
+    'Objeto de conhecimento',
+];
+
+/**
+ * Uma linha do escopo, na ordem do cabeçalho.
+ *
+ * @param  array<string, mixed>  $campos
+ * @return array<int, mixed>
+ */
+function linhaDoEscopo(array $campos = []): array
+{
+    $padrao = [
+        'Aula complementar' => 'Não',
+        'Bimestre' => 1,
+        'CH teórica/prática' => '2/1',
+        'Competência técnica' => 'Desenvolver algoritmos',
+        'Competências socioemocionais' => 'Organização',
+        'Nome do componente' => 'Lógica de Programação',
+        'Código componente' => 'LLP',
+        'Componente de 3 ou 4 aulas semanais?' => '4',
+        'Unidade curricular' => 'Introdução à lógica',
+        'Código unidade curricular' => 'UC01',
+        'Semana' => 1,
+        'Tema da semana' => 'Primeiros algoritmos',
+        'Título da aula' => 'O que é um algoritmo',
+        'Habilidades técnicas' => 'Identificar passos',
+        'Habildades socioemocionais' => 'Escuta ativa',
+        'Objetivos da aula' => 'Reconhecer sequências',
+        'Objeto de conhecimento' => 'Sequência lógica',
+    ];
+
+    return array_values(array_merge($padrao, $campos));
+}
+
+/*
+|--------------------------------------------------------------------------
 | Diretiva crua no HTML
 |--------------------------------------------------------------------------
 */

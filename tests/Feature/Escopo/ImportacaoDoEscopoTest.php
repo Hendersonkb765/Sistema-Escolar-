@@ -26,47 +26,6 @@ use PhpOffice\PhpSpreadsheet\Writer\Ods;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Spatie\Activitylog\Models\Activity;
 
-/** O cabeçalho do arquivo, como a rede o publica — com a grafia torta e tudo. */
-const CABECALHO_DO_ESCOPO = [
-    'Aula complementar', 'Bimestre', 'CH teórica/prática', 'Competência técnica',
-    'Competências socioemocionais', 'Nome do componente', 'Código componente',
-    'Componente de 3 ou 4 aulas semanais?', 'Unidade curricular',
-    'Código unidade curricular', 'Semana', 'Tema da semana', 'Título da aula',
-    'Habilidades técnicas', 'Habildades socioemocionais', 'Objetivos da aula',
-    'Objeto de conhecimento',
-];
-
-/**
- * Uma linha do escopo, na ordem do cabeçalho.
- *
- * @param  array<string, mixed>  $campos
- * @return array<int, mixed>
- */
-function linhaDoEscopo(array $campos = []): array
-{
-    $padrao = [
-        'Aula complementar' => 'Não',
-        'Bimestre' => 1,
-        'CH teórica/prática' => '2/1',
-        'Competência técnica' => 'Desenvolver algoritmos',
-        'Competências socioemocionais' => 'Organização',
-        'Nome do componente' => 'Lógica de Programação',
-        'Código componente' => 'LLP',
-        'Componente de 3 ou 4 aulas semanais?' => '4',
-        'Unidade curricular' => 'Introdução à lógica',
-        'Código unidade curricular' => 'UC01',
-        'Semana' => 1,
-        'Tema da semana' => 'Primeiros algoritmos',
-        'Título da aula' => 'O que é um algoritmo',
-        'Habilidades técnicas' => 'Identificar passos',
-        'Habildades socioemocionais' => 'Escuta ativa',
-        'Objetivos da aula' => 'Reconhecer sequências',
-        'Objeto de conhecimento' => 'Sequência lógica',
-    ];
-
-    return array_values(array_merge($padrao, $campos));
-}
-
 beforeEach(function () {
     $this->eixo = Eixo::factory()->create(['codigo' => 'TEC', 'nome' => 'Tecnologia']);
     $this->paeet = paeet($this->eixo);
@@ -663,4 +622,45 @@ it('não importa a linha de legenda como se fosse aula', function () {
 
     expect(EscopoAula::query()->count())->toBe(2)
         ->and(EscopoAula::query()->pluck('semana')->all())->toBe([1, 2]);
+});
+
+/*
+ * Os arquivos da rede não vêm todos iguais. Entre os que a escola
+ * recebeu, um traz "Objetivo da aula" no singular e "Objeto de
+ * conhecimento – macro" com qualificador, e as colunas em outra ordem.
+ * Sem aceitar as variantes, duas das informações mais úteis para o
+ * professor entravam vazias — sem erro, sem aviso.
+ */
+it('lê as variantes de cabeçalho que os arquivos reais trazem', function () {
+    $cabecalho = [
+        'Bimestre', 'Semana', 'Nome do componente', 'Código componente',
+        'Objetivo da aula', 'Objeto de conhecimento – macro',
+        'Competências Socioemocionais ', 'Título da aula',
+    ];
+
+    $caminho = ($this->arquivo)([
+        [1, 1, 'Lógica de Programação', 'LLP', 'Reconhecer sequências', 'Sequência lógica', 'Curiosidade', 'Algoritmos'],
+        [1, 2, 'Lógica de Programação', 'LLP', 'Aplicar condicionais', 'Decisão', 'Foco', 'Condicionais'],
+    ], cabecalho: $cabecalho);
+
+    $this->action->executar($caminho, $this->curso, 1, $this->paeet);
+
+    $aulas = EscopoAula::query()->orderBy('semana')->get();
+
+    expect($aulas)->toHaveCount(2)
+        ->and($aulas[0]->objetivos)->toBe('Reconhecer sequências')
+        ->and($aulas[0]->objeto_conhecimento)->toBe('Sequência lógica')
+        // O espaço sobrando no fim do cabeçalho não esconde a coluna.
+        ->and($aulas[0]->competencias_socioemocionais)->toBe('Curiosidade');
+});
+
+it('não deixa coluna conhecida cair na lista de ignoradas', function () {
+    $caminho = ($this->arquivo)([
+        linhaDoEscopo(),
+        linhaDoEscopo(['Semana' => 2]),
+    ]);
+
+    $relatorio = $this->action->conferir($caminho, $this->curso, 1, $this->paeet);
+
+    expect($relatorio['colunas_ignoradas'])->toBe([]);
 });

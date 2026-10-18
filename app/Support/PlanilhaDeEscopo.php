@@ -34,8 +34,10 @@ final class PlanilhaDeEscopo
         'unidade_codigo' => ['codigo unidade curricular', 'codigo da unidade curricular'],
         'titulo_aula' => ['titulo da aula'],
         'tema_semana' => ['tema da semana'],
-        'objetivos' => ['objetivos da aula'],
-        'objeto_conhecimento' => ['objeto de conhecimento'],
+        // Singular e plural: os arquivos da rede trazem os dois.
+        'objetivos' => ['objetivos da aula', 'objetivo da aula'],
+        // "– macro" é qualificador de um dos arquivos, não outra coluna.
+        'objeto_conhecimento' => ['objeto de conhecimento', 'objeto de conhecimento - macro'],
         'habilidades_tecnicas' => ['habilidades tecnicas'],
         // A grafia torta é a do arquivo; a certa fica aceita também.
         'habilidades_socioemocionais' => ['habildades socioemocionais', 'habilidades socioemocionais'],
