@@ -86,21 +86,20 @@ class UserPolicy
 
     /**
      * Um usuário de gestão só enxerga contas que tocam seus Eixos.
-     * Professor recém-criado ainda sem vínculo é visível a quem o criou.
+     *
+     * Conta ainda sem vínculo — professor ou PAEET — fica com quem a
+     * criou e com o PAEET Admin. Sem isso ninguém a editaria, e editar é
+     * o único jeito de vinculá-la a um Eixo.
      */
     protected function compartilhamEixo(User $usuario, User $alvo): bool
     {
-        if ($alvo->perfil === PerfilUsuario::Professor) {
-            $eixosDoAlvo = $alvo->eixos()->pluck('eixos.id')->all();
+        $eixosDoAlvo = $alvo->eixos()->pluck('eixos.id')->all();
 
-            if ($eixosDoAlvo === []) {
-                return (int) $alvo->criado_por === (int) $usuario->getKey()
-                    || $usuario->ehPaeetAdmin();
-            }
-
-            return array_intersect($eixosDoAlvo, $usuario->eixoIds()) !== [];
+        if ($eixosDoAlvo === [] && $alvo->perfil !== PerfilUsuario::PaeetAdmin) {
+            return (int) $alvo->criado_por === (int) $usuario->getKey()
+                || $usuario->ehPaeetAdmin();
         }
 
-        return array_intersect($alvo->eixos()->pluck('eixos.id')->all(), $usuario->eixoIds()) !== [];
+        return array_intersect($eixosDoAlvo, $usuario->eixoIds()) !== [];
     }
 }
