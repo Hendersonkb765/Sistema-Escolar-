@@ -38,7 +38,7 @@ use Illuminate\Support\Facades\Route;
 const TELAS_VARRIDAS = [
     'painel', 'eixos.index', 'eixos.criar', 'cursos.index', 'cursos.criar',
     'disciplinas.index', 'disciplinas.criar', 'grades.index',
-    'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar',
+    'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar', 'calendario.index',
     'escopo.index', 'escopo.importar',
     'usuarios.index', 'usuarios.criar', 'auditoria.index',
     'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
