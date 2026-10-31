@@ -47,7 +47,9 @@ it('responde 403 ao professor em toda a estrutura acadêmica', function (string 
     'disciplinas.index',
     'grades.index',
     'turmas.index',
-    'alunos.index',
+    // `alunos.index` saiu daqui: o professor consulta os alunos das
+    // turmas dele (ResetDeSenhaNaSedTest), mas segue sem criar ou editar.
+    'alunos.criar',
     'modelos-prova.index',
     'importacoes.index',
     'auditoria.index',

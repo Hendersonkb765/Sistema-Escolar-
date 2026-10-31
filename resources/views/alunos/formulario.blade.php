@@ -42,6 +42,11 @@
                         </x-select>
                     </x-campo>
                 </div>
+
+                <x-campo rotulo="Código da SED" para="codigo_reset" :erro="$errors->first('codigo_reset')"
+                         ajuda="O código com que a SED identifica o aluno na redefinição de senha. Sem ele, a lista de alunos não oferece o botão.">
+                    <x-input id="codigo_reset" wire:model="codigo_reset" inputmode="numeric"/>
+                </x-campo>
             </div>
         </x-cartao>
 
