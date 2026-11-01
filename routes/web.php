@@ -5,6 +5,9 @@ use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
 use App\Livewire\Analises\Desempenho;
+use App\Livewire\Ausencias\DetalheAusencia;
+use App\Livewire\Ausencias\InformarAusencia;
+use App\Livewire\Ausencias\MinhasAusencias;
 use App\Livewire\Autenticacao\PrimeiraSenha;
 use App\Livewire\Calendario\CalendarioLetivo;
 use App\Livewire\Cursos\DetalheCurso;
@@ -103,6 +106,10 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
 
     // As aulas de quem leciona, tiradas do quadro de todas as turmas.
     Route::get('/minha-semana', MinhaSemana::class)->name('horarios.meus');
+
+    Route::get('/ausencias', MinhasAusencias::class)->name('ausencias.index');
+    Route::get('/ausencias/informar', InformarAusencia::class)->name('ausencias.criar');
+    Route::get('/ausencias/{ausencia}', DetalheAusencia::class)->name('ausencias.show');
 
     Route::get('/alunos', ListaAlunos::class)->name('alunos.index');
     Route::get('/alunos/criar', FormularioAluno::class)->name('alunos.criar');

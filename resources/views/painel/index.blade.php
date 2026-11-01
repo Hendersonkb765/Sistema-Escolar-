@@ -17,6 +17,38 @@
         @endforeach
     </div>
 
+    @if ($acessoRapido)
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <x-cartao titulo="Minha semana" descricao="Suas aulas no quadro de horários das turmas.">
+                <x-slot:acoes>
+                    <x-botao variante="secundario" href="{{ route('horarios.meus') }}" wire:navigate>Abrir</x-botao>
+                </x-slot:acoes>
+
+                <p class="text-sm text-slate-700 dark:text-slate-200">
+                    {{ $acessoRapido['aulasHoje'] === 0 ? 'Nenhuma aula sua hoje.' : $acessoRapido['aulasHoje'].' aula(s) sua(s) hoje.' }}
+                </p>
+            </x-cartao>
+
+            <x-cartao titulo="Minhas ausências" descricao="Avise a coordenação com antecedência.">
+                <x-slot:acoes>
+                    <x-botao variante="secundario" href="{{ route('ausencias.index') }}" wire:navigate>Abrir</x-botao>
+                    <x-botao href="{{ route('ausencias.criar') }}" wire:navigate>Informar ausência</x-botao>
+                </x-slot:acoes>
+
+                @if ($acessoRapido['proximaAusencia'])
+                    <p class="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        Próxima:
+                        <a href="{{ route('ausencias.show', $acessoRapido['proximaAusencia']) }}" wire:navigate
+                           class="font-medium hover:underline">{{ $acessoRapido['proximaAusencia']->rotuloDoDia() }}</a>
+                        <x-badge :cor="$acessoRapido['proximaAusencia']->status->cor()">{{ $acessoRapido['proximaAusencia']->status->rotulo() }}</x-badge>
+                    </p>
+                @else
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Nenhuma ausência marcada.</p>
+                @endif
+            </x-cartao>
+        </div>
+    @endif
+
     {{--
         O número diz quantos; a lista diz quais. Sem ela, "3 atrasadas"
         custa três telas até chegar na primeira, e o painel vira um

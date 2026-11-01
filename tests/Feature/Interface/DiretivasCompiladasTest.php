@@ -19,6 +19,7 @@ use App\Actions\Resultado\CalcularNotasAction;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\ModeloProva;
@@ -39,6 +40,7 @@ const TELAS_VARRIDAS = [
     'painel', 'eixos.index', 'eixos.criar', 'cursos.index', 'cursos.criar',
     'disciplinas.index', 'disciplinas.criar', 'grades.index',
     'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar', 'calendario.index', 'horarios.meus',
+    'ausencias.index', 'ausencias.criar',
     'escopo.index', 'escopo.importar',
     'usuarios.index', 'usuarios.criar', 'auditoria.index',
     'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
@@ -137,6 +139,17 @@ beforeEach(function () {
         $calcular->executar($resultado->refresh());
     }
 
+    // De quem abre a tela: a ausência só é vista por quem a informou.
+    $this->ausencia = Ausencia::query()->create(['professor_id' => $this->admin->id, 'data' => today()->addWeek()]);
+
+    foreach ([['Lógica', '07:00', '07:50'], ['Redes', '07:50', '08:40']] as $i => [$disciplina, $inicio, $fim]) {
+        $this->ausencia->aulas()->create([
+            'turma_id' => $this->turma->id, 'disciplina_id' => $montagem['disciplinas'][$disciplina]->id,
+            'aula_numero' => $i + 1, 'hora_inicio' => $inicio, 'hora_fim' => $fim,
+            'escopo_titulo' => $i === 0 ? 'Estruturas condicionais' : null, 'conteudo_planejado' => 'Lista de exercícios',
+        ]);
+    }
+
     /** Diretivas cruas que sobraram no HTML. A varredura mora em tests/Pest.php. */
     $this->sobras = fn (string $html): array => sobrasDeDiretiva($html);
 });
@@ -183,6 +196,7 @@ it('não deixa diretiva crua nas telas com parâmetro', function () {
         ['analises.index', ['bimestre' => $this->prova->bimestre->value]],
         ['turmas.show', $this->turma],
         ['turmas.horarios', $this->turma],
+        ['ausencias.show', $this->ausencia],
     ] as [$rota, $parametro]) {
         expect(($this->sobras)($como($rota, $parametro)))->toBe([]);
     }

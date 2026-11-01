@@ -2,16 +2,21 @@
 
 namespace App\Livewire;
 
+use App\Enums\DiaDaSemana;
+use App\Enums\StatusAusencia;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
+use App\Enums\StatusTurma;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
 use App\Models\Importacao;
 use App\Models\Prova;
+use App\Models\QuadroHorario;
 use App\Models\Questao;
 use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
@@ -38,6 +43,7 @@ class Painel extends Component
             // O número diz quantos; a lista diz quais, e é com ela que
             // se faz alguma coisa sem passar por três telas antes.
             'pendencias' => $this->pendencias($usuario),
+            'acessoRapido' => $this->acessoRapido($usuario),
             'estrutura' => $usuario->ehGestao() ? $this->estrutura($usuario) : [],
         ])->layout('components.layouts.app', [
             'titulo' => 'Painel',
@@ -386,6 +392,36 @@ class Painel extends Component
                 'cor' => 'cinza',
                 'href' => null,
             ],
+        ];
+    }
+
+    /**
+     * Atalhos de quem dá aula — professor ou PAEET com disciplina —, o
+     * mesmo critério do menu. Cada um já diz o essencial: as aulas de
+     * hoje e a próxima ausência marcada.
+     *
+     * @return array{aulasHoje: int, proximaAusencia: ?Ausencia}|null
+     */
+    protected function acessoRapido(User $usuario): ?array
+    {
+        if ($usuario->disciplinaIds() === []) {
+            return null;
+        }
+
+        $hoje = DiaDaSemana::daData(today());
+
+        return [
+            'aulasHoje' => $hoje === null ? 0 : QuadroHorario::query()
+                ->where('professor_id', $usuario->id)
+                ->where('dia_semana', $hoje)
+                ->whereHas('turma', fn ($q) => $q->where('status', StatusTurma::Ativa))
+                ->count(),
+            'proximaAusencia' => Ausencia::query()
+                ->where('professor_id', $usuario->id)
+                ->whereDate('data', '>=', today())
+                ->where('status', '!=', StatusAusencia::Cancelada)
+                ->orderBy('data')
+                ->first(),
         ];
     }
 

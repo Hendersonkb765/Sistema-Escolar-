@@ -16,6 +16,7 @@
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\Eixo;
 use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
@@ -82,8 +83,13 @@ beforeEach(function () {
         titulo: 'Avaliação alheia',
     );
 
+    $ausencia = Ausencia::query()->create([
+        'professor_id' => $professor->id, 'data' => today()->addWeek(),
+    ]);
+
     $this->alheios = [
         'alunos.editar' => $aluno,
+        'ausencias.show' => $ausencia,
         'cursos.show' => $montagem['curso'],
         'cursos.editar' => $montagem['curso'],
         'disciplinas.editar' => $montagem['disciplinas']['Contabilidade'],
