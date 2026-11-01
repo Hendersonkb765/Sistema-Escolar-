@@ -99,6 +99,7 @@ beforeEach(function () {
         'solicitacoes.responder' => $solicitacao,
         'turmas.show' => $turma,
         'turmas.editar' => $turma,
+        'turmas.horarios' => $turma,
     ];
 
     /*

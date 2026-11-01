@@ -3,6 +3,7 @@
         <x-slot:acoes>
             @can('update', $turma)
                 <x-botao variante="secundario" href="{{ route('turmas.editar', $turma) }}" wire:navigate>Editar</x-botao>
+                <x-botao variante="secundario" href="{{ route('turmas.horarios', $turma) }}" wire:navigate>Quadro de horários</x-botao>
             @endcan
             @can('create', App\Models\Aluno::class)
                 <x-botao variante="secundario" href="{{ route('alunos.criar', ['turma' => $turma->id]) }}" wire:navigate>

@@ -39,6 +39,9 @@ class Navegacao
                 'titulo' => null,
                 'itens' => [
                     self::item('Painel', 'painel', self::icone('painel')),
+                    // Para quem leciona: professores e PAEETs que também dão aula.
+                    ...($usuario->disciplinaIds() !== []
+                        ? [self::item('Minha semana', 'horarios.meus', self::icone('calendario'))] : []),
                 ],
             ],
             [

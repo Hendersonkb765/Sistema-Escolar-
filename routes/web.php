@@ -22,6 +22,8 @@ use App\Livewire\Escopo\ImportarEscopo;
 use App\Livewire\Escopo\VisaoDoEscopo;
 use App\Livewire\Grades\DetalheGrade;
 use App\Livewire\Grades\ListaGrades;
+use App\Livewire\Horarios\MinhaSemana;
+use App\Livewire\Horarios\QuadroDeHorarios;
 use App\Livewire\Importacoes\ListaImportacoes;
 use App\Livewire\Importacoes\NovaImportacao;
 use App\Livewire\ModelosProva\FormularioModeloProva;
@@ -97,6 +99,10 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/turmas/criar', FormularioTurma::class)->name('turmas.criar');
     Route::get('/turmas/{turma}', DetalheTurma::class)->name('turmas.show');
     Route::get('/turmas/{turma}/editar', FormularioTurma::class)->name('turmas.editar');
+    Route::get('/turmas/{turma}/horarios', QuadroDeHorarios::class)->name('turmas.horarios');
+
+    // As aulas de quem leciona, tiradas do quadro de todas as turmas.
+    Route::get('/minha-semana', MinhaSemana::class)->name('horarios.meus');
 
     Route::get('/alunos', ListaAlunos::class)->name('alunos.index');
     Route::get('/alunos/criar', FormularioAluno::class)->name('alunos.criar');
