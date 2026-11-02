@@ -15,6 +15,7 @@ use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Avaliacao\ReenviarQuestaoAction;
 use App\Enums\DiaDaSemana;
 use App\Livewire\Notificacoes\Sino;
+use App\Models\Aviso;
 use App\Models\Eixo;
 use App\Models\ProfessorDisciplina;
 use App\Models\QuadroHorario;
@@ -133,6 +134,8 @@ it('avisa quando o professor cancela a ausência', function () {
     ($this->naTerca)($this->turmaTec, $this->logica, 1);
     $ausencia = ($this->informar)();
 
+    // O relógio dos testes está parado; na vida real o cancelamento vem depois.
+    $this->travel(1)->seconds();
     app(CancelarAusenciaAction::class)->executar($ausencia);
 
     expect(($this->avisosDe)($this->paula)->pluck('data.titulo')->all())->toBe(['Ausência informada', 'Ausência cancelada'])
@@ -265,8 +268,10 @@ it('deixa para a consulta seguinte o aviso gravado no mesmo segundo dela', funct
 it('resume em um balão o que passar de três avisos novos', function () {
     $sino = Livewire::actingAs($this->paula)->test(Sino::class);
 
-    $this->travel(5)->seconds();
+    // Um por segundo: com o relógio parado os cinco teriam a mesma hora,
+    // até o microssegundo, e a ordem entre eles não existiria.
     foreach (range(1, 5) as $i) {
+        $this->travel(1)->seconds();
         avisoNoSino($this->paula, "Aviso {$i}");
     }
     $this->travel(25)->seconds();
@@ -430,4 +435,23 @@ it('entrega ao sino um endereço novo e válido quando o antigo é recusado', fu
     expect($novo)->toBe(SinalDeAvisos::url($this->paula));
 
     $this->getJson($novo)->assertOk();
+});
+
+/*
+ * A hora do aviso vai até o microssegundo. Só até o segundo, dois avisos
+ * do mesmo segundo empatavam, e o MySQL os devolvia na ordem do UUID, que
+ * é sorteada: o sino mostrava uma sequência diferente a cada vez.
+ */
+it('grava a hora do aviso com microssegundos, e ordena por ela', function () {
+    Carbon::setTestNow(Carbon::parse('2026-05-04 09:00:00.200000'));
+    avisoNoSino($this->paula, 'Segundo, no mesmo segundo.');
+
+    Carbon::setTestNow(Carbon::parse('2026-05-04 09:00:00.100000'));
+    avisoNoSino($this->paula, 'Primeiro, no mesmo segundo.');
+
+    $avisos = $this->paula->notifications()->get();
+
+    expect($avisos->map(fn ($a) => $a->created_at->format('H:i:s.u'))->all())->toBe(['09:00:00.200000', '09:00:00.100000'])
+        ->and($avisos->pluck('data.mensagem')->all())->toBe(['Segundo, no mesmo segundo.', 'Primeiro, no mesmo segundo.'])
+        ->and($avisos->first())->toBeInstanceOf(Aviso::class);
 });

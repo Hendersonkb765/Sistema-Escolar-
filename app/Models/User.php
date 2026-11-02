@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -198,6 +199,17 @@ class User extends Authenticatable
             ->whereHas('eixos', fn (Builder $q) => $q->whereIn('eixos.id', $usuario->eixoIds()))
             ->orWhere('criado_por', $usuario->getKey())
             ->orWhere('usuarios.id', $usuario->getKey()));
+    }
+
+    /**
+     * Os avisos do sino, com a hora em microssegundos (ver Aviso). O canal
+     * `database` grava por esta relação, e os não lidos partem dela.
+     *
+     * @return MorphMany<Aviso, $this>
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(Aviso::class, 'notifiable')->latest();
     }
 
     /**
