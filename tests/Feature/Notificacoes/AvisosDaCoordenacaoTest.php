@@ -21,8 +21,10 @@ use App\Models\QuadroHorario;
 use App\Models\Turma;
 use App\Models\User;
 use App\Notifications\AvisoACoordenacao;
+use App\Support\SinalDeAvisos;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -195,7 +197,8 @@ it('mostra no sino o número de não lidos e os avisos recentes', function () {
 
     $html = $this->actingAs($this->paula)->get(route('painel'))->assertOk()->getContent();
 
-    expect($html)->toContain('wire:poll.30s="verificar"')
+    expect($html)->not->toContain('wire:poll')
+        ->and($html)->toContain('x-data="sinoDeAvisos(')
         ->and($html)->toMatch('/data-contador-de-avisos[^>]*>2</')
         ->and($html)->toContain('Renato Lima vai faltar em Terça, 12/05/2026.')
         ->and($html)->toContain('Marta Reis vai faltar em Quarta, 13/05/2026.')
@@ -306,4 +309,125 @@ it('não abre o aviso de outra pessoa pelo id', function () {
         ->toThrow(ModelNotFoundException::class);
 
     expect($doColega->fresh()->read_at)->toBeNull();
+});
+
+// --- O sinal sem banco ----------------------------------------------------
+
+/*
+ * O sino pergunta a cada 30 segundos se há aviso novo. Se cada pergunta
+ * abrisse o banco, um PAEET parado gastaria 120 conexões por hora, e a
+ * hospedagem limita o site inteiro a 500. A pergunta vai a um endereço
+ * sem sessão e sem banco; só a mudança do contador faz o sino buscar.
+ */
+
+it('responde ao sino sem consultar o banco', function () {
+    $url = SinalDeAvisos::url($this->paula);
+
+    $consultas = 0;
+    DB::listen(function () use (&$consultas) {
+        $consultas++;
+    });
+
+    $resposta = $this->getJson($url)->assertOk()->assertExactJson(['versao' => 0])
+        // Sem sessão: nos testes ela fica em memória, mas em produção mora no banco.
+        ->assertCookieMissing(config('session.cookie'));
+
+    expect($resposta->headers->get('Cache-Control'))->toContain('no-store')
+        ->and($consultas)->toBe(0)
+        // Nem `web`, nem `auth`: nada que leia sessão ou usuário.
+        ->and(app('router')->getRoutes()->getByName('avisos.sinal')->gatherMiddleware())->toBe([]);
+});
+
+it('muda o contador de quem recebe o aviso, e só dele', function () {
+    ($this->naTerca)($this->turmaTec, $this->logica, 1);
+
+    ($this->informar)();
+
+    expect(SinalDeAvisos::versao($this->paula->id))->toBe(1)
+        ->and(SinalDeAvisos::versao($this->admin->id))->toBe(1)
+        ->and(SinalDeAvisos::versao($this->deAdm->id))->toBe(0)
+        ->and(SinalDeAvisos::versao($this->renato->id))->toBe(0);
+
+    $this->getJson(SinalDeAvisos::url($this->paula))->assertExactJson(['versao' => 1]);
+});
+
+it('recusa o sinal sem assinatura, ou com o id trocado', function () {
+    $this->getJson("/avisos/{$this->paula->id}/sinal")->assertForbidden();
+
+    $daPaula = SinalDeAvisos::url($this->paula);
+    $trocada = str_replace("/avisos/{$this->paula->id}/", "/avisos/{$this->admin->id}/", $daPaula);
+
+    $this->getJson($trocada)->assertForbidden();
+});
+
+it('põe no sino o endereço assinado e o contador atual', function () {
+    SinalDeAvisos::avisar([$this->paula->id, $this->paula->id]);
+
+    $html = Livewire::actingAs($this->paula)->test(Sino::class)->html();
+
+    expect($html)->toContain('data-sinal="'.e(SinalDeAvisos::url($this->paula)).'"')
+        ->and($html)->toContain(', 2)"');
+});
+
+/*
+ * O contador muda depois do commit. Antes dele, o sino veria a mudança,
+ * iria ao banco, não acharia o aviso ainda, e ficaria quieto até o
+ * próximo.
+ */
+it('só muda o contador depois que a transação do aviso é confirmada', function () {
+    DB::transaction(function () {
+        avisoNoSino($this->paula, 'Dentro da transação.');
+
+        expect(SinalDeAvisos::versao($this->paula->id))->toBe(0);
+    });
+
+    expect(SinalDeAvisos::versao($this->paula->id))->toBe(1);
+});
+
+it('não muda o contador quando a transação do aviso é desfeita', function () {
+    try {
+        DB::transaction(function () {
+            avisoNoSino($this->paula, 'Vai ser desfeito.');
+
+            throw new RuntimeException('falhou depois do aviso');
+        });
+    } catch (RuntimeException) {
+    }
+
+    expect(SinalDeAvisos::versao($this->paula->id))->toBe(0)
+        ->and($this->paula->notifications()->count())->toBe(0);
+});
+
+it('muda o contador por qualquer caminho que grave aviso, um por aviso', function () {
+    // Direto pelo notify(), sem passar pela Action da coordenação.
+    avisoNoSino($this->paula, 'Primeiro.');
+    avisoNoSino($this->paula, 'Segundo.');
+
+    expect(SinalDeAvisos::versao($this->paula->id))->toBe(2)
+        ->and(SinalDeAvisos::versao($this->admin->id))->toBe(0);
+});
+
+/*
+ * O endereço do sinal não expira: a página fica aberta o dia inteiro, e
+ * uma assinatura com prazo faria o sino receber 403 em silêncio. O risco
+ * é baixo — o endereço só diz um número.
+ */
+it('dá ao sino um endereço sem prazo, que continua valendo meses depois', function () {
+    $url = SinalDeAvisos::url($this->paula);
+
+    expect($url)->not->toContain('expires=');
+
+    $this->travel(400)->days();
+
+    $this->getJson($url)->assertOk();
+});
+
+it('entrega ao sino um endereço novo e válido quando o antigo é recusado', function () {
+    $sino = Livewire::actingAs($this->paula)->test(Sino::class)->call('enderecoDoSinal');
+
+    $novo = $sino->effects['returns'][0];
+
+    expect($novo)->toBe(SinalDeAvisos::url($this->paula));
+
+    $this->getJson($novo)->assertOk();
 });

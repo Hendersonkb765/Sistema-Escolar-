@@ -67,6 +67,9 @@ it('lê do banco na inicialização, por cima do arquivo', function () {
         ['chave' => 'intervalos', 'valor' => json_encode([['nome' => 'Recreio', 'inicio' => '09:30', 'minutos' => 15]]), 'created_at' => now(), 'updated_at' => now()],
     ]);
 
+    // Gravado direto no banco, sem passar por gravar(), que é quem limpa o cache.
+    App\Support\ConfiguracaoDaEscola::esquecer();
+
     config(['instituicao.aulas_por_dia' => 7]);
     // A inicialização do sistema, como numa requisição nova.
     app()->getProvider(AppServiceProvider::class)->boot();
@@ -258,4 +261,19 @@ it('recusa turma que não existe', function () {
         ->set('intervalos.1.turmas', ['999'])
         ->call('salvar')
         ->assertDispatched('notificar', fn (string $evento, array $dados) => $dados['mensagem'] === 'Uma das turmas marcadas não existe mais. Recarregue a página.');
+});
+
+it('lê a configuração do cache na inicialização, sem abrir o banco a cada requisição', function () {
+    Livewire::actingAs($this->admin)->test(ConfiguracaoDaEscola::class)->set('aulas_por_dia', '6')->call('salvar');
+
+    $consultas = 0;
+    DB::listen(function () use (&$consultas) {
+        $consultas++;
+    });
+
+    config(['instituicao.aulas_por_dia' => 7]);
+    app()->getProvider(AppServiceProvider::class)->boot();
+
+    expect(config('instituicao.aulas_por_dia'))->toBe(6)
+        ->and($consultas)->toBe(0);
 });

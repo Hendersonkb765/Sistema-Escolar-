@@ -34,6 +34,9 @@ const FORA_DO_ESCOPO_DE_EIXO = [
     // Usuário não pertence a um Eixo: pertence a vários. O limite de quem
     // pode editar quem está em CriacaoDeUsuariosTest.
     'usuarios.editar',
+    // O id é de quem recebe o aviso, e a assinatura da URL é a credencial:
+    // não há sessão nem banco. Coberto em AvisosDaCoordenacaoTest.
+    'avisos.sinal',
 ];
 
 beforeEach(function () {

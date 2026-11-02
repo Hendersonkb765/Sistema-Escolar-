@@ -132,7 +132,7 @@ it('marca a coluna de hoje', function () {
 
     expect($marcadas[1])->toHaveCount(1)
         ->and(trim($marcadas[1][0]))->toBe('Terça')
-        ->and(substr_count($html, '>Hoje</span>'))->toBe(1);
+        ->and(substr_count(semSelosEscondidos($html), '>Hoje</span>'))->toBe(1);
 });
 
 it('move o marcador com o dia', function () {
@@ -208,6 +208,11 @@ function vazias(int $de, int $ate): array
     return array_map(fn (int $n) => [$n, ['', '', '', '', '']], range($de, $ate));
 }
 
+function semSelosEscondidos(string $html): string
+{
+    return preg_replace('/<span[^>]*style="display: none"[^>]*>.*?<\/span>/s', '', $html);
+}
+
 /** As linhas da tabela, por número de aula: [número => [texto de cada dia]]. */
 function linhasDaEscala(string $html): array
 {
@@ -218,7 +223,8 @@ function linhasDaEscala(string $html): array
     foreach ($linhas as [, $numero, $conteudo]) {
         preg_match_all('/<td[^>]*>(.*?)<\/td>/s', $conteudo, $celulas);
 
-        $textos = array_map(fn (string $c) => trim(preg_replace('/\s+/', ' ', strip_tags($c))), $celulas[1]);
+        // Sem os selos escondidos: o "Agora" de cada aula só aparece quando o relógio do navegador o acende.
+        $textos = array_map(fn (string $c) => trim(preg_replace('/\s+/', ' ', strip_tags(semSelosEscondidos($c)))), $celulas[1]);
 
         // A célula da turma (rowspan) só vem na primeira linha do bloco; o número da aula, sempre.
         $resultado[] = [(int) $numero, array_slice($textos, array_search($numero.'ª', $textos, true) + 1)];
@@ -409,8 +415,27 @@ it('marca o intervalo que está acontecendo agora', function () {
         ->and(substr_count($html, 'data-agora'))->toBe(1);
 });
 
-it('atualiza a escala sozinha a cada minuto', function () {
-    expect(Livewire::actingAs($this->paeet)->test(EscalaDaSemana::class)->html())->toContain('wire:poll.60s');
+it('anda com o relógio no navegador, sem consultar o servidor', function () {
+    $html = Livewire::actingAs($this->paeet)->test(EscalaDaSemana::class)->html();
+
+    // Cada consulta periódica era uma conexão com o banco, e a hospedagem limita as conexões por hora.
+    expect($html)->not->toContain('wire:poll')
+        ->and($html)->toContain('$store.relogio.hoje(2)')
+        // As aspas saem como &#039; no atributo; o navegador as devolve antes de o Alpine ler.
+        ->and($html)->toContain('$store.relogio.agora(2, &#039;07:00&#039;, &#039;07:50&#039;)');
+
+    $this->actingAs($this->paeet)->get(route('painel'))
+        ->assertSee('<meta name="fuso-da-escola" content="America/Sao_Paulo">', false);
+});
+
+it('leva a data em que foi desenhada, para o painel recarregar quando o dia virar', function () {
+    // 01:00 de quarta em UTC ainda é terça, 22:00, em Brasília: vale a data da escola.
+    Carbon::setTestNow(Carbon::parse('2026-05-13 01:00', 'UTC'));
+
+    $html = Livewire::actingAs($this->paeet)->test(EscalaDaSemana::class)->html();
+
+    expect($html)->toContain("x-data=\"{ dataDaTela: '2026-05-12' }\"")
+        ->and($html)->toContain('x-effect="$store.relogio.recarregarSeOutroDia(dataDaTela)"');
 });
 
 it('usa o intervalo escolhido para a turma no lugar do padrão', function () {

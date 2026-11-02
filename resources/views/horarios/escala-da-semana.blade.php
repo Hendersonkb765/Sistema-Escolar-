@@ -1,5 +1,15 @@
-{{-- A cada minuto: o marcador de "Agora" anda com o relógio. --}}
-<div wire:poll.60s>
+{{--
+    Sem consulta periódica ao servidor: os marcadores de "Hoje" e "Agora"
+    vêm desenhados daqui e andam no navegador, pelo $store.relogio
+    (resources/js/relogio-da-escola.js). Cada consulta seria uma conexão
+    com o banco, e a hospedagem limita as conexões por hora.
+
+
+    A data da tela vai junto: virando o dia com a página aberta, o painel
+    recarrega — os marcadores andariam sozinhos, mas bimestre, eventos e
+    ausências ficariam no dia em que a página abriu.
+--}}
+<div x-data="{ dataDaTela: '{{ $momento->toDateString() }}' }" x-effect="$store.relogio.recarregarSeOutroDia(dataDaTela)">
     <x-cartao :titulo="$daCoordenacao ? 'Escala da semana da escola' : 'Sua escala da semana'"
               :icone="App\Support\Navegacao::icone('calendario')"
               :descricao="($hoje
@@ -45,11 +55,11 @@
                                 <th @class([
                                     'min-w-40 px-3 py-2',
                                     'bg-marca-50 text-marca-700 dark:bg-marca-900/30 dark:text-marca-300' => $coluna === $hoje,
-                                ]) @if ($coluna === $hoje) data-hoje aria-current="date" @endif>
+                                ]) @if ($coluna === $hoje) data-hoje aria-current="date" @endif
+                                    :class="{ 'bg-marca-50 text-marca-700 dark:bg-marca-900/30 dark:text-marca-300': $store.relogio.hoje({{ $coluna->value }}) }">
                                     {{ $coluna->rotulo() }}
-                                    @if ($coluna === $hoje)
-                                        <span class="ml-1 rounded-full bg-marca-600 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-white">Hoje</span>
-                                    @endif
+                                    <span x-show="$store.relogio.hoje({{ $coluna->value }})" @if ($coluna !== $hoje) style="display: none" @endif
+                                          class="ml-1 rounded-full bg-marca-600 px-1.5 py-0.5 text-[10px] font-semibold normal-case text-white">Hoje</span>
                                 </th>
                             @endforeach
                         </tr>
@@ -85,16 +95,20 @@
                                             <td rowspan="{{ count($linha['linhas']) }}"
                                                 class="whitespace-nowrap px-4 py-2 align-top font-medium text-slate-800 sm:px-6 dark:text-slate-100">{{ $linha['rotulo'] }}</td>
                                         @endif
+                                        @php($noRelogio = "\$store.relogio.intervaloAgora('{$item['intervalo']->inicio}', '{$item['intervalo']->fim}')")
                                         <td colspan="{{ $dias->count() + 1 }}"
                                             @class([
                                                 'px-2 py-1 text-center text-xs',
                                                 'bg-slate-50 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400' => ! $intervaloAgora,
                                                 'bg-amber-50 font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300' => $intervaloAgora,
-                                            ])>
+                                            ])
+                                            :class="{
+                                                'bg-slate-50 text-slate-500 dark:bg-slate-800/40 dark:text-slate-400': ! {{ $noRelogio }},
+                                                'bg-amber-50 font-semibold text-amber-800 dark:bg-amber-500/10 dark:text-amber-300': {{ $noRelogio }},
+                                            }">
                                             {{ $item['intervalo']->nome }} · {{ $item['intervalo']->intervalo() }}
-                                            @if ($intervaloAgora)
-                                                <span class="ml-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Agora</span>
-                                            @endif
+                                            <span x-show="{{ $noRelogio }}" @unless ($intervaloAgora) style="display: none" @endunless
+                                                  class="ml-1 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white">Agora</span>
                                         </td>
                                     </tr>
                                     @continue
@@ -116,17 +130,18 @@
                                         <td @class([
                                             'px-3 py-2 align-top',
                                             'bg-marca-50/60 dark:bg-marca-900/20' => $coluna === $hoje,
-                                        ])>
+                                        ]) :class="{ 'bg-marca-50/60 dark:bg-marca-900/20': $store.relogio.hoje({{ $coluna->value }}) }">
                                             @foreach ($linha['porCelula']->get($coluna->value.'-'.$numero, collect()) as $aula)
                                                 @php($aulaAgora = $aula->acontecendoEm($momento))
+                                                @php($noRelogio = "\$store.relogio.agora({$aula->dia_semana->value}, '{$aula->horaInicio()}', '{$aula->horaFim()}')")
                                                 <p wire:key="aula-{{ $aula->id }}" @if ($aulaAgora) data-agora @endif
                                                    @class([
                                                        'text-xs leading-5',
                                                        '-mx-1 rounded-md bg-marca-600/10 px-1 ring-2 ring-marca-500 dark:bg-marca-400/10 dark:ring-marca-400' => $aulaAgora,
-                                                   ])>
-                                                    @if ($aulaAgora)
-                                                        <span class="mr-1 rounded-full bg-marca-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Agora</span>
-                                                    @endif
+                                                   ])
+                                                   :class="{ '-mx-1 rounded-md bg-marca-600/10 px-1 ring-2 ring-marca-500 dark:bg-marca-400/10 dark:ring-marca-400': {{ $noRelogio }} }">
+                                                    <span x-show="{{ $noRelogio }}" @unless ($aulaAgora) style="display: none" @endunless
+                                                          class="mr-1 rounded-full bg-marca-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Agora</span>
                                                     <span class="tabular-nums text-slate-500 dark:text-slate-400">{{ $aula->horaInicio() }}</span>
                                                     <span class="font-medium text-slate-800 dark:text-slate-100">{{ $aula->disciplina->nome }}</span>
                                                     <span class="text-slate-500 dark:text-slate-400">· {{ $daCoordenacao ? $aula->professor->nome : $aula->turma->nome }}</span>
