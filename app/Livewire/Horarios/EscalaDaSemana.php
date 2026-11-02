@@ -14,9 +14,15 @@ use Livewire\Component;
 /**
  * A semana no painel, com o dia de hoje marcado.
  *
- * A coordenação vê o quadro das turmas ativas do seu Eixo, uma linha por
- * turma; o filtro por curso existe porque um Eixo tem muitas turmas. O
- * professor vê as próprias aulas, numa linha só.
+ * A coordenação vê o quadro das turmas ativas de **todos** os Eixos — o
+ * PAEET precisa saber quem está em sala na escola inteira, para cobrir
+ * uma falta com quem está livre —, os do seu Eixo primeiro. É uma
+ * exceção deliberada ao escopo por Eixo, e só de consulta: a escala não
+ * leva a tela nenhuma de outro Eixo, e turma, quadro e alunos seguem
+ * restritos. Os filtros por Eixo e curso existem porque a escola tem
+ * muitas turmas.
+ *
+ * O professor vê as próprias aulas, numa linha só.
  *
  * O PAEET que também dá aula vê a escala do Eixo: a dele está em
  * "Minha semana".
@@ -26,29 +32,44 @@ class EscalaDaSemana extends Component
     /** @var array<int, string> número da aula => primeiro início dela na escola, "HH:MM". Só para montar a grade. */
     private array $horarioDaEscola = [];
 
+    public string $eixo = '';
+
     public string $curso = '';
+
+    /** Trocar de Eixo invalida o curso escolhido no anterior. */
+    public function updatedEixo(): void
+    {
+        $this->curso = '';
+    }
 
     public function render(): View
     {
         $usuario = auth()->user();
         $daCoordenacao = $usuario->ehGestao();
 
+        $meusEixos = $daCoordenacao ? $usuario->eixoIds() : [];
+
         $aulas = QuadroHorario::query()
-            ->when(
-                $daCoordenacao,
-                fn (Builder $q) => $q->visivelPara($usuario),
-                fn (Builder $q) => $q->where('professor_id', $usuario->id),
-            )
+            // A coordenação, sem `visivelPara`: a escala é da escola inteira (ver a nota da classe).
+            ->when(! $daCoordenacao, fn (Builder $q) => $q->where('professor_id', $usuario->id))
             ->whereHas('turma', fn (Builder $q) => $q->where('status', StatusTurma::Ativa))
-            ->with('turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id', 'disciplina:id,nome', 'professor:id,nome')
+            ->with('turma:id,nome,curso_id', 'turma.curso:id,nome,eixo_id', 'turma.curso.eixo:id,nome', 'disciplina:id,nome', 'professor:id,nome')
             ->orderBy('aula_numero')
             ->get();
 
-        // Os cursos do filtro vêm do quadro inteiro, antes de filtrar: escolher um curso não some com os outros.
-        $cursos = $aulas->pluck('turma.curso')->unique('id')->sortBy('nome')->values();
+        // Os filtros vêm do quadro inteiro, antes de filtrar: escolher um não some com os outros.
+        $eixos = $aulas->pluck('turma.curso.eixo')->unique('id')
+            ->sortBy(fn ($eixo) => [in_array($eixo->id, $meusEixos, true) ? 0 : 1, $eixo->nome])
+            ->values();
+        $cursos = $aulas->pluck('turma.curso')
+            ->filter(fn ($curso) => $this->eixo === '' || (string) $curso->eixo_id === $this->eixo)
+            ->unique('id')->sortBy('nome')->values();
 
-        if ($daCoordenacao && $this->curso !== '') {
-            $aulas = $aulas->filter(fn (QuadroHorario $a) => (string) $a->turma->curso_id === $this->curso)->values();
+        if ($daCoordenacao) {
+            $aulas = $aulas
+                ->filter(fn (QuadroHorario $a) => $this->eixo === '' || (string) $a->turma->curso->eixo_id === $this->eixo)
+                ->filter(fn (QuadroHorario $a) => $this->curso === '' || (string) $a->turma->curso_id === $this->curso)
+                ->values();
         }
 
         // Pelo relógio da escola, e não pelo do servidor (UTC): é a hora da parede que diz qual aula é agora.
@@ -74,7 +95,9 @@ class EscalaDaSemana extends Component
 
         return view('horarios.escala-da-semana', [
             'daCoordenacao' => $daCoordenacao,
-            'linhas' => $daCoordenacao ? $this->porTurma($aulas) : $this->doProfessor($aulas),
+            'linhas' => $daCoordenacao ? $this->porTurma($aulas, $meusEixos) : $this->doProfessor($aulas),
+            'eixos' => $eixos,
+            'meusEixos' => $meusEixos,
             'cursos' => $cursos,
             'dias' => $dias,
             'hoje' => $hoje,
@@ -83,21 +106,31 @@ class EscalaDaSemana extends Component
     }
 
     /**
-     * Um bloco por turma, agrupados por curso.
+     * Um bloco por turma, agrupados por Eixo e curso: os Eixos de quem
+     * olha primeiro, depois os demais, em ordem de nome.
      *
-     * @return Collection<int, array{rotulo: string, grupo: ?string, linhas: array, porCelula: Collection}>
+     * @param  array<int, int>  $meusEixos
+     * @return Collection<int, array{rotulo: string, grupo: ?string, eixo: ?string, doMeuEixo: bool, linhas: array, porCelula: Collection}>
      */
-    private function porTurma(Collection $aulas): Collection
+    private function porTurma(Collection $aulas, array $meusEixos): Collection
     {
         return $aulas
             ->groupBy('turma_id')
-            ->map(fn (Collection $daTurma) => $this->bloco(
-                $daTurma->first()->turma->nome,
-                $daTurma->first()->turma->curso->nome,
-                $daTurma,
-                IntervaloDoDia::daTurma($daTurma->first()->turma),
-            ))
-            ->sortBy([['grupo', 'asc'], ['rotulo', 'asc']])
+            ->map(function (Collection $daTurma) use ($meusEixos) {
+                $turma = $daTurma->first()->turma;
+
+                return [
+                    ...$this->bloco($turma->nome, $turma->curso->nome, $daTurma, IntervaloDoDia::daTurma($turma)),
+                    'eixo' => $turma->curso->eixo->nome,
+                    'doMeuEixo' => in_array($turma->curso->eixo_id, $meusEixos, true),
+                ];
+            })
+            ->sortBy([
+                fn ($a, $b) => $b['doMeuEixo'] <=> $a['doMeuEixo'],
+                ['eixo', 'asc'],
+                ['grupo', 'asc'],
+                ['rotulo', 'asc'],
+            ])
             ->values();
     }
 
@@ -108,7 +141,7 @@ class EscalaDaSemana extends Component
         $turmas = $aulas->pluck('turma_id')->unique();
         $comuns = IntervaloDoDia::padrao()->filter(fn (IntervaloDoDia $i) => $turmas->every(fn (int $id) => $i->aplicaA($id)));
 
-        return $aulas->isEmpty() ? collect() : collect([$this->bloco('Suas aulas', null, $aulas, $comuns)]);
+        return $aulas->isEmpty() ? collect() : collect([[...$this->bloco('Suas aulas', null, $aulas, $comuns), 'eixo' => null, 'doMeuEixo' => true]]);
     }
 
     /**

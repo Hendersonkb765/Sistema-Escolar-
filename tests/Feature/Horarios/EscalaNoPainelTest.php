@@ -21,9 +21,13 @@ use Livewire\Livewire;
 beforeEach(function () {
     Carbon::setTestNow('2026-05-12 08:00');
 
-    $tec = Eixo::factory()->create(['codigo' => 'TEC']);
-    $adm = Eixo::factory()->create(['codigo' => 'ADM']);
+    // "Gestão" vem antes de "Tecnologia" no alfabeto: é o que mostra que o Eixo de quem olha passa à frente.
+    $tec = Eixo::factory()->create(['codigo' => 'TEC', 'nome' => 'Tecnologia da Informação']);
+    $adm = Eixo::factory()->create(['codigo' => 'ADM', 'nome' => 'Gestão e Negócios']);
+    $this->tec = $tec;
+    $this->adm = $adm;
     $this->paeet = paeet($tec);
+    $this->paeetAdm = paeet($adm);
 
     $this->renato = professor($tec);
     $this->renato->update(['nome' => 'Renato Lima']);
@@ -58,15 +62,56 @@ beforeEach(function () {
 
 afterEach(fn () => Carbon::setTestNow());
 
-it('mostra à coordenação a escala das turmas do Eixo, por curso, com professor', function () {
-    $this->actingAs($this->paeet)
+it('mostra à coordenação a escala de todos os Eixos, o seu primeiro, por curso, com professor', function () {
+    $html = $this->actingAs($this->paeet)
         ->get(route('painel'))
         ->assertOk()
-        ->assertSee('Escala da semana do Eixo')
-        ->assertSeeInOrder(['Desenvolvimento de Sistemas', '1 A', 'Lógica', 'Renato Lima', 'Redes', 'Marta Reis', 'Informática', '1 B', 'Hardware'])
-        // Outro Eixo fica de fora.
-        ->assertDontSee('Contabilidade')
-        ->assertDontSee('Carlos Dantas');
+        ->assertSee('Escala da semana da escola')
+        ->assertSee('Seu Eixo vem primeiro; depois, os demais.')
+        ->assertSeeInOrder([
+            'Tecnologia da Informação', 'Seu Eixo',
+            'Desenvolvimento de Sistemas', '1 A', 'Lógica', 'Renato Lima', 'Redes', 'Marta Reis',
+            'Informática', '1 B', 'Hardware',
+            // Depois, os outros Eixos — mesmo vindo antes no alfabeto.
+            'Gestão e Negócios', '2 C', 'Contabilidade', 'Carlos Dantas',
+        ])
+        ->getContent();
+
+    expect(substr_count($html, 'data-eixo-da-escala'))->toBe(2)
+        ->and(substr_count($html, '>Seu Eixo</span>'))->toBe(1);
+});
+
+it('põe à frente o Eixo de quem olha, seja ele qual for', function () {
+    $this->actingAs($this->paeetAdm)
+        ->get(route('painel'))
+        ->assertSeeInOrder(['Gestão e Negócios', 'Seu Eixo', 'Contabilidade', 'Tecnologia da Informação', 'Lógica']);
+});
+
+it('só mostra a escala de outro Eixo: não leva às telas dele, que seguem restritas', function () {
+    $html = $this->actingAs($this->paeet)->get(route('painel'))->getContent();
+
+    expect($html)->toContain('Contabilidade')
+        ->and($html)->not->toContain(route('turmas.show', $this->turmaAdm))
+        ->and($html)->not->toContain(route('turmas.horarios', $this->turmaAdm));
+
+    $this->actingAs($this->paeet)->get(route('turmas.show', $this->turmaAdm))->assertForbidden();
+    $this->actingAs($this->paeet)->get(route('turmas.horarios', $this->turmaAdm))->assertForbidden();
+});
+
+it('filtra por Eixo, com os cursos daquele Eixo e a escolha marcada no seletor', function () {
+    $html = Livewire::actingAs($this->paeet)->test(EscalaDaSemana::class)
+        ->set('curso', (string) $this->cursoDesenvolvimento->id)
+        // Trocar de Eixo desfaz o curso escolhido no outro.
+        ->set('eixo', (string) $this->adm->id)
+        ->assertSet('curso', '')
+        ->assertSee('Contabilidade')
+        ->assertDontSee('Lógica')
+        ->html();
+
+    expect($html)->toMatch('/<option value="'.$this->adm->id.'"\s+selected/')
+        ->and($html)->toContain('Tecnologia da Informação (seu Eixo)')
+        // No Eixo de Gestão há um curso só: o seletor de curso sai.
+        ->and($html)->not->toContain('Todos os cursos');
 });
 
 it('mostra ao professor só as aulas dele, com a turma', function () {
@@ -144,7 +189,7 @@ it('explica a escala vazia, para a coordenação e para o professor', function (
     QuadroHorario::query()->delete();
 
     $this->actingAs($this->paeet)->get(route('painel'))
-        ->assertSee('Nenhuma aula no quadro das turmas do seu Eixo')
+        ->assertSee('Nenhuma aula no quadro das turmas')
         ->assertSee('pelo botão Quadro de horários');
 
     $this->actingAs($this->renato)->get(route('painel'))
@@ -334,10 +379,12 @@ it('marca a aula que está acontecendo agora, pelo relógio da escola', function
     $html = Livewire::actingAs($quem === 'paeet' ? $this->paeet : $this->renato)->test(EscalaDaSemana::class)->html();
 
     preg_match_all('/<p[^>]*data-agora[^>]*>(.*?)<\/p>/s', $html, $agora);
+    $marcadas = array_map(fn (string $p) => trim(preg_replace('/\s+/', ' ', strip_tags($p))), $agora[1]);
 
-    expect($agora[1])->toHaveCount(1)
-        ->and(strip_tags($agora[1][0]))->toContain('Lógica')
-        ->and(substr_count($html, '>Agora</span>'))->toBe(1);
+    // A coordenação vê a escola inteira: a 1ª aula de terça da 1 A e a da 2 C.
+    expect($marcadas)->toBe($quem === 'paeet'
+        ? ['Agora 07:00 Lógica · Renato Lima', 'Agora 07:00 Contabilidade · Carlos Dantas']
+        : ['Agora 07:00 Lógica · 1 A']);
 })->with(['paeet', 'professor']);
 
 it('não marca aula nenhuma fora do horário de aula, nem em outro dia', function (string $quando) {

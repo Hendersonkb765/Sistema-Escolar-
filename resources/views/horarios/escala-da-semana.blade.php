@@ -1,23 +1,36 @@
 {{-- A cada minuto: o marcador de "Agora" anda com o relógio. --}}
 <div wire:poll.60s>
-    <x-cartao :titulo="$daCoordenacao ? 'Escala da semana do Eixo' : 'Sua escala da semana'"
+    <x-cartao :titulo="$daCoordenacao ? 'Escala da semana da escola' : 'Sua escala da semana'"
               :icone="App\Support\Navegacao::icone('calendario')"
-              :descricao="$hoje
+              :descricao="($hoje
                   ? 'A coluna marcada é hoje, '.mb_strtolower($hoje->rotulo()).'.'
-                  : 'Hoje é domingo: não há aula. A semana abaixo começa amanhã.'">
-        @if ($daCoordenacao && $cursos->count() > 1)
+                  : 'Hoje é domingo: não há aula. A semana abaixo começa amanhã.')
+                  .($daCoordenacao ? ' Seu Eixo vem primeiro; depois, os demais.' : '')">
+        @if ($daCoordenacao && ($eixos->count() > 1 || $cursos->count() > 1))
             <x-slot:acoes>
-                <x-select id="escala-curso" wire:model.live="curso" class="!w-auto">
-                    <option value="" @selected($curso === '')>Todos os cursos</option>
-                    @foreach ($cursos as $opcao)
-                        <option value="{{ $opcao->id }}" @selected($curso === (string) $opcao->id)>{{ $opcao->nome }}</option>
-                    @endforeach
-                </x-select>
+                <div class="flex flex-wrap gap-2">
+                    @if ($eixos->count() > 1)
+                        <x-select id="escala-eixo" wire:model.live="eixo" class="!w-auto">
+                            <option value="" @selected($eixo === '')>Todos os Eixos</option>
+                            @foreach ($eixos as $opcao)
+                                <option value="{{ $opcao->id }}" @selected($eixo === (string) $opcao->id)>{{ $opcao->nome }}{{ in_array($opcao->id, $meusEixos, true) ? ' (seu Eixo)' : '' }}</option>
+                            @endforeach
+                        </x-select>
+                    @endif
+                    @if ($cursos->count() > 1)
+                        <x-select id="escala-curso" wire:model.live="curso" class="!w-auto">
+                            <option value="" @selected($curso === '')>Todos os cursos</option>
+                            @foreach ($cursos as $opcao)
+                                <option value="{{ $opcao->id }}" @selected($curso === (string) $opcao->id)>{{ $opcao->nome }}</option>
+                            @endforeach
+                        </x-select>
+                    @endif
+                </div>
             </x-slot:acoes>
         @endif
 
         @if ($linhas->isEmpty())
-            <x-vazio :titulo="$daCoordenacao ? 'Nenhuma aula no quadro das turmas do seu Eixo' : 'Nenhuma aula sua no quadro de horários'"
+            <x-vazio :titulo="$daCoordenacao ? 'Nenhuma aula no quadro das turmas' : 'Nenhuma aula sua no quadro de horários'"
                      :descricao="$daCoordenacao
                          ? 'O quadro de cada turma é montado na tela da turma, pelo botão Quadro de horários.'
                          : 'Quem monta o quadro é a coordenação. Se faltar alguma aula, avise o PAEET.'"/>
@@ -43,7 +56,19 @@
                     </thead>
                     <tbody>
                         @foreach ($linhas as $linha)
-                            @if ($daCoordenacao && ($loop->first || $linhas[$loop->index - 1]['grupo'] !== $linha['grupo']))
+                            @php($anterior = $loop->first ? null : $linhas[$loop->index - 1])
+                            @if ($daCoordenacao && ($anterior === null || $anterior['eixo'] !== $linha['eixo']))
+                                <tr wire:key="eixo-{{ $loop->index }}" data-eixo-da-escala>
+                                    <td colspan="{{ $dias->count() + 2 }}"
+                                        class="border-t-2 border-slate-300 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 sm:px-6 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">
+                                        {{ $linha['eixo'] }}
+                                        @if ($linha['doMeuEixo'])
+                                            <span class="ml-2 rounded-full bg-marca-600 px-2 py-0.5 text-[10px] font-semibold text-white">Seu Eixo</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endif
+                            @if ($daCoordenacao && ($anterior === null || $anterior['eixo'] !== $linha['eixo'] || $anterior['grupo'] !== $linha['grupo']))
                                 <tr wire:key="grupo-{{ $loop->index }}">
                                     <td colspan="{{ $dias->count() + 2 }}"
                                         class="border-t border-slate-200 bg-slate-50 px-4 py-1.5 text-xs font-semibold text-slate-600 sm:px-6 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-300">{{ $linha['grupo'] }}</td>
