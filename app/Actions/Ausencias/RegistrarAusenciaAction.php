@@ -2,10 +2,12 @@
 
 namespace App\Actions\Ausencias;
 
+use App\Actions\Notificacoes\AvisarCoordenacaoAction;
 use App\Enums\StatusAusencia;
 use App\Exceptions\RegraDeNegocioException;
 use App\Models\Ausencia;
 use App\Models\User;
+use App\Notifications\AvisoACoordenacao;
 use App\Support\AulaPrevista;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -68,7 +70,7 @@ class RegistrarAusenciaAction
             throw RegraDeNegocioException::porque($pendencias->implode(' '));
         }
 
-        return DB::transaction(function () use ($professor, $data, $motivo, $previstas, $planos) {
+        $ausencia = DB::transaction(function () use ($professor, $data, $motivo, $previstas, $planos) {
             $ausencia = Ausencia::query()->create([
                 'professor_id' => $professor->id,
                 'data' => $data,
@@ -96,5 +98,11 @@ class RegistrarAusenciaAction
 
             return $ausencia;
         });
+
+        app(AvisarCoordenacaoAction::class)->executar(
+            $ausencia->eixoIds(), AvisoACoordenacao::ausenciaInformada($ausencia->load('professor:id,nome')), $professor,
+        );
+
+        return $ausencia;
     }
 }

@@ -201,6 +201,22 @@ class User extends Authenticatable
     }
 
     /**
+     * A coordenação ativa destes Eixos: quem recebe os avisos do que
+     * acontece neles.
+     *
+     * @param  Builder<User>  $query
+     * @param  array<int, int>  $eixoIds
+     * @return Builder<User>
+     */
+    public function scopeCoordenacaoDosEixos(Builder $query, array $eixoIds): Builder
+    {
+        return $query
+            ->where('ativo', true)
+            ->whereIn('perfil', [PerfilUsuario::PaeetAdmin->value, PerfilUsuario::Paeet->value])
+            ->whereHas('eixos', fn (Builder $q) => $q->whereIn('eixos.id', $eixoIds));
+    }
+
+    /**
      * O primeiro nome, pulando o tratamento.
      *
      * O cadastro guarda o nome como ele vem da escola, e lá vem

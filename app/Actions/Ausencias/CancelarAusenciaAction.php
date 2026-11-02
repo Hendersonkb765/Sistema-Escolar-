@@ -2,9 +2,11 @@
 
 namespace App\Actions\Ausencias;
 
+use App\Actions\Notificacoes\AvisarCoordenacaoAction;
 use App\Enums\StatusAusencia;
 use App\Exceptions\RegraDeNegocioException;
 use App\Models\Ausencia;
+use App\Notifications\AvisoACoordenacao;
 
 /**
  * O professor desiste da ausência — vai estar na escola, afinal.
@@ -32,6 +34,10 @@ class CancelarAusenciaAction
             'status' => StatusAusencia::Cancelada,
             'cancelada_em' => now(),
         ]);
+
+        app(AvisarCoordenacaoAction::class)->executar(
+            $ausencia->eixoIds(), AvisoACoordenacao::ausenciaCancelada($ausencia->load('professor:id,nome')), $ausencia->professor,
+        );
 
         return $ausencia;
     }
