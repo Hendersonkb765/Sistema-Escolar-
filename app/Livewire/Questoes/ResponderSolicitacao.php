@@ -3,6 +3,7 @@
 namespace App\Livewire\Questoes;
 
 use App\Actions\Avaliacao\EnviarParteAction;
+use App\Actions\Avaliacao\ImportarQuestoesAction;
 use App\Actions\Avaliacao\ReenviarQuestaoAction;
 use App\Actions\Avaliacao\SalvarBlocosDaQuestaoAction;
 use App\Actions\Avaliacao\SalvarQuestaoAction;
@@ -21,6 +22,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 /**
@@ -63,6 +65,15 @@ class ResponderSolicitacao extends Component
      */
     #[Url(as: 'questao', except: null)]
     public ?int $questaoEmFoco = null;
+
+    /** A parte cuja importação por planilha está aberta. */
+    #[Locked]
+    public ?int $importandoParte = null;
+
+    public ?TemporaryUploadedFile $planilhaDeQuestoes = null;
+
+    /** O que a importação faria, enquanto não é confirmada. */
+    public ?array $relatorioDeQuestoes = null;
 
     public function mount(SolicitacaoProva $solicitacao, SalvarQuestaoAction $action, ?int $questao = null): void
     {
@@ -436,6 +447,109 @@ class ResponderSolicitacao extends Component
         );
 
         $this->carregarFormulario();
+    }
+
+    // ------------------------------------------------------------------
+    // Importação por planilha
+    // ------------------------------------------------------------------
+
+    public function abrirImportacao(int $parteId): void
+    {
+        $parte = $this->minhaParte($parteId);
+
+        $this->authorize('responder', $parte);
+
+        $this->importandoParte = $parte->getKey();
+        $this->reset('planilhaDeQuestoes', 'relatorioDeQuestoes');
+        $this->resetErrorBag();
+    }
+
+    public function fecharImportacao(): void
+    {
+        $this->reset('importandoParte', 'planilhaDeQuestoes', 'relatorioDeQuestoes');
+        $this->resetErrorBag();
+    }
+
+    /** Trocar o arquivo invalida a conferência do anterior. */
+    public function updatedPlanilhaDeQuestoes(): void
+    {
+        $this->relatorioDeQuestoes = null;
+    }
+
+    public function conferirPlanilha(ImportarQuestoesAction $action): void
+    {
+        $parte = $this->parteEmImportacao();
+        $this->validarPlanilha();
+
+        try {
+            $this->relatorioDeQuestoes = $action->conferir($parte, $this->planilhaDeQuestoes->getRealPath(), auth()->user());
+        } catch (RegraDeNegocioException $excecao) {
+            $this->relatorioDeQuestoes = null;
+            $this->notificarErro($excecao->getMessage());
+        }
+    }
+
+    public function importarPlanilha(ImportarQuestoesAction $action): void
+    {
+        $parte = $this->parteEmImportacao();
+
+        if ($this->relatorioDeQuestoes === null) {
+            $this->notificarErro('Confira a planilha antes de importar.');
+
+            return;
+        }
+
+        $this->validarPlanilha();
+
+        try {
+            $quantas = $action->executar($parte, $this->planilhaDeQuestoes->getRealPath(), auth()->user());
+        } catch (RegraDeNegocioException $excecao) {
+            $this->notificarErro($excecao->getMessage());
+
+            return;
+        }
+
+        $disciplina = $parte->disciplina->nome;
+
+        $this->fecharImportacao();
+        $this->carregarFormulario();
+
+        $this->notificarSucesso(
+            "{$quantas} questão(ões) de {$disciplina} preenchida(s) pela planilha, como rascunho. Revise e envie quando estiver pronto.",
+            'Planilha importada',
+        );
+    }
+
+    /** A parte pelo id, confinada às deste professor nesta solicitação. */
+    protected function minhaParte(int $parteId): SolicitacaoParte
+    {
+        return SolicitacaoParte::query()
+            ->where('solicitacao_id', $this->solicitacaoId)
+            ->with('disciplina', 'solicitacao')
+            ->findOrFail($parteId);
+    }
+
+    protected function parteEmImportacao(): SolicitacaoParte
+    {
+        abort_if($this->importandoParte === null, 404);
+
+        $parte = $this->minhaParte($this->importandoParte);
+
+        $this->authorize('responder', $parte);
+
+        return $parte;
+    }
+
+    protected function validarPlanilha(): void
+    {
+        $this->validate(
+            ['planilhaDeQuestoes' => ['required', 'file', 'mimes:xlsx,xls,ods,csv,txt', 'max:5120']],
+            [
+                'planilhaDeQuestoes.required' => 'Escolha a planilha com as questões.',
+                'planilhaDeQuestoes.mimes' => 'Envie a planilha em XLSX, ODS ou CSV.',
+                'planilhaDeQuestoes.max' => 'O arquivo passa de 5 MB.',
+            ],
+        );
     }
 
     public function confirmarEnvio(int $parteId): void

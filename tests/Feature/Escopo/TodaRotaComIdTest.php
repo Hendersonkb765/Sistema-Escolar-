@@ -107,6 +107,7 @@ beforeEach(function () {
         'provas.gabarito' => $prova,
         'solicitacoes.show' => $solicitacao,
         'solicitacoes.responder' => $solicitacao,
+        'solicitacoes.partes.modelo' => $solicitacao->partes()->first(),
         'turmas.show' => $turma,
         'turmas.editar' => $turma,
         'turmas.horarios' => $turma,

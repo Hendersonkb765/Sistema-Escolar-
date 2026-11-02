@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\ModeloDeEventosController;
+use App\Http\Controllers\ModeloDeQuestoesController;
 use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
@@ -127,6 +128,7 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/solicitacoes/criar', FormularioSolicitacao::class)->name('solicitacoes.criar');
     Route::get('/solicitacoes/{solicitacao}', DetalheSolicitacao::class)->name('solicitacoes.show');
     Route::get('/solicitacoes/{solicitacao}/responder', ResponderSolicitacao::class)->name('solicitacoes.responder');
+    Route::get('/solicitacoes/partes/{parte}/modelo', ModeloDeQuestoesController::class)->name('solicitacoes.partes.modelo');
 
     Route::get('/questoes', ListaQuestoes::class)->name('questoes.index');
 
