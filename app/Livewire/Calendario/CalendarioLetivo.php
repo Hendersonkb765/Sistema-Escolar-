@@ -121,9 +121,18 @@ class CalendarioLetivo extends Component
             'anos' => $anos,
             'bimestres' => Bimestre::cases(),
             'podeEditar' => auth()->user()->can('gerenciar', BimestreLetivo::class),
+            // A exceção à vista de quem cuida do padrão: sem isto, mudar a
+            // data da escola e ver uma turma não acompanhar seria mistério.
+            'comCalendarioProprio' => Turma::query()
+                ->visivelPara(auth()->user())
+                ->where('periodo_letivo', $this->ano)
+                ->whereHas('bimestresProprios')
+                ->with('curso:id,nome,eixo_id')
+                ->orderBy('nome')
+                ->get(['id', 'nome', 'curso_id']),
         ])->layout('components.layouts.app', [
             'titulo' => 'Calendário letivo',
-            'subtitulo' => 'As datas de cada bimestre, que ligam o dia da aula à semana do escopo-sequência',
+            'subtitulo' => 'As datas dos bimestres da escola, que valem para todas as turmas',
         ]);
     }
 }

@@ -75,4 +75,26 @@
             </table>
         </x-cartao>
     @endif
+
+    {{-- Com a chave no ano: trocar de ano monta a lista de novo. --}}
+    <livewire:calendario.eventos-da-escola :ano="$ano" :key="'eventos-'.$ano"/>
+
+    @if ($comCalendarioProprio->isNotEmpty())
+        <x-cartao titulo="Turmas com calendário próprio"
+                  descricao="Estas turmas não seguem as datas acima. A exceção é feita em Calendário e intervalos, na tela de cada turma.">
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach ($comCalendarioProprio as $turma)
+                    <li class="flex justify-between py-2 text-sm" wire:key="propria-{{ $turma->id }}">
+                        @can('update', $turma)
+                            <a href="{{ route('turmas.calendario', $turma) }}" wire:navigate
+                               class="font-medium text-marca-600 hover:underline dark:text-marca-400">{{ $turma->nome }}</a>
+                        @else
+                            <span class="font-medium text-slate-700 dark:text-slate-200">{{ $turma->nome }}</span>
+                        @endcan
+                        <span class="text-slate-500 dark:text-slate-400">{{ $turma->curso->nome }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        </x-cartao>
+    @endif
 </div>

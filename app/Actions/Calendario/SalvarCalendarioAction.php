@@ -23,6 +23,36 @@ class SalvarCalendarioAction
      */
     public function executar(string $periodoLetivo, array $datas): void
     {
+        self::conferirSequencia($datas);
+
+        DB::transaction(function () use ($periodoLetivo, $datas) {
+            foreach ($datas as $numero => $par) {
+                $chave = ['periodo_letivo' => $periodoLetivo, 'bimestre' => $numero];
+
+                if ($par === null) {
+                    // Um por um, e não `delete()` em massa: assim a
+                    // auditoria registra o que saiu.
+                    BimestreLetivo::query()->where($chave)->get()->each->delete();
+
+                    continue;
+                }
+
+                BimestreLetivo::query()->updateOrCreate($chave, [
+                    'inicio' => $par['inicio'],
+                    'fim' => $par['fim'],
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Um bimestre não começa antes de o anterior terminar. Vale para o
+     * calendário da escola e para o próprio de uma turma.
+     *
+     * @param  array<int, array{inicio: string, fim: string}|null>  $datas
+     */
+    public static function conferirSequencia(array $datas): void
+    {
         ksort($datas);
 
         $anterior = null;
@@ -44,24 +74,5 @@ class SalvarCalendarioAction
 
             $anterior = ['bimestre' => $bimestre, 'fim' => Carbon::parse($par['fim'])];
         }
-
-        DB::transaction(function () use ($periodoLetivo, $datas) {
-            foreach ($datas as $numero => $par) {
-                $chave = ['periodo_letivo' => $periodoLetivo, 'bimestre' => $numero];
-
-                if ($par === null) {
-                    // Um por um, e não `delete()` em massa: assim a
-                    // auditoria registra o que saiu.
-                    BimestreLetivo::query()->where($chave)->get()->each->delete();
-
-                    continue;
-                }
-
-                BimestreLetivo::query()->updateOrCreate($chave, [
-                    'inicio' => $par['inicio'],
-                    'fim' => $par['fim'],
-                ]);
-            }
-        });
     }
 }

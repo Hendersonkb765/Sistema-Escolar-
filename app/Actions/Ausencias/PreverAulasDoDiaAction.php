@@ -6,6 +6,7 @@ use App\Enums\DiaDaSemana;
 use App\Enums\StatusTurma;
 use App\Models\BimestreLetivo;
 use App\Models\EscopoAula;
+use App\Models\EventoEscolar;
 use App\Models\QuadroHorario;
 use App\Models\User;
 use App\Support\AulaPrevista;
@@ -19,8 +20,8 @@ use Illuminate\Database\Eloquent\Builder;
  * escopo-sequência que caberia nela.
  *
  * O caminho: o dia da semana tira as aulas do quadro; o calendário
- * letivo diz em que bimestre e semana a data cai, para o ano de cada
- * turma; o escopo daquela semana, para o curso, o período e a
+ * letivo diz em que bimestre e semana a data cai, para cada turma — o da
+ * escola, ou o próprio dela quando tem; o escopo daquela semana, para o curso, o período e a
  * disciplina, dá as opções. Cada passo que não acha nada diz o motivo
  * na aula, e não some com ela.
  */
@@ -34,11 +35,18 @@ class PreverAulasDoDiaAction
             return new AulasDoDia(collect(), "{$data->format('d/m/Y')} é domingo, e não há aula aos domingos.");
         }
 
+        $semAula = EventoEscolar::semAulaEm($data);
+
+        if ($semAula !== null) {
+            return new AulasDoDia(collect(), "{$data->format('d/m/Y')} é dia sem aula no calendário da escola: "
+                ."{$semAula->titulo} ({$semAula->tipo->rotulo()}, {$semAula->periodo()}).");
+        }
+
         $quadro = QuadroHorario::query()
             ->where('professor_id', $professor->id)
             ->where('dia_semana', $dia)
             ->whereHas('turma', fn (Builder $q) => $q->where('status', StatusTurma::Ativa))
-            ->with('turma:id,nome,curso_id,periodo,periodo_letivo', 'disciplina:id,nome')
+            ->with('turma:id,nome,curso_id,periodo,periodo_letivo', 'turma.bimestresProprios', 'disciplina:id,nome')
             ->orderBy('hora_inicio')
             ->get();
 
@@ -62,7 +70,8 @@ class PreverAulasDoDiaAction
 
         $aulas = $quadro->map(function (QuadroHorario $horario) use ($data, $posicoes, &$locais) {
             $turma = $horario->turma;
-            $local = $locais[$turma->periodo_letivo] ??= BimestreLetivo::localizar($turma->periodo_letivo, $data);
+            // Pela turma: ela pode ter calendário próprio.
+            $local = $locais[$turma->id] ??= BimestreLetivo::localizarNaTurma($turma, $data);
 
             if (! $local->encontrada()) {
                 return new AulaPrevista($horario, $local, collect(), null, $local->motivo);
