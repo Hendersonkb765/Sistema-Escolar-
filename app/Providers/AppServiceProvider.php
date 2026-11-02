@@ -5,9 +5,13 @@ namespace App\Providers;
 use App\Models\User;
 use App\Support\ConfiguracaoDaEscola;
 use App\Support\CriteriosDaAnalise;
+use App\Support\SinalDeAvisos;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
@@ -46,5 +50,18 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('configurarEscola', fn (User $usuario) => $usuario->ehPaeetAdmin());
 
         ConfiguracaoDaEscola::aplicar();
+
+        /*
+         * Todo aviso gravado no banco muda o contador do sino de quem o
+         * recebe — venha de onde vier —, e só depois do commit. Fora de
+         * transação, `afterCommit` roda na hora.
+         */
+        Event::listen(NotificationSent::class, function (NotificationSent $enviada) {
+            if ($enviada->channel === 'database' && $enviada->notifiable instanceof User) {
+                $id = $enviada->notifiable->getKey();
+
+                DB::afterCommit(fn () => SinalDeAvisos::avisar([$id]));
+            }
+        });
     }
 }

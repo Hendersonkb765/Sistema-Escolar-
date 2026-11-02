@@ -1,4 +1,6 @@
 import './bootstrap';
+import { registrarRelogio } from './relogio-da-escola';
+import { criarSino } from './sino-de-avisos';
 
 import hljs from 'highlight.js/lib/common';
 import kotlin from 'highlight.js/lib/languages/kotlin';
@@ -33,6 +35,10 @@ document.addEventListener('livewire:update', realcarCodigo);
  * para as duas divergirem.
  */
 document.addEventListener('alpine:init', () => {
+    registrarRelogio(window.Alpine);
+
+    window.Alpine.data('sinoDeAvisos', (url, versao) => criarSino(url, versao));
+
         window.Alpine.data('marcasDeTexto', () => ({
         init() {
             // O campo é redesenhado com o valor novo, e o cursor cairia no

@@ -53,6 +53,18 @@ return [
             'lock_path' => storage_path('framework/cache/data'),
         ],
 
+        /*
+         * O que é lido a cada requisição e não pode custar uma conexão com
+         * o banco: a configuração da escola e o contador de avisos que o
+         * sino consulta. Em arquivo sempre, seja qual for o CACHE_STORE —
+         * a hospedagem limita as conexões por hora.
+         */
+        'escola' => [
+            'driver' => env('CACHE_ESCOLA_DRIVER', 'file'),
+            'path' => storage_path('framework/cache/escola'),
+            'lock_path' => storage_path('framework/cache/escola'),
+        ],
+
         'memcached' => [
             'driver' => 'memcached',
             'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),

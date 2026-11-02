@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,13 +19,26 @@ final class ConfiguracaoDaEscola
     /** O que a tela altera. Outra chave em `instituicao.*` segue só no arquivo. */
     public const CHAVES = ['nome', 'aulas_por_dia', 'intervalos'];
 
-    /** Lê o banco e põe por cima da configuração. Chamado no boot e depois de salvar. */
+    private const CHAVE_DO_CACHE = 'configuracao-da-escola';
+
+    /**
+     * Põe o que foi gravado por cima da configuração. Chamado no boot e
+     * depois de salvar.
+     *
+     * Lê do cache em arquivo, e só vai ao banco quando ele está vazio: o
+     * boot roda em toda requisição, e uma consulta aqui seria uma conexão
+     * por requisição — inclusive no sinal do sino, que existe justamente
+     * para não abrir o banco.
+     */
     public static function aplicar(): void
     {
         try {
-            $gravadas = DB::table('configuracoes')->whereIn('chave', self::CHAVES)->pluck('valor', 'chave');
+            $gravadas = Cache::store('escola')->rememberForever(
+                self::CHAVE_DO_CACHE,
+                fn () => DB::table('configuracoes')->whereIn('chave', self::CHAVES)->pluck('valor', 'chave')->all(),
+            );
         } catch (QueryException) {
-            // Antes da migration — instalação nova, `migrate` rodando. Vale o arquivo.
+            // Antes da migration — instalação nova, `migrate` rodando. Vale o arquivo, e nada fica em cache.
             return;
         }
 
@@ -43,7 +57,14 @@ final class ConfiguracaoDaEscola
             );
         }
 
+        self::esquecer();
         self::aplicar();
+    }
+
+    /** Descarta o cache: a próxima leitura vai ao banco. */
+    public static function esquecer(): void
+    {
+        Cache::store('escola')->forget(self::CHAVE_DO_CACHE);
     }
 
     /** O valor em uso agora, gravado ou do arquivo. */

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notificacoes;
 
+use App\Support\SinalDeAvisos;
 use Illuminate\Contracts\View\View;
 use Illuminate\Notifications\DatabaseNotification;
 use Livewire\Attributes\Locked;
@@ -11,8 +12,10 @@ use Livewire\Component;
  * O sino no topo da tela: os avisos da coordenação.
  *
  * Não há servidor de WebSocket — a hospedagem não roda processo
- * permanente. O sino pergunta ao servidor a cada 30 segundos, e o que
- * chegou desde a última pergunta aparece também como aviso flutuante.
+ * permanente. O navegador pergunta a cada 30 segundos por um contador
+ * (SinalDeAvisos) num endereço que não abre o banco; só quando o
+ * contador muda ele chama `verificar()`, que busca os avisos novos e os
+ * mostra em balão. Uma conexão por aviso, e não uma a cada 30 segundos.
  *
  * A janela de cada pergunta é [desde, agora), em segundos inteiros: um
  * aviso gravado no mesmo segundo da pergunta fica para a seguinte, e
@@ -69,6 +72,16 @@ class Sino extends Component
         $this->redirect($aviso->data['url'], navigate: true);
     }
 
+    /**
+     * Um endereço novo para o sinal, quando o antigo deixou de valer —
+     * chave da aplicação trocada, endereço que chega diferente pelo proxy.
+     * O sino pede uma vez, ao receber 403.
+     */
+    public function enderecoDoSinal(): string
+    {
+        return SinalDeAvisos::url(auth()->user());
+    }
+
     public function marcarTodasComoLidas(): void
     {
         auth()->user()->unreadNotifications()->update(['read_at' => now()]);
@@ -79,6 +92,8 @@ class Sino extends Component
         $usuario = auth()->user();
 
         return view('notificacoes.sino', [
+            'sinal' => SinalDeAvisos::url($usuario),
+            'versao' => SinalDeAvisos::versao($usuario->id),
             'naoLidas' => $usuario->unreadNotifications()->count(),
             'recentes' => $usuario->notifications()->limit(8)->get(),
         ]);

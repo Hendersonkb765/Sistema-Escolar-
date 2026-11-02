@@ -1,5 +1,5 @@
-{{-- A cada 30 segundos: ver a nota em App\Livewire\Notificacoes\Sino. --}}
-<div wire:poll.30s="verificar" x-data="{ aberto: false }" class="relative">
+{{-- O contador é consultado a cada 30 s sem abrir o banco: ver a nota em App\Livewire\Notificacoes\Sino. --}}
+<div x-data="sinoDeAvisos({{ Js::from($sinal) }}, {{ $versao }})" data-sinal="{{ $sinal }}" class="relative">
     <button type="button" @click="aberto = ! aberto" @click.outside="aberto = false"
             class="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
             aria-label="Avisos{{ $naoLidas > 0 ? ': '.$naoLidas.' não lido(s)' : '' }}"
