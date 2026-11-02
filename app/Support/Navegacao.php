@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Enums\StatusQuestao;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\BimestreLetivo;
 use App\Models\CompartilhamentoDeModelo;
 use App\Models\Curso;
@@ -45,6 +46,13 @@ class Navegacao
                             self::item('Minha semana', 'horarios.meus', self::icone('calendario')),
                             self::item('Minhas ausências', 'ausencias.index', self::icone('ausencia')),
                         ] : []),
+                    ...(Gate::forUser($usuario)->allows('acompanhar', Ausencia::class)
+                        ? [self::item(
+                            'Ausências de professores',
+                            'ausencias.coordenacao',
+                            self::icone('ausencia'),
+                            contador: self::contadorDeAusencias($usuario),
+                        )] : []),
                 ],
             ],
             [
@@ -122,6 +130,8 @@ class Navegacao
                 'itens' => array_filter([
                     Gate::forUser($usuario)->allows('viewAny', User::class)
                         ? self::item('Usuários', 'usuarios.index', self::icone('usuario')) : null,
+                    Gate::forUser($usuario)->allows('configurarEscola')
+                        ? self::item('Configuração da escola', 'configuracao.escola', self::icone('configuracao')) : null,
                     $usuario->ehGestao()
                         ? self::item('Auditoria', 'auditoria.index', self::icone('auditoria')) : null,
                 ]),
@@ -201,6 +211,25 @@ class Navegacao
     }
 
     /**
+     * Selo ao lado de "Ausências de professores": as que ainda vão
+     * acontecer e a coordenação não viu.
+     *
+     * @return array{valor: int, cor: string, titulo: string}|null
+     */
+    protected static function contadorDeAusencias(User $usuario): ?array
+    {
+        $aguardando = Ausencia::query()->daCoordenacaoDe($usuario)->aguardandoCiencia()->count();
+
+        return $aguardando === 0 ? null : [
+            'valor' => $aguardando,
+            'cor' => 'amarelo',
+            'titulo' => $aguardando === 1
+                ? '1 ausência aguardando ciência'
+                : "{$aguardando} ausências aguardando ciência",
+        ];
+    }
+
+    /**
      * Selo ao lado de "Modelos compartilhados": ofertas que estão
      * paradas esperando esta pessoa responder.
      *
@@ -263,7 +292,12 @@ class Navegacao
         ];
     }
 
-    protected static function icone(string $chave): string
+    /**
+     * O ícone de uma seção, em SVG. Público porque o painel usa os mesmos
+     * do menu: o card de "Provas sem resultado" e o item "Provas" falam
+     * a mesma língua visual.
+     */
+    public static function icone(string $chave, string $classe = 'h-5 w-5 shrink-0'): string
     {
         $caminhos = [
             'painel' => 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75',
@@ -286,13 +320,17 @@ class Navegacao
             'resultado' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z',
             'usuario' => 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
             'auditoria' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+            'configuracao' => 'M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894zM15 12a3 3 0 11-6 0 3 3 0 016 0z',
+            'relogio' => 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+            'devolvida' => 'M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3',
+            'enviada' => 'M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5',
             'ausencia' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5M10 13.5l4 4m0-4l-4 4',
             'calendario' => 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5',
         ];
 
         $d = $caminhos[$chave] ?? $caminhos['painel'];
 
-        return '<svg class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">'
+        return '<svg class="'.$classe.'" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor" aria-hidden="true">'
             .'<path stroke-linecap="round" stroke-linejoin="round" d="'.$d.'"/></svg>';
     }
 }

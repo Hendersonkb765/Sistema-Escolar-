@@ -1,15 +1,18 @@
 <?php
 
 use App\Http\Controllers\AuditoriaController;
+use App\Http\Controllers\ModeloDeEventosController;
 use App\Http\Controllers\ProvaArquivoController;
 use App\Livewire\Alunos\FormularioAluno;
 use App\Livewire\Alunos\ListaAlunos;
 use App\Livewire\Analises\Desempenho;
+use App\Livewire\Ausencias\AusenciasDaCoordenacao;
 use App\Livewire\Ausencias\DetalheAusencia;
 use App\Livewire\Ausencias\InformarAusencia;
 use App\Livewire\Ausencias\MinhasAusencias;
 use App\Livewire\Autenticacao\PrimeiraSenha;
 use App\Livewire\Calendario\CalendarioLetivo;
+use App\Livewire\Configuracao\ConfiguracaoDaEscola;
 use App\Livewire\Cursos\DetalheCurso;
 use App\Livewire\Cursos\FormularioCurso;
 use App\Livewire\Cursos\ListaCursos;
@@ -41,6 +44,7 @@ use App\Livewire\Resultados\ListaResultados;
 use App\Livewire\Solicitacoes\DetalheSolicitacao;
 use App\Livewire\Solicitacoes\FormularioSolicitacao;
 use App\Livewire\Solicitacoes\ListaSolicitacoes;
+use App\Livewire\Turmas\CalendarioEIntervalos;
 use App\Livewire\Turmas\DetalheTurma;
 use App\Livewire\Turmas\FormularioTurma;
 use App\Livewire\Turmas\ListaTurmas;
@@ -97,18 +101,21 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
 
     // O calendário é da escola: todos consultam, o PAEET Admin altera.
     Route::get('/calendario', CalendarioLetivo::class)->name('calendario.index');
+    Route::get('/calendario/eventos/modelo', ModeloDeEventosController::class)->name('calendario.eventos.modelo');
 
     Route::get('/turmas', ListaTurmas::class)->name('turmas.index');
     Route::get('/turmas/criar', FormularioTurma::class)->name('turmas.criar');
     Route::get('/turmas/{turma}', DetalheTurma::class)->name('turmas.show');
     Route::get('/turmas/{turma}/editar', FormularioTurma::class)->name('turmas.editar');
     Route::get('/turmas/{turma}/horarios', QuadroDeHorarios::class)->name('turmas.horarios');
+    Route::get('/turmas/{turma}/calendario', CalendarioEIntervalos::class)->name('turmas.calendario');
 
     // As aulas de quem leciona, tiradas do quadro de todas as turmas.
     Route::get('/minha-semana', MinhaSemana::class)->name('horarios.meus');
 
     Route::get('/ausencias', MinhasAusencias::class)->name('ausencias.index');
     Route::get('/ausencias/informar', InformarAusencia::class)->name('ausencias.criar');
+    Route::get('/ausencias/coordenacao', AusenciasDaCoordenacao::class)->name('ausencias.coordenacao');
     Route::get('/ausencias/{ausencia}', DetalheAusencia::class)->name('ausencias.show');
 
     Route::get('/alunos', ListaAlunos::class)->name('alunos.index');
@@ -161,5 +168,6 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/usuarios/criar', FormularioUsuario::class)->name('usuarios.criar');
     Route::get('/usuarios/{usuario}/editar', FormularioUsuario::class)->name('usuarios.editar');
 
+    Route::get('/configuracao-da-escola', ConfiguracaoDaEscola::class)->name('configuracao.escola');
     Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
 })->scopeBindings();

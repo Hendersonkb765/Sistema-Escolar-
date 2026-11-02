@@ -40,9 +40,9 @@ const TELAS_VARRIDAS = [
     'painel', 'eixos.index', 'eixos.criar', 'cursos.index', 'cursos.criar',
     'disciplinas.index', 'disciplinas.criar', 'grades.index',
     'turmas.index', 'turmas.criar', 'alunos.index', 'alunos.criar', 'calendario.index', 'horarios.meus',
-    'ausencias.index', 'ausencias.criar',
+    'ausencias.index', 'ausencias.criar', 'ausencias.coordenacao',
     'escopo.index', 'escopo.importar',
-    'usuarios.index', 'usuarios.criar', 'auditoria.index',
+    'usuarios.index', 'usuarios.criar', 'auditoria.index', 'configuracao.escola',
     'solicitacoes.index', 'solicitacoes.criar', 'questoes.index',
     'provas.index', 'provas.criar', 'modelos-prova.index', 'modelos-prova.criar',
     'importacoes.index', 'importacoes.criar', 'resultados.index', 'analises.index',
@@ -55,8 +55,8 @@ const TELAS_VARRIDAS = [
 const TELAS_FORA_DA_VARREDURA = [
     // Redireciona para o painel ou para o login; não tem HTML próprio.
     'inicio',
-    // Devolve PDF, não HTML — não há Blade para varrer.
-    'resultados.boletim',
+    // Devolvem arquivo (PDF, planilha), não HTML — não há Blade para varrer.
+    'resultados.boletim', 'calendario.eventos.modelo',
     // Telas de autenticação: varridas em DiretivasNasTelasPublicasTest,
     // porque exigem estar deslogado ou com a senha ainda provisória.
     'login', 'password.request', 'primeira-senha', 'two-factor.login',
@@ -196,6 +196,7 @@ it('não deixa diretiva crua nas telas com parâmetro', function () {
         ['analises.index', ['bimestre' => $this->prova->bimestre->value]],
         ['turmas.show', $this->turma],
         ['turmas.horarios', $this->turma],
+        ['turmas.calendario', $this->turma],
         ['ausencias.show', $this->ausencia],
     ] as [$rota, $parametro]) {
         expect(($this->sobras)($como($rota, $parametro)))->toBe([]);

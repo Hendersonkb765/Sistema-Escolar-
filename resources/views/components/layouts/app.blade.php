@@ -93,6 +93,25 @@
                 @endif
             </div>
 
+            {{-- O bimestre de hoje, do calendário letivo. Sem calendário, diz que falta. --}}
+            @php($situacaoDoBimestre = \App\Support\SituacaoDoBimestre::hoje())
+            <a href="{{ route('calendario.index') }}" wire:navigate data-bimestre-atual
+               title="{{ $situacaoDoBimestre->periodo() }}"
+               @class([
+                   'hidden shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset sm:inline-flex',
+                   'bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/30' => $situacaoDoBimestre->acabando(),
+                   'bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30' => $situacaoDoBimestre->emAndamento() && ! $situacaoDoBimestre->acabando(),
+                   'bg-slate-100 text-slate-600 ring-slate-500/20 dark:bg-slate-500/10 dark:text-slate-300 dark:ring-slate-400/30' => ! $situacaoDoBimestre->emAndamento(),
+               ])>
+                {!! \App\Support\Navegacao::icone('calendario', 'h-4 w-4 shrink-0') !!}
+                <span>{{ $situacaoDoBimestre->rotulo() }}{{ $situacaoDoBimestre->prazo() ? ' · '.$situacaoDoBimestre->prazo() : '' }}</span>
+            </a>
+
+            {{-- Os avisos são da coordenação: ausências e envios dos professores do Eixo. --}}
+            @if ($usuario->ehGestao())
+                <livewire:notificacoes.sino/>
+            @endif
+
             @include('layouts.partials.seletor-de-tema')
 
             <div x-data="{ aberto: false }" class="relative">

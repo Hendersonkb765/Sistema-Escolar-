@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DiaDaSemana;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -88,6 +89,16 @@ class QuadroHorario extends Model
     public function intervalo(): string
     {
         return $this->horaInicio().'–'.$this->horaFim();
+    }
+
+    /** A aula está acontecendo neste momento: é o dia dela, e a hora cai entre o início e o fim. */
+    public function acontecendoEm(CarbonInterface $momento): bool
+    {
+        $hora = $momento->format('H:i');
+
+        return $this->dia_semana === DiaDaSemana::daData($momento)
+            && $this->horaInicio() <= $hora
+            && $hora < $this->horaFim();
     }
 
     /** "1ª aula de segunda" */

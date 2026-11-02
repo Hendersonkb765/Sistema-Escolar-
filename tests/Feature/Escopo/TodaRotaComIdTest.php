@@ -86,6 +86,10 @@ beforeEach(function () {
     $ausencia = Ausencia::query()->create([
         'professor_id' => $professor->id, 'data' => today()->addWeek(),
     ]);
+    $ausencia->aulas()->create([
+        'turma_id' => $turma->id, 'disciplina_id' => $montagem['disciplinas']['Contabilidade']->id,
+        'aula_numero' => 1, 'hora_inicio' => '07:00', 'hora_fim' => '07:50', 'conteudo_planejado' => 'Exercícios',
+    ]);
 
     $this->alheios = [
         'alunos.editar' => $aluno,
@@ -106,6 +110,7 @@ beforeEach(function () {
         'turmas.show' => $turma,
         'turmas.editar' => $turma,
         'turmas.horarios' => $turma,
+        'turmas.calendario' => $turma,
     ];
 
     /*
