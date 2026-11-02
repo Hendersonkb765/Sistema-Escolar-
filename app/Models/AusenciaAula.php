@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -39,6 +40,17 @@ class AusenciaAula extends Model
     public function disciplina(): BelongsTo
     {
         return $this->belongsTo(Disciplina::class);
+    }
+
+    /**
+     * As aulas em turmas destes Eixos.
+     *
+     * @param  Builder<AusenciaAula>  $query
+     * @param  array<int, int>  $eixoIds
+     */
+    public function scopeNosEixos(Builder $query, array $eixoIds): Builder
+    {
+        return $query->whereHas('turma.curso', fn (Builder $curso) => $curso->whereIn('eixo_id', $eixoIds));
     }
 
     /** "07:00–07:50" */

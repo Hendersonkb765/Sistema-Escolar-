@@ -445,9 +445,10 @@ it('não mostra a ausência a quem não a informou', function () {
 });
 
 it('põe "Minhas ausências" no menu de quem dá aula, e só de quem dá aula', function () {
+    // Com a aspa: `/ausencias` é prefixo de `/ausencias/coordenacao`, que o PAEET vê.
     $this->actingAs($this->renato)->get(route('painel'))
-        ->assertSee(route('ausencias.index'), false);
+        ->assertSee('href="'.route('ausencias.index').'"', false);
 
     $this->actingAs($this->paeet)->get(route('painel'))
-        ->assertDontSee(route('ausencias.index'), false);
+        ->assertDontSee('href="'.route('ausencias.index').'"', false);
 });

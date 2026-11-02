@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DiaDaSemana;
 use App\Enums\StatusAusencia;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,8 +16,8 @@ use Spatie\Activitylog\Support\LogOptions;
  * daria nesse dia.
  *
  * Não pertence a um Eixo: o professor pode dar aula em turmas de mais de
- * um. Quem a vê é o próprio professor e, a partir da etapa da
- * coordenação, os PAEETs dos Eixos das turmas afetadas.
+ * um. Quem a vê é o próprio professor e os PAEETs dos Eixos das turmas
+ * afetadas — cada um enxergando só as aulas do seu Eixo.
  */
 class Ausencia extends Model
 {
@@ -54,7 +55,55 @@ class Ausencia extends Model
     /** @return HasMany<AusenciaAula, $this> */
     public function aulas(): HasMany
     {
-        return $this->hasMany(AusenciaAula::class)->orderBy('hora_inicio');
+        return $this->hasMany(AusenciaAula::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function cientePor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ciente_por');
+    }
+
+    /**
+     * As ausências que tocam os Eixos do usuário: as que têm ao menos
+     * uma aula numa turma de lá. É o que a coordenação acompanha.
+     *
+     * @param  Builder<Ausencia>  $query
+     */
+    public function scopeDaCoordenacaoDe(Builder $query, User $usuario): Builder
+    {
+        return $query->whereHas('aulas', fn (Builder $aulas) => $aulas->nosEixos($usuario->eixoIds()));
+    }
+
+    /**
+     * O que espera a coordenação: pendente e ainda por acontecer. A
+     * pendente que já passou não é mais aviso, é histórico.
+     *
+     * @param  Builder<Ausencia>  $query
+     */
+    public function scopeAguardandoCiencia(Builder $query): Builder
+    {
+        return $query->where('status', StatusAusencia::Pendente)->whereDate('data', '>=', today());
+    }
+
+    /**
+     * Os Eixos das turmas em que o professor daria aula no dia.
+     *
+     * @return array<int, int>
+     */
+    public function eixoIds(): array
+    {
+        return Curso::query()
+            ->whereHas('turmas', fn (Builder $q) => $q->whereIn('turmas.id', $this->aulas()->select('turma_id')))
+            ->pluck('eixo_id')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function afetaEixosDe(User $usuario): bool
+    {
+        return $this->aulas()->nosEixos($usuario->eixoIds())->exists();
     }
 
     /**
