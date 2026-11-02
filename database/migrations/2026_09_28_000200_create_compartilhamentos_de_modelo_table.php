@@ -33,7 +33,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['destinatario_id', 'status']);
-            $table->index(['modelo_documento_id', 'destinatario_id']);
+            // Nome explícito: o que o Laravel gera passa dos 64 caracteres que o MySQL aceita.
+            $table->index(['modelo_documento_id', 'destinatario_id'], 'compartilhamentos_modelo_destinatario_index');
         });
     }
 

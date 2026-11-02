@@ -233,7 +233,17 @@ it('abre os formulários de criação com listas de opções povoadas', function
 it('abre o painel do professor com mais de um vínculo docente', function () {
     $professor = professor($this->eixo);
 
-    Disciplina::query()->where('eixo_id', $this->eixo->id)->take(2)->get()
+    // Pelo curso: `disciplinas` não tem `eixo_id`. No SQLite a coluna que
+    // não existe virava texto, a consulta voltava vazia e o teste passava
+    // sem criar vínculo nenhum; no MySQL ela quebra.
+    $disciplinas = Disciplina::query()
+        ->whereHas('curso', fn ($curso) => $curso->where('eixo_id', $this->eixo->id))
+        ->take(2)
+        ->get();
+
+    expect($disciplinas)->toHaveCount(2);
+
+    $disciplinas
         ->each(fn (Disciplina $disciplina) => $professor->vinculosDocentes()->create([
             'disciplina_id' => $disciplina->getKey(),
             'ativo' => true,

@@ -14,20 +14,27 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    /*
+     * Renomear, e não apagar e recriar os índices.
+     *
+     * No MySQL, a chave estrangeira de `turma_id` precisa de um índice que
+     * comece por `turma_id`, e usa o único `(turma_id, matricula)` para
+     * isso: apagá-lo dá "Cannot drop index … needed in a foreign key
+     * constraint". O SQLite não tem essa regra, e por isso a versão antiga
+     * passava aqui e quebrava na produção.
+     *
+     * RENAME COLUMN leva os índices junto, nos dois bancos; depois só se
+     * troca o nome deles para o que o Laravel daria à coluna nova.
+     */
     public function up(): void
     {
-        Schema::table('alunos', function (Blueprint $table) {
-            $table->dropUnique(['turma_id', 'matricula']);
-            $table->dropIndex(['matricula']);
-        });
-
         Schema::table('alunos', function (Blueprint $table) {
             $table->renameColumn('matricula', 'ra');
         });
 
         Schema::table('alunos', function (Blueprint $table) {
-            $table->unique(['turma_id', 'ra']);
-            $table->index('ra');
+            $table->renameIndex('alunos_turma_id_matricula_unique', 'alunos_turma_id_ra_unique');
+            $table->renameIndex('alunos_matricula_index', 'alunos_ra_index');
         });
 
         $this->trocarNoJson('matricula', 'ra');
@@ -36,17 +43,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('alunos', function (Blueprint $table) {
-            $table->dropUnique(['turma_id', 'ra']);
-            $table->dropIndex(['ra']);
-        });
-
-        Schema::table('alunos', function (Blueprint $table) {
             $table->renameColumn('ra', 'matricula');
         });
 
         Schema::table('alunos', function (Blueprint $table) {
-            $table->unique(['turma_id', 'matricula']);
-            $table->index('matricula');
+            $table->renameIndex('alunos_turma_id_ra_unique', 'alunos_turma_id_matricula_unique');
+            $table->renameIndex('alunos_ra_index', 'alunos_matricula_index');
         });
 
         $this->trocarNoJson('ra', 'matricula');
