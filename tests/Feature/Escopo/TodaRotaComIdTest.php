@@ -16,6 +16,7 @@
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\Eixo;
 use App\Models\ModeloDocumento;
 use App\Models\ModeloProva;
@@ -82,8 +83,17 @@ beforeEach(function () {
         titulo: 'Avaliação alheia',
     );
 
+    $ausencia = Ausencia::query()->create([
+        'professor_id' => $professor->id, 'data' => today()->addWeek(),
+    ]);
+    $ausencia->aulas()->create([
+        'turma_id' => $turma->id, 'disciplina_id' => $montagem['disciplinas']['Contabilidade']->id,
+        'aula_numero' => 1, 'hora_inicio' => '07:00', 'hora_fim' => '07:50', 'conteudo_planejado' => 'Exercícios',
+    ]);
+
     $this->alheios = [
         'alunos.editar' => $aluno,
+        'ausencias.show' => $ausencia,
         'cursos.show' => $montagem['curso'],
         'cursos.editar' => $montagem['curso'],
         'disciplinas.editar' => $montagem['disciplinas']['Contabilidade'],
@@ -97,8 +107,11 @@ beforeEach(function () {
         'provas.gabarito' => $prova,
         'solicitacoes.show' => $solicitacao,
         'solicitacoes.responder' => $solicitacao,
+        'solicitacoes.partes.modelo' => $solicitacao->partes()->first(),
         'turmas.show' => $turma,
         'turmas.editar' => $turma,
+        'turmas.horarios' => $turma,
+        'turmas.calendario' => $turma,
     ];
 
     /*

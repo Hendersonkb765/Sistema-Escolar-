@@ -2,11 +2,13 @@
 
 namespace App\Actions\Avaliacao;
 
+use App\Actions\Notificacoes\AvisarCoordenacaoAction;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Exceptions\RegraDeNegocioException;
 use App\Models\Questao;
 use App\Models\User;
+use App\Notifications\AvisoACoordenacao;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -47,7 +49,7 @@ class ReenviarQuestaoAction
             );
         }
 
-        return DB::transaction(function () use ($questao, $autor, $solicitacao) {
+        $reenviada = DB::transaction(function () use ($questao, $autor, $solicitacao) {
             $questao->update([
                 'status' => StatusQuestao::Enviada,
                 'versao' => $questao->versao + 1,
@@ -77,5 +79,13 @@ class ReenviarQuestaoAction
 
             return $questao->refresh();
         });
+
+        app(AvisarCoordenacaoAction::class)->executar(
+            [$solicitacao->eixoId()],
+            AvisoACoordenacao::questaoReenviada($reenviada->load('professor:id,nome', 'disciplina:id,nome', 'solicitacao.turma')),
+            $autor,
+        );
+
+        return $reenviada;
     }
 }

@@ -13,9 +13,64 @@
                 :valor="$indicador['valor']"
                 :cor="$indicador['cor']"
                 :href="$indicador['href']"
-                :detalhe="$indicador['detalhe'] ?? null"/>
+                :detalhe="$indicador['detalhe'] ?? null"
+                :icone="$indicador['icone'] ?? null"/>
         @endforeach
     </div>
+
+    @if ($proximosEventos->isNotEmpty())
+        <x-cartao titulo="Próximos eventos" :icone="App\Support\Navegacao::icone('calendario')"
+                  descricao="Feriados, recessos e eventos da escola nos próximos 30 dias.">
+            <x-slot:acoes>
+                <x-botao variante="discreto" href="{{ route('calendario.index') }}" wire:navigate>Ver o calendário</x-botao>
+            </x-slot:acoes>
+
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach ($proximosEventos as $evento)
+                    <li class="flex flex-wrap items-center gap-2 py-2" wire:key="proximo-evento-{{ $evento->id }}" data-proximo-evento>
+                        <span class="w-44 tabular-nums text-sm text-slate-500 dark:text-slate-400">{{ $evento->periodo() }}</span>
+                        <span class="font-medium text-slate-900 dark:text-slate-100">{{ $evento->titulo }}</span>
+                        <x-badge :cor="$evento->tipo->cor()">{{ $evento->tipo->rotulo() }}{{ $evento->tipo->semAula() ? ' · sem aula' : '' }}</x-badge>
+                    </li>
+                @endforeach
+            </ul>
+        </x-cartao>
+    @endif
+
+    {{-- A semana do Eixo, ou a do professor, com o dia de hoje marcado. --}}
+    <livewire:horarios.escala-da-semana/>
+
+    @if ($acessoRapido)
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <x-cartao titulo="Minha semana" :icone="App\Support\Navegacao::icone('calendario')" descricao="Suas aulas no quadro de horários das turmas.">
+                <x-slot:acoes>
+                    <x-botao variante="secundario" href="{{ route('horarios.meus') }}" wire:navigate>Abrir</x-botao>
+                </x-slot:acoes>
+
+                <p class="text-sm text-slate-700 dark:text-slate-200">
+                    {{ $acessoRapido['aulasHoje'] === 0 ? 'Nenhuma aula sua hoje.' : $acessoRapido['aulasHoje'].' aula(s) sua(s) hoje.' }}
+                </p>
+            </x-cartao>
+
+            <x-cartao titulo="Minhas ausências" :icone="App\Support\Navegacao::icone('ausencia')" descricao="Avise a coordenação com antecedência.">
+                <x-slot:acoes>
+                    <x-botao variante="secundario" href="{{ route('ausencias.index') }}" wire:navigate>Abrir</x-botao>
+                    <x-botao href="{{ route('ausencias.criar') }}" wire:navigate>Informar ausência</x-botao>
+                </x-slot:acoes>
+
+                @if ($acessoRapido['proximaAusencia'])
+                    <p class="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                        Próxima:
+                        <a href="{{ route('ausencias.show', $acessoRapido['proximaAusencia']) }}" wire:navigate
+                           class="font-medium hover:underline">{{ $acessoRapido['proximaAusencia']->rotuloDoDia() }}</a>
+                        <x-badge :cor="$acessoRapido['proximaAusencia']->status->cor()">{{ $acessoRapido['proximaAusencia']->status->rotulo() }}</x-badge>
+                    </p>
+                @else
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Nenhuma ausência marcada.</p>
+                @endif
+            </x-cartao>
+        </div>
+    @endif
 
     {{--
         O número diz quantos; a lista diz quais. Sem ela, "3 atrasadas"
@@ -23,7 +78,8 @@
         lugar por onde se passa em vez de onde se começa.
     --}}
     @if ($pendencias->isNotEmpty())
-        <x-cartao titulo="{{ $usuario->ehProfessor() ? 'Esperando você' : 'Esperando alguém' }}">
+        <x-cartao titulo="{{ $usuario->ehProfessor() ? 'Esperando você' : 'Esperando alguém' }}"
+                  :icone="App\Support\Navegacao::icone('solicitacao')">
             <x-slot:descricao>
                 @if ($usuario->ehProfessor())
                     As disciplinas que foram pedidas a você e ainda não foram enviadas,
@@ -113,7 +169,8 @@
                 <div class="mt-2 flex flex-wrap gap-x-6 gap-y-2">
                     @foreach ($estrutura as $item)
                         <a @if ($item['href']) href="{{ $item['href'] }}" wire:navigate @endif
-                           class="text-sm text-slate-500 hover:text-marca-600 dark:text-slate-400 dark:hover:text-marca-400">
+                           class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-marca-600 dark:text-slate-400 dark:hover:text-marca-400">
+                            {!! App\Support\Navegacao::icone($item['icone'], 'h-4 w-4 shrink-0') !!}
                             <span class="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{{ $item['valor'] }}</span>
                             {{ $item['rotulo'] }}
                         </a>

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Avaliacao;
 
+use App\Actions\Notificacoes\AvisarCoordenacaoAction;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Exceptions\RegraDeNegocioException;
@@ -9,6 +10,7 @@ use App\Models\Questao;
 use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use App\Models\User;
+use App\Notifications\AvisoACoordenacao;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -62,7 +64,7 @@ class EnviarParteAction
             );
         }
 
-        return DB::transaction(function () use ($parte, $autor, $solicitacao) {
+        $enviada = DB::transaction(function () use ($parte, $autor, $solicitacao) {
             $agora = now();
 
             // O prazo original nunca é reescrito; registra-se a data real
@@ -100,6 +102,14 @@ class EnviarParteAction
 
             return $parte->refresh();
         });
+
+        app(AvisarCoordenacaoAction::class)->executar(
+            [$solicitacao->eixoId()],
+            AvisoACoordenacao::parteEnviada($enviada->load('professor:id,nome', 'disciplina:id,nome', 'solicitacao.turma:id,nome,periodo_letivo')),
+            $autor,
+        );
+
+        return $enviada;
     }
 
     /**

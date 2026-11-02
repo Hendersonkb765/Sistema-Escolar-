@@ -154,6 +154,10 @@
                         <x-badge cor="vermelho" :rotulo="$rotuloParte"/>
                     @endif
 
+                    @if ($podeEditar && $parte->aceitaEnvio() && $importandoParte !== $parte->id)
+                        <x-botao variante="secundario" wire:click="abrirImportacao({{ $parte->id }})">Importar planilha</x-botao>
+                    @endif
+
                     @if ($parte->aceitaEnvio() && $confirmandoEnvio !== $parte->id)
                         <x-botao wire:click="confirmarEnvio({{ $parte->id }})"
                                  :desabilitado="$pendenciasDaParte->isNotEmpty()"
@@ -177,6 +181,10 @@
                         @endforeach
                     </ul>
                 </x-alerta>
+            @endif
+
+            @if ($importandoParte === $parte->id)
+                @include('questoes.partials.importar-planilha', ['parte' => $parte])
             @endif
 
             @if ($confirmandoEnvio === $parte->id)

@@ -70,6 +70,17 @@ class Turma extends Model
         );
     }
 
+    /**
+     * As datas próprias dos bimestres, quando a turma não segue o
+     * calendário letivo da escola. Vazio é o caso comum.
+     *
+     * @return HasMany<TurmaBimestre, $this>
+     */
+    public function bimestresProprios(): HasMany
+    {
+        return $this->hasMany(TurmaBimestre::class)->orderBy('bimestre');
+    }
+
     /** @return BelongsTo<Curso, $this> */
     public function curso(): BelongsTo
     {

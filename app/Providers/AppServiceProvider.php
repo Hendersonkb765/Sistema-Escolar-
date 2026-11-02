@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\ConfiguracaoDaEscola;
 use App\Support\CriteriosDaAnalise;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -39,5 +40,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function (User $usuario) {
             return $usuario->ativo ? null : false;
         });
+
+        // A configuração da escola só se altera pelo PAEET Admin: nome nos
+        // documentos, aulas do dia e intervalos de todas as turmas.
+        Gate::define('configurarEscola', fn (User $usuario) => $usuario->ehPaeetAdmin());
+
+        ConfiguracaoDaEscola::aplicar();
     }
 }

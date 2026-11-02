@@ -30,6 +30,8 @@ class FormularioAluno extends Component
 
     public string $ra = '';
 
+    public string $codigo_reset = '';
+
     public string $status = 'ativo';
 
     public string $motivoMovimentacao = '';
@@ -52,6 +54,7 @@ class FormularioAluno extends Component
             $this->turmaOriginal = $aluno->turma_id;
             $this->nome = $aluno->nome;
             $this->ra = $aluno->ra;
+            $this->codigo_reset = (string) $aluno->codigo_reset;
             $this->status = $aluno->status->value;
 
             return;
@@ -78,6 +81,8 @@ class FormularioAluno extends Component
                     ->where(fn ($consulta) => $consulta->where('turma_id', $this->turma_id))
                     ->ignore($this->aluno?->getKey()),
             ],
+            // O número que a SED dá ao aluno, guardado como veio.
+            'codigo_reset' => ['nullable', 'string', 'max:40'],
             'status' => ['required', Rule::in(StatusAluno::valores())],
             'motivoMovimentacao' => ['nullable', 'string', 'max:500'],
         ];
@@ -90,6 +95,7 @@ class FormularioAluno extends Component
             'turma_id' => 'turma',
             'nome' => 'nome',
             'ra' => 'RA',
+            'codigo_reset' => 'código da SED',
             'status' => 'status',
             'motivoMovimentacao' => 'motivo',
         ];
@@ -111,6 +117,7 @@ class FormularioAluno extends Component
             : $this->authorize('create', Aluno::class);
 
         $dados = $this->validate();
+        $dados['codigo_reset'] = trim((string) $dados['codigo_reset']) ?: null;
 
         try {
             DB::transaction(function () use ($dados, $mover) {
@@ -119,6 +126,7 @@ class FormularioAluno extends Component
                         'turma_id' => $dados['turma_id'],
                         'nome' => $dados['nome'],
                         'ra' => $dados['ra'],
+                        'codigo_reset' => $dados['codigo_reset'],
                         'status' => $dados['status'],
                     ]);
 
@@ -139,6 +147,7 @@ class FormularioAluno extends Component
                 $this->aluno->update([
                     'nome' => $dados['nome'],
                     'ra' => $dados['ra'],
+                    'codigo_reset' => $dados['codigo_reset'],
                     'status' => $dados['status'],
                 ]);
 

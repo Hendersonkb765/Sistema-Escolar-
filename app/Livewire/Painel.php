@@ -2,21 +2,29 @@
 
 namespace App\Livewire;
 
+use App\Enums\DiaDaSemana;
+use App\Enums\StatusAusencia;
 use App\Enums\StatusImportacao;
 use App\Enums\StatusProva;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
+use App\Enums\StatusTurma;
 use App\Models\Aluno;
+use App\Models\Ausencia;
 use App\Models\Curso;
 use App\Models\Disciplina;
 use App\Models\Eixo;
+use App\Models\EventoEscolar;
 use App\Models\Importacao;
 use App\Models\Prova;
+use App\Models\QuadroHorario;
 use App\Models\Questao;
 use App\Models\SolicitacaoParte;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
+use App\Support\Navegacao;
+use App\Support\SituacaoDoBimestre;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -38,6 +46,13 @@ class Painel extends Component
             // O número diz quantos; a lista diz quais, e é com ela que
             // se faz alguma coisa sem passar por três telas antes.
             'pendencias' => $this->pendencias($usuario),
+            'acessoRapido' => $this->acessoRapido($usuario),
+            // Para todos saberem o que vem pela frente: feriado, recesso, reunião.
+            'proximosEventos' => EventoEscolar::query()
+                ->entre(today(), today()->addDays(30))
+                ->orderBy('inicio')
+                ->limit(5)
+                ->get(),
             'estrutura' => $usuario->ehGestao() ? $this->estrutura($usuario) : [],
         ])->layout('components.layouts.app', [
             'titulo' => 'Painel',
@@ -45,14 +60,49 @@ class Painel extends Component
         ]);
     }
 
-    /** @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string}> */
+    /** @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, icone: string}> */
     protected function indicadores(User $usuario): array
     {
-        if (! $usuario->ehGestao()) {
-            return $this->indicadoresDoProfessor($usuario);
-        }
+        return [
+            $this->indicadorDoBimestre(),
+            ...($usuario->ehGestao()
+                ? $this->indicadoresDeAvaliacao($usuario)
+                : $this->indicadoresDoProfessor($usuario)),
+        ];
+    }
 
-        return $this->indicadoresDeAvaliacao($usuario);
+    /**
+     * O bimestre de hoje e quanto falta para acabar — ou, nas férias, para
+     * o próximo começar. Sem calendário, o card diz que falta o calendário
+     * em vez de mostrar zero.
+     *
+     * @return array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe: ?string, icone: string}
+     */
+    protected function indicadorDoBimestre(): array
+    {
+        $situacao = SituacaoDoBimestre::hoje();
+        $dias = $situacao->dias();
+
+        return [
+            'rotulo' => $situacao->emAndamento() ? $situacao->rotulo() : 'Bimestre atual',
+            'valor' => match (true) {
+                $dias === null => '—',
+                $dias === 1 => '1 dia',
+                default => "{$dias} dias",
+            },
+            'cor' => match (true) {
+                $situacao->acabando() => 'amarelo',
+                $situacao->emAndamento() => 'azul',
+                default => 'cinza',
+            },
+            'href' => route('calendario.index'),
+            'detalhe' => match (true) {
+                $situacao->emAndamento() => 'para acabar · termina em '.$situacao->atual->fim->format('d/m/Y'),
+                $situacao->proximo !== null => "Férias · o {$situacao->proximo->bimestre->rotulo()} começa em {$situacao->proximo->inicio->format('d/m/Y')}",
+                default => 'Calendário letivo não cadastrado',
+            },
+            'icone' => Navegacao::icone('calendario'),
+        ];
     }
 
     /**
@@ -62,7 +112,7 @@ class Painel extends Component
      * compete por atenção com "3 solicitações atrasadas" — só empurra a
      * segunda para longe do olho. Desce para o pé da página, menor.
      *
-     * @return array<int, array{rotulo: string, valor: int|string, href: ?string}>
+     * @return array<int, array{rotulo: string, valor: int|string, href: ?string, icone: string}>
      */
     protected function estrutura(User $usuario): array
     {
@@ -74,6 +124,7 @@ class Painel extends Component
         $itens = count($usuario->eixoIds()) > 1 ? [
             [
                 'rotulo' => 'Eixos no meu escopo',
+                'icone' => 'eixo',
                 'valor' => count($usuario->eixoIds()),
                 'href' => Gate::allows('viewAny', Eixo::class) ? route('eixos.index') : null,
             ],
@@ -83,21 +134,25 @@ class Painel extends Component
             ...$itens,
             [
                 'rotulo' => 'Cursos',
+                'icone' => 'curso',
                 'valor' => Curso::query()->visivelPara($usuario)->count(),
                 'href' => route('cursos.index'),
             ],
             [
                 'rotulo' => 'Disciplinas',
+                'icone' => 'disciplina',
                 'valor' => Disciplina::query()->visivelPara($usuario)->count(),
                 'href' => route('disciplinas.index'),
             ],
             [
                 'rotulo' => 'Turmas ativas',
+                'icone' => 'turma',
                 'valor' => Turma::query()->visivelPara($usuario)->where('status', 'ativa')->count(),
                 'href' => route('turmas.index'),
             ],
             [
                 'rotulo' => 'Alunos',
+                'icone' => 'aluno',
                 'valor' => Aluno::query()->visivelPara($usuario)->count(),
                 'href' => route('alunos.index'),
             ],
@@ -106,6 +161,7 @@ class Painel extends Component
         if (Gate::allows('viewAny', User::class)) {
             $itens[] = [
                 'rotulo' => 'Usuários',
+                'icone' => 'usuario',
                 // Pelo mesmo escopo da tela de usuários, que é para
                 // onde este número leva: se divergirem, o painel mente.
                 'valor' => User::query()->visivelPara($usuario)->count(),
@@ -120,7 +176,7 @@ class Painel extends Component
      * O que a gestão precisa ver primeiro: o que está pendente com os
      * professores e o que já passou do prazo.
      *
-     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string}>
+     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string, icone: string}>
      */
     protected function indicadoresDeAvaliacao(User $usuario): array
     {
@@ -150,11 +206,26 @@ class Painel extends Component
 
         $extras = $devolvidas === 0 ? [] : [[
             'rotulo' => 'Devolvidas aos professores',
+            'icone' => Navegacao::icone('devolvida'),
             'valor' => $devolvidas,
             'cor' => 'amarelo',
             'href' => route('questoes.index', ['situacao' => StatusQuestao::Rejeitada->value]),
             'detalhe' => 'Aguardando correção',
         ]];
+
+        // Só quando há: ausência sem aviso pendente não é notícia.
+        $ausencias = Ausencia::query()->daCoordenacaoDe($usuario)->aguardandoCiencia()->count();
+
+        if ($ausencias > 0) {
+            array_unshift($extras, [
+                'rotulo' => 'Ausências aguardando ciência',
+                'icone' => Navegacao::icone('ausencia'),
+                'valor' => $ausencias,
+                'cor' => 'amarelo',
+                'href' => route('ausencias.coordenacao'),
+                'detalhe' => 'Professores que avisaram que vão faltar',
+            ]);
+        }
 
         /*
          * O ciclo não termina na análise das questões: a prova é
@@ -179,12 +250,14 @@ class Painel extends Component
             ...$extras,
             [
                 'rotulo' => 'Solicitações aguardando envio',
+                'icone' => Navegacao::icone('solicitacao'),
                 'valor' => $aguardando,
                 'cor' => $aguardando > 0 ? 'amarelo' : 'verde',
                 'href' => route('solicitacoes.index', ['prazo' => 'pendentes']),
             ],
             [
                 'rotulo' => 'Atrasadas',
+                'icone' => Navegacao::icone('relogio'),
                 'valor' => $atrasadas,
                 'cor' => $atrasadas > 0 ? 'vermelho' : 'verde',
                 'href' => route('solicitacoes.index', ['prazo' => 'atrasadas']),
@@ -192,12 +265,14 @@ class Painel extends Component
             ],
             [
                 'rotulo' => 'Questões aguardando análise',
+                'icone' => Navegacao::icone('questao'),
                 'valor' => $aguardandoAnalise,
                 'cor' => $aguardandoAnalise > 0 ? 'azul' : 'cinza',
                 'href' => route('solicitacoes.index', ['situacao' => StatusSolicitacao::Enviada->value]),
             ],
             [
                 'rotulo' => 'Provas sem resultado',
+                'icone' => Navegacao::icone('prova'),
                 'valor' => $semResultado,
                 'cor' => $semResultado > 0 ? 'amarelo' : 'verde',
                 // Para a importação, que é o que se faz com elas — e não
@@ -207,6 +282,7 @@ class Painel extends Component
             ],
             [
                 'rotulo' => 'Importações a confirmar',
+                'icone' => Navegacao::icone('importacao'),
                 'valor' => $aConfirmar,
                 'cor' => $aConfirmar > 0 ? 'amarelo' : 'cinza',
                 'href' => route('importacoes.index', ['situacao' => StatusImportacao::Validada->value]),
@@ -313,7 +389,7 @@ class Painel extends Component
      * Área do professor: o que lhe foi pedido, o que está atrasado e o
      * que já seguiu para análise.
      *
-     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string}>
+     * @return array<int, array{rotulo: string, valor: int|string, cor: string, href: ?string, detalhe?: string, icone: string}>
      */
     protected function indicadoresDoProfessor(User $usuario): array
     {
@@ -349,6 +425,7 @@ class Painel extends Component
         if ($devolvidas > 0) {
             $indicadores[] = [
                 'rotulo' => 'Questões devolvidas',
+                'icone' => Navegacao::icone('devolvida'),
                 'valor' => $devolvidas,
                 'cor' => 'vermelho',
                 'href' => route('questoes.index', ['situacao' => StatusQuestao::Rejeitada->value]),
@@ -360,6 +437,7 @@ class Painel extends Component
             ...$indicadores,
             [
                 'rotulo' => 'A responder',
+                'icone' => Navegacao::icone('solicitacao'),
                 'valor' => $aResponder,
                 'cor' => $aResponder > 0 ? 'amarelo' : 'verde',
                 'href' => route('solicitacoes.index'),
@@ -369,6 +447,7 @@ class Painel extends Component
             ],
             [
                 'rotulo' => 'Com prazo vencido',
+                'icone' => Navegacao::icone('relogio'),
                 'valor' => $atrasadas,
                 'cor' => $atrasadas > 0 ? 'vermelho' : 'verde',
                 'href' => route('solicitacoes.index', ['prazo' => 'atrasadas']),
@@ -376,16 +455,48 @@ class Painel extends Component
             ],
             [
                 'rotulo' => 'Já enviadas',
+                'icone' => Navegacao::icone('enviada'),
                 'valor' => $enviadas,
                 'cor' => 'azul',
                 'href' => route('solicitacoes.index'),
             ],
             [
                 'rotulo' => 'Disciplinas que leciono',
+                'icone' => Navegacao::icone('disciplina'),
                 'valor' => count($usuario->disciplinaIds()),
                 'cor' => 'cinza',
                 'href' => null,
             ],
+        ];
+    }
+
+    /**
+     * Atalhos de quem dá aula — professor ou PAEET com disciplina —, o
+     * mesmo critério do menu. Cada um já diz o essencial: as aulas de
+     * hoje e a próxima ausência marcada.
+     *
+     * @return array{aulasHoje: int, proximaAusencia: ?Ausencia}|null
+     */
+    protected function acessoRapido(User $usuario): ?array
+    {
+        if ($usuario->disciplinaIds() === []) {
+            return null;
+        }
+
+        $hoje = DiaDaSemana::daData(today());
+
+        return [
+            'aulasHoje' => $hoje === null ? 0 : QuadroHorario::query()
+                ->where('professor_id', $usuario->id)
+                ->where('dia_semana', $hoje)
+                ->whereHas('turma', fn ($q) => $q->where('status', StatusTurma::Ativa))
+                ->count(),
+            'proximaAusencia' => Ausencia::query()
+                ->where('professor_id', $usuario->id)
+                ->whereDate('data', '>=', today())
+                ->where('status', '!=', StatusAusencia::Cancelada)
+                ->orderBy('data')
+                ->first(),
         ];
     }
 

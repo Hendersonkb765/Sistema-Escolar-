@@ -22,7 +22,7 @@ class Aluno extends Model
 
     protected $table = 'alunos';
 
-    protected $fillable = ['turma_id', 'nome', 'ra', 'status'];
+    protected $fillable = ['turma_id', 'nome', 'ra', 'codigo_reset', 'status'];
 
     /** Espelha o default da coluna, para valer já no objeto recém-criado. */
     protected $attributes = ['status' => 'ativo'];
@@ -84,5 +84,24 @@ class Aluno extends Model
     public function podeSerDesligado(): bool
     {
         return $this->status === StatusAluno::Ativo;
+    }
+
+    /**
+     * A página da SED que redefine a senha deste aluno, ou null enquanto
+     * o código dele não foi cadastrado.
+     *
+     * Quem abre precisa estar logado na SED no mesmo navegador: a página
+     * é dela, e a sessão também.
+     */
+    public function linkDeResetDeSenhaNaSed(): ?string
+    {
+        $codigo = trim((string) $this->codigo_reset);
+
+        if ($codigo === '') {
+            return null;
+        }
+
+        return 'https://sed.educacao.sp.gov.br/MinhasTurmas/ResetSenhaAluno?'
+            .http_build_query(['codigoAluno' => $codigo]);
     }
 }
