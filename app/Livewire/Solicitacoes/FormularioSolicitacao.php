@@ -219,7 +219,8 @@ class FormularioSolicitacao extends Component
 
         return $turma->disciplinasDoPeriodo()
             ->map(fn ($item) => $item->disciplina)
-            ->filter()
+            // A grade é foto e ainda lista a disciplina na Lixeira; para pedir questões, ela não serve.
+            ->filter(fn ($disciplina) => $disciplina !== null && ! $disciplina->trashed())
             ->sortBy('nome')
             ->values();
     }

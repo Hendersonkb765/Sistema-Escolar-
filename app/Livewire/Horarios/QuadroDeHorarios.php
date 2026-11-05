@@ -194,7 +194,8 @@ class QuadroDeHorarios extends Component
             'dias' => $dias,
             'numeros' => $aulas->pluck('aula_numero')->unique()->sort()->values(),
             'porCelula' => $aulas->keyBy(fn (QuadroHorario $a) => $a->dia_semana->value.'-'.$a->aula_numero),
-            'disciplinas' => $this->turma->disciplinasDoPeriodo()->map->disciplina->sortBy('nome')->values(),
+            // A grade é foto e ainda lista a disciplina na Lixeira; no quadro ela não entra.
+            'disciplinas' => $this->turma->disciplinasDoPeriodo()->map->disciplina->reject->trashed()->sortBy('nome')->values(),
             'professores' => $professores,
             'diasDoFormulario' => DiaDaSemana::cases(),
         ])->layout('components.layouts.app', [

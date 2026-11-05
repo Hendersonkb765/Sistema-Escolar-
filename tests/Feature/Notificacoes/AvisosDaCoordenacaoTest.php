@@ -176,6 +176,8 @@ it('avisa quando o professor reenvia uma questão corrigida', function () {
 
     $questao = $solicitacao->questoes()->sole();
     app(AnalisarQuestaoAction::class)->rejeitar($questao, $this->paula, 'Alternativa B também está certa.');
+    // O relógio dos testes está parado; na vida real a correção vem depois do envio.
+    $this->travel(1)->seconds();
     app(ReenviarQuestaoAction::class)->executar($questao->refresh(), $this->renato);
 
     $aviso = ($this->avisosDe)($this->paula)->last();

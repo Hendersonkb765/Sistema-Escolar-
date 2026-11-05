@@ -54,6 +54,9 @@
                                         @can('update', $curso)
                                             <x-botao variante="discreto" href="{{ route('cursos.editar', $curso) }}" wire:navigate>Editar</x-botao>
                                         @endcan
+                                        @can('delete', $curso)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('curso', {{ $curso->id }})">Excluir</x-botao>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -65,4 +68,6 @@
             <div class="mt-4">{{ $cursos->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

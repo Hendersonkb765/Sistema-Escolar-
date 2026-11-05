@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,12 +17,13 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Prova extends Model
+class Prova extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'provas';
 
@@ -217,5 +220,24 @@ class Prova extends Model
             $this->status === StatusProva::Encerrada => 'Esta prova já foi encerrada.',
             default => null,
         };
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Prova {$this->titulo}";
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $resultados = $this->resultados()->count();
+
+        return $resultados > 0 ? ["{$resultados} resultado(s) lançado(s) desta prova deixam de aparecer."] : [];
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->turma()->withTrashed()->first();
     }
 }

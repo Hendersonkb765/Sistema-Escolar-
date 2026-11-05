@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\StatusAluno;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,12 +15,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Aluno extends Model
+class Aluno extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'alunos';
 
@@ -103,5 +106,24 @@ class Aluno extends Model
 
         return 'https://sed.educacao.sp.gov.br/MinhasTurmas/ResetSenhaAluno?'
             .http_build_query(['codigoAluno' => $codigo]);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Aluno {$this->nome} (RA {$this->ra})";
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $resultados = $this->resultados()->count();
+
+        return $resultados > 0 ? ["{$resultados} resultado(s) de prova deste aluno deixam de aparecer."] : [];
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->turma()->withTrashed()->first();
     }
 }

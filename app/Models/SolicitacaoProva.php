@@ -6,6 +6,8 @@ use App\Enums\Bimestre;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,12 +25,13 @@ use Spatie\Activitylog\Support\LogOptions;
  * pares são as partes (`solicitacao_partes`). O prazo é da prova inteira;
  * o envio é de cada parte, feito por seu professor.
  */
-class SolicitacaoProva extends Model
+class SolicitacaoProva extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'solicitacoes_prova';
 
@@ -273,5 +276,23 @@ class SolicitacaoProva extends Model
         $turma = $this->loadMissing('turma')->turma;
 
         return "Prova · {$turma->nome} · {$turma->periodo_letivo}";
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Solicitação {$this->identificacao()}";
+    }
+
+    /** As questões pedidas nela saem junto. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect($this->questoes()->get());
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->turma()->withTrashed()->first();
     }
 }

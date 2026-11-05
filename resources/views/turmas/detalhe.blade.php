@@ -1,6 +1,9 @@
 <div class="space-y-4">
     <x-cartao>
         <x-slot:acoes>
+            @can('delete', $turma)
+                <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('turma', {{ $turma->id }})">Excluir turma</x-botao>
+            @endcan
             @can('update', $turma)
                 <x-botao variante="secundario" href="{{ route('turmas.editar', $turma) }}" wire:navigate>Editar</x-botao>
                 <x-botao variante="secundario" href="{{ route('turmas.horarios', $turma) }}" wire:navigate>Quadro de horários</x-botao>
@@ -281,4 +284,6 @@
             </ol>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

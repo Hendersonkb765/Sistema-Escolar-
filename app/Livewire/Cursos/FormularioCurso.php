@@ -59,7 +59,7 @@ class FormularioCurso extends Component
             'eixo_id' => [
                 'required',
                 Rule::exists('eixos', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn('id', $eixosDoUsuario)
+                    fn ($consulta) => $consulta->whereIn('id', $eixosDoUsuario)->whereNull('deleted_at')
                 ),
             ],
             'nome' => ['required', 'string', 'max:255'],
@@ -90,7 +90,9 @@ class FormularioCurso extends Component
     protected function messages(): array
     {
         return [
-            'codigo.unique' => 'Já existe um curso com este código neste eixo.',
+            'codigo.unique' => Curso::onlyTrashed()->where('eixo_id', $this->eixo_id)->where('codigo', $this->codigo)->exists()
+                ? 'Um curso com este código está na Lixeira. O PAEET Admin pode restaurá-lo por lá.'
+                : 'Já existe um curso com este código neste eixo.',
         ];
     }
 

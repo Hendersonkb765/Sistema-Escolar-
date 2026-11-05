@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\StatusTurma;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,12 +16,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Turma extends Model
+class Turma extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'turmas';
 
@@ -168,5 +171,44 @@ class Turma extends Model
         return preg_match('/^\\d+/', $this->nome) === 1
             ? preg_replace('/^\\d+/', (string) $periodo, $this->nome)
             : $this->nome;
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Turma {$this->nome} ({$this->periodo_letivo})";
+    }
+
+    /** Alunos, provas e solicitações da turma saem com ela. */
+    public function dependentesNaExclusao(): \Illuminate\Support\Collection
+    {
+        return collect()
+            ->concat($this->alunos()->get())
+            ->concat($this->provas()->get())
+            ->concat($this->solicitacoes()->get());
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $resultados = ResultadoAluno::query()->whereIn('prova_id', $this->provas()->select('id'))->count();
+        $aulas = QuadroHorario::query()->where('turma_id', $this->id)->count();
+
+        return array_values(array_filter([
+            $resultados > 0 ? "{$resultados} resultado(s) de prova lançado(s) deixam de aparecer nas notas e na análise." : null,
+            $aulas > 0 ? "{$aulas} aula(s) do quadro de horários deixam de aparecer na escala." : null,
+            'O histórico da turma é mantido.',
+        ]));
+    }
+
+    /** Leva alunos e notas: pede duas confirmações. */
+    public function confirmacoesParaExcluir(): int
+    {
+        return 2;
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->curso()->withTrashed()->first();
     }
 }

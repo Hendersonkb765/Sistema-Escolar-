@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\StatusQuestao;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,12 +15,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Questao extends Model
+class Questao extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'questoes';
 
@@ -90,7 +93,8 @@ class Questao extends Model
     /** @return BelongsTo<Disciplina, $this> */
     public function disciplina(): BelongsTo
     {
-        return $this->belongsTo(Disciplina::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Disciplina::class)->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */
@@ -213,5 +217,17 @@ class Questao extends Model
     public function scopeAprovadas(Builder $query): Builder
     {
         return $query->where('status', StatusQuestao::Aprovada);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Questão {$this->ordem}";
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->solicitacao()->withTrashed()->first();
     }
 }

@@ -53,19 +53,22 @@ class TurmaHistorico extends Model
     /** @return BelongsTo<Turma, $this> */
     public function turma(): BelongsTo
     {
-        return $this->belongsTo(Turma::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Turma::class)->withTrashed();
     }
 
     /** @return BelongsTo<Curso, $this> */
     public function curso(): BelongsTo
     {
-        return $this->belongsTo(Curso::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Curso::class)->withTrashed();
     }
 
     /** @return BelongsTo<GradeCurricular, $this> */
     public function grade(): BelongsTo
     {
-        return $this->belongsTo(GradeCurricular::class, 'grade_curricular_id');
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(GradeCurricular::class, 'grade_curricular_id')->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */

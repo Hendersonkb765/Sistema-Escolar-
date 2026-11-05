@@ -5,8 +5,10 @@ namespace App\Livewire\Cursos;
 use App\Actions\Academico\CompararGradeComCursoAction;
 use App\Actions\Academico\PublicarVersaoDeGradeAction;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
 use App\Models\Curso;
+use App\Models\Exclusao;
 use App\Models\GradeCurricular;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -19,6 +21,7 @@ use Livewire\Component;
 class DetalheCurso extends Component
 {
     use AuthorizesRequests;
+    use ConfirmaExclusao;
     use Notifica;
 
     public Curso $curso;
@@ -63,6 +66,13 @@ class DetalheCurso extends Component
             "Grade v{$grade->versao} publicada. Turmas já abertas seguem na versão que congelaram.");
 
         $this->redirectRoute('grades.show', $grade, navigate: true);
+    }
+
+    /** O curso desta tela saiu: volta para a lista. */
+    protected function depoisDeExcluir(Exclusao $lote): void
+    {
+        $this->flashSucesso($this->mensagemDeExcluido($lote));
+        $this->redirectRoute('cursos.index', navigate: true);
     }
 
     public function render(CompararGradeComCursoAction $comparar): View

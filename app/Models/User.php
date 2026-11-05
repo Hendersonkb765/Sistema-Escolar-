@@ -262,6 +262,8 @@ class User extends Authenticatable
     {
         return $this->disciplinaIdsCache ??= $this->vinculosDocentes()
             ->where('ativo', true)
+            // O vínculo fica (é histórico); a disciplina na Lixeira não conta mais como dada.
+            ->whereHas('disciplina')
             ->pluck('disciplina_id')
             ->unique()
             ->values()

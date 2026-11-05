@@ -89,7 +89,7 @@ class FormularioTurma extends Component
             'curso_id' => [
                 'required',
                 Rule::exists('cursos', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn('eixo_id', $usuario->eixoIds())
+                    fn ($consulta) => $consulta->whereIn('eixo_id', $usuario->eixoIds())->whereNull('deleted_at')
                 ),
             ],
             // A grade precisa ser do mesmo curso — não se congela em uma
@@ -97,7 +97,7 @@ class FormularioTurma extends Component
             'grade_curricular_id' => [
                 'required',
                 Rule::exists('grades_curriculares', 'id')->where(
-                    fn ($consulta) => $consulta->where('curso_id', $this->curso_id)
+                    fn ($consulta) => $consulta->where('curso_id', $this->curso_id)->whereNull('deleted_at')
                 ),
             ],
             'periodo' => ['required', 'integer', 'min:1', 'max:'.$duracao],
@@ -130,7 +130,9 @@ class FormularioTurma extends Component
     protected function messages(): array
     {
         return [
-            'nome.unique' => 'Já existe uma turma com este nome neste curso e período letivo.',
+            'nome.unique' => Turma::onlyTrashed()->where('curso_id', $this->curso_id)->where('nome', $this->nome)->where('periodo_letivo', $this->periodo_letivo)->exists()
+                ? 'Uma turma com este nome, neste curso e período letivo, está na Lixeira. O PAEET Admin pode restaurá-la por lá.'
+                : 'Já existe uma turma com este nome neste curso e período letivo.',
             'grade_curricular_id.exists' => 'Selecione uma grade curricular do curso escolhido.',
             'periodo.max' => 'O curso selecionado não chega a esse período.',
         ];

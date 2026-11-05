@@ -78,7 +78,12 @@
                                     <x-badge :cor="$turma->status->cor()" :rotulo="$turma->status->rotulo()"/>
                                 </td>
                                 <td class="px-4 py-3 text-right sm:px-6">
-                                    <x-botao variante="discreto" href="{{ route('turmas.show', $turma) }}" wire:navigate>Ver</x-botao>
+                                    <div class="flex items-center justify-end gap-1">
+                                        <x-botao variante="discreto" href="{{ route('turmas.show', $turma) }}" wire:navigate>Ver</x-botao>
+                                        @can('delete', $turma)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('turma', {{ $turma->id }})">Excluir</x-botao>
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -89,4 +94,6 @@
             <div class="mt-4">{{ $turmas->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

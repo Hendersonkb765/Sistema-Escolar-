@@ -18,11 +18,12 @@ class DisciplinaPolicy extends PolicyBase
         return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 
-    /** Disciplina já fotografada em alguma grade não é removida. */
+    /**
+     * Vai para a Lixeira mesmo já fotografada em grade: as grades publicadas
+     * continuam com ela, e a confirmação diz isso. Responde só "é sua?".
+     */
     public function delete(User $usuario, Model $registro): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $registro)
-            && ! $registro->gradeDisciplinas()->exists();
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 }

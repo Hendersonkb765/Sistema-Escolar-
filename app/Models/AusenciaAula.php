@@ -33,13 +33,15 @@ class AusenciaAula extends Model
     /** @return BelongsTo<Turma, $this> */
     public function turma(): BelongsTo
     {
-        return $this->belongsTo(Turma::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Turma::class)->withTrashed();
     }
 
     /** @return BelongsTo<Disciplina, $this> */
     public function disciplina(): BelongsTo
     {
-        return $this->belongsTo(Disciplina::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Disciplina::class)->withTrashed();
     }
 
     /**
