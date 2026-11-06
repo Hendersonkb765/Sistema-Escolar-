@@ -90,10 +90,18 @@ class ConfirmarImportacaoAction
     {
         // Reimportar a mesma prova substitui o resultado anterior do
         // aluno: o que vale é a última leitura da folha, não a soma.
-        $resultado = ResultadoAluno::query()->updateOrCreate(
+        //
+        // Com a Lixeira: o resultado de uma importação excluída continua
+        // ocupando a chave (prova, aluno). A nova leitura o traz de volta,
+        // em vez de esbarrar nele.
+        $resultado = ResultadoAluno::withTrashed()->updateOrCreate(
             ['prova_id' => $importacao->prova_id, 'aluno_id' => $alunoId],
             ['importacao_id' => $importacao->getKey()],
         );
+
+        if ($resultado->trashed()) {
+            $resultado->restore();
+        }
 
         $resultado->respostas()->delete();
 

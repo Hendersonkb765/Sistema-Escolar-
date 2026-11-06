@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Escopo;
 
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Models\Curso;
 use App\Models\EscopoAula;
 use Illuminate\Contracts\View\View;
@@ -26,20 +28,26 @@ use Livewire\Component;
 class VisaoDoEscopo extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     #[Url(as: 'periodo', except: '')]
+    #[LembrarFiltro]
     public string $filtroPeriodo = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     #[Url(as: 'componente', except: '')]
+    #[LembrarFiltro]
     public string $filtroComponente = '';
 
     #[Url(as: 'busca', except: '')]
+    #[LembrarFiltro]
     public string $busca = '';
 
     /**
@@ -51,6 +59,7 @@ class VisaoDoEscopo extends Component
      * PAEET que também dá aula pode querer só as dele.
      */
     #[Url(as: 'meus', except: false)]
+    #[LembrarFiltro]
     public bool $soOsMeus = false;
 
     /** A semana aberta, para ver as aulas dela. */

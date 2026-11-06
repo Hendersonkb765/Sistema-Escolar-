@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\StatusGrade;
 use App\Enums\StatusRegistro;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,12 +17,13 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Curso extends Model
+class Curso extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'cursos';
 
@@ -124,5 +127,42 @@ class Curso extends Model
             ->where('status', StatusGrade::Vigente)
             ->orderByDesc('versao')
             ->first();
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Curso {$this->nome}";
+    }
+
+    /** As turmas (com o que é delas), as disciplinas e as versões de grade. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect()
+            ->concat($this->turmas()->get())
+            ->concat($this->disciplinas()->get())
+            ->concat($this->grades()->get());
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $escopo = $this->escopoAulas()->count();
+
+        return array_values(array_filter([
+            $escopo > 0 ? "{$escopo} aula(s) do escopo-sequência deixam de aparecer." : null,
+            'O histórico das turmas é mantido.',
+        ]));
+    }
+
+    /** Leva turmas inteiras: pede duas confirmações. */
+    public function confirmacoesParaExcluir(): int
+    {
+        return 2;
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->eixo()->withTrashed()->first();
     }
 }

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\StatusRegistro;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -22,12 +25,13 @@ use Spatie\Activitylog\Support\LogOptions;
  * versão, e é nelas que as turmas se apoiam para não terem o percurso
  * reescrito quando o cadastro muda.
  */
-class Disciplina extends Model
+class Disciplina extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'disciplinas';
 
@@ -91,5 +95,41 @@ class Disciplina extends Model
     public function scopeDoPeriodo(Builder $query, int $periodo): Builder
     {
         return $query->where('periodo', $periodo);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Disciplina {$this->nome}";
+    }
+
+    /**
+     * As aulas dela no quadro saem de fato: a aula ocupa um horário da
+     * turma, e na Lixeira continuaria ocupando. A cópia volta na
+     * restauração.
+     *
+     * Os vínculos de professor ficam: o cadastro de usuários os desativa,
+     * nunca apaga — é o histórico de quem lecionou o quê.
+     */
+    public function retiradosNaExclusao(): Collection
+    {
+        return QuadroHorario::query()->where('disciplina_id', $this->id)->get();
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $grades = $this->gradeDisciplinas()->distinct()->count('grade_curricular_id');
+        $questoes = Questao::query()->where('disciplina_id', $this->id)->count();
+
+        return array_values(array_filter([
+            $grades > 0 ? "Continua nas {$grades} grade(s) já publicada(s), que são fotos e não mudam; a próxima versão sai sem ela." : null,
+            $questoes > 0 ? "{$questoes} questão(ões) já escrita(s) continuam no banco, com o nome dela." : null,
+        ]));
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->curso()->withTrashed()->first();
     }
 }

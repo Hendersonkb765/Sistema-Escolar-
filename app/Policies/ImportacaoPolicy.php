@@ -19,9 +19,12 @@ class ImportacaoPolicy extends PolicyBase
         return $usuario->ehGestao() && $this->noEscopo($usuario, $importacao);
     }
 
-    /** Importação é registro de auditoria: não se apaga. */
+    /**
+     * Uma leitura errada da folha sai, com os resultados que trouxe, para a
+     * Lixeira — de onde volta. A auditoria registra quem tirou.
+     */
     public function delete(User $usuario, Model $registro): bool
     {
-        return false;
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 }

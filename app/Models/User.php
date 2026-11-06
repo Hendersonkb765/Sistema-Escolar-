@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\PerfilUsuario;
 use App\Enums\StatusQuestao;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +20,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Activitylog\Models\Concerns\HasActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class User extends Authenticatable
+class User extends Authenticatable implements Excluivel
 {
     use HasActivity;
 
@@ -28,6 +30,7 @@ class User extends Authenticatable
     use Notifiable;
     use SoftDeletes;
     use TwoFactorAuthenticatable;
+    use VaiParaALixeira;
 
     protected $table = 'usuarios';
 
@@ -119,10 +122,18 @@ class User extends Authenticatable
         return $this->belongsTo(self::class, 'criado_por');
     }
 
-    /** @return HasMany<SolicitacaoProva, $this> */
-    public function solicitacoesComoProfessor(): HasMany
+    /**
+     * As partes de solicitação pedidas a este professor.
+     *
+     * Pela parte, e não pela solicitação: `solicitacoes_prova` não tem
+     * `professor_id`. A relação antiga apontava para lá, e no SQLite a
+     * coluna inexistente virava texto — a contagem só dava zero.
+     *
+     * @return HasMany<SolicitacaoParte, $this>
+     */
+    public function partesDeSolicitacao(): HasMany
     {
-        return $this->hasMany(SolicitacaoProva::class, 'professor_id');
+        return $this->hasMany(SolicitacaoParte::class, 'professor_id');
     }
 
     /** @return HasMany<Questao, $this> */
@@ -262,6 +273,8 @@ class User extends Authenticatable
     {
         return $this->disciplinaIdsCache ??= $this->vinculosDocentes()
             ->where('ativo', true)
+            // O vínculo fica (é histórico); a disciplina na Lixeira não conta mais como dada.
+            ->whereHas('disciplina')
             ->pluck('disciplina_id')
             ->unique()
             ->values()
@@ -312,5 +325,39 @@ class User extends Authenticatable
         $this->questoesDevolvidasCache = null;
 
         return $this;
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Usuário {$this->nome} ({$this->email})";
+    }
+
+    /**
+     * A conta com histórico não sai: questões, aulas e ausências dela
+     * deixariam de dizer quem as fez. Para quem já trabalhou no sistema, o
+     * caminho é desativar. Sai a conta criada por engano, sem nada ainda.
+     */
+    public function impedimentoDaExclusao(): ?string
+    {
+        $historico = array_filter([
+            'questão(ões)' => $this->questoes()->count(),
+            'parte(s) de solicitação' => $this->partesDeSolicitacao()->count(),
+            'solicitação(ões) criada(s)' => SolicitacaoProva::query()->where('criado_por', $this->id)->count(),
+            'aula(s) no quadro de horários' => QuadroHorario::query()->where('professor_id', $this->id)->count(),
+            'ausência(s)' => Ausencia::query()->where('professor_id', $this->id)->count(),
+            'importação(ões) de resultados' => Importacao::query()->where('usuario_id', $this->id)->count(),
+            'análise(s) de questão' => QuestaoFeedback::query()->where('analisado_por', $this->id)->count(),
+        ]);
+
+        if ($historico === []) {
+            return null;
+        }
+
+        $quanto = collect($historico)->map(fn (int $n, string $o) => "{$n} {$o}")->join(', ', ' e ');
+
+        return "{$this->nome} tem {$quanto}. A conta não pode sair sem apagar quem fez isso: "
+            .'desative-a em vez de excluir, na lista de usuários.';
     }
 }

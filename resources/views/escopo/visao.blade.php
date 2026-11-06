@@ -24,7 +24,7 @@
             --}}
             <x-campo rotulo="Curso" para="filtro-curso">
                 <x-select id="filtro-curso" wire:model.live="filtroCurso" :desabilitado="$cursos->isEmpty()">
-                    <option value="">
+                    <option value="" @selected((string) $filtroCurso === '')>
                         {{ $cursos->isEmpty() ? 'Nenhum curso com escopo' : 'Escolha um curso' }}
                     </option>
                     @foreach ($cursos as $curso)
@@ -35,7 +35,7 @@
 
             <x-campo rotulo="Período" para="filtro-periodo">
                 <x-select id="filtro-periodo" wire:model.live="filtroPeriodo" :desabilitado="$periodos->isEmpty()">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroPeriodo === '')>Todos</option>
                     @foreach ($periodos as $periodo)
                         <option value="{{ $periodo }}" @selected((string) $periodo === $filtroPeriodo)>{{ $periodo }}º período</option>
                     @endforeach
@@ -44,7 +44,7 @@
 
             <x-campo rotulo="Bimestre" para="filtro-bimestre">
                 <x-select id="filtro-bimestre" wire:model.live="filtroBimestre" :desabilitado="$bimestres->isEmpty()">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroBimestre === '')>Todos</option>
                     @foreach ($bimestres as $bimestre)
                         <option value="{{ $bimestre }}" @selected((string) $bimestre === $filtroBimestre)>{{ $bimestre }}º bimestre</option>
                     @endforeach
@@ -53,7 +53,7 @@
 
             <x-campo rotulo="Componente" para="filtro-componente">
                 <x-select id="filtro-componente" wire:model.live="filtroComponente" :desabilitado="$componentes->isEmpty()">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroComponente === '')>Todos</option>
                     @foreach ($componentes as $nome => $rotulo)
                         <option value="{{ $nome }}" @selected($nome === $filtroComponente)>{{ $rotulo }}</option>
                     @endforeach

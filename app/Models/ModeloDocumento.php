@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\TipoDeDocumento;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use App\Support\CamposDoDocumento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -21,12 +24,13 @@ use Spatie\Activitylog\Support\LogOptions;
  * ({@see CompartilhamentoDeModelo}), de modo que `visivelPara` continua
  * sendo só "os meus Eixos" e nenhuma consulta precisa de exceção.
  */
-class ModeloDocumento extends Model
+class ModeloDocumento extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'modelos_documento';
 
@@ -125,5 +129,23 @@ class ModeloDocumento extends Model
     public function camposInvalidos(): array
     {
         return CamposDoDocumento::validar((string) $this->corpo, $this->tipo);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Modelo de documento {$this->nome}";
+    }
+
+    /** As ofertas de compartilhamento dele saem junto; as cópias já aceitas são de quem as aceitou. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect($this->compartilhamentos()->get());
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->eixo()->withTrashed()->first();
     }
 }

@@ -4,18 +4,24 @@ namespace App\Models;
 
 use App\Enums\StatusImportacao;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Importacao extends Model
+class Importacao extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
+    use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'importacoes';
 
@@ -72,5 +78,25 @@ class Importacao extends Model
     public function resultados(): HasMany
     {
         return $this->hasMany(ResultadoAluno::class);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        $prova = $this->prova()->withTrashed()->first();
+
+        return "Importação de {$this->created_at->format('d/m/Y H:i')} da prova {$prova?->titulo}";
+    }
+
+    /** Os resultados lidos nela saem junto: a prova volta a ficar sem eles. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect($this->resultados()->get());
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->prova()->withTrashed()->first();
     }
 }

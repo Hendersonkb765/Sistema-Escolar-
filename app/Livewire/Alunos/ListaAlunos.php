@@ -3,7 +3,10 @@
 namespace App\Livewire\Alunos;
 
 use App\Enums\StatusAluno;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Aluno;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -16,11 +19,15 @@ class ListaAlunos extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     #[Url(as: 'turma', except: '')]
+    #[LembrarFiltro]
     public string $filtroTurma = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     public function mount(): void

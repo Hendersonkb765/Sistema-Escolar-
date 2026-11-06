@@ -5,7 +5,10 @@ namespace App\Livewire\Solicitacoes;
 use App\Enums\Bimestre;
 use App\Enums\StatusQuestao;
 use App\Enums\StatusSolicitacao;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Curso;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
@@ -23,17 +26,23 @@ class ListaSolicitacoes extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     #[Url(as: 'prazo', except: '')]
+    #[LembrarFiltro]
     public string $filtroPrazo = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     public function mount(): void

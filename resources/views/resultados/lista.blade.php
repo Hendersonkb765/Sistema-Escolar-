@@ -3,9 +3,9 @@
         <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:p-6">
             <x-campo rotulo="Turma" para="filtro-turma">
                 <x-select id="filtro-turma" wire:model.live="filtroTurma">
-                    <option value="">Todas</option>
+                    <option value="" @selected((string) $filtroTurma === '')>Todas</option>
                     @foreach ($turmas as $opcao)
-                        <option value="{{ $opcao->id }}">
+                        <option value="{{ $opcao->id }}" @selected((string) $filtroTurma === (string) ($opcao->id))>
                             {{ $opcao->nome }} — {{ $opcao->curso->nome }} ({{ $opcao->periodo_letivo }})
                         </option>
                     @endforeach
@@ -14,18 +14,18 @@
 
             <x-campo rotulo="Bimestre" para="filtro-bimestre">
                 <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroBimestre === '')>Todos</option>
                     @foreach ($bimestres as $valor => $rotulo)
-                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        <option value="{{ $valor }}" @selected((string) $filtroBimestre === (string) ($valor))>{{ $rotulo }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
 
             <x-campo rotulo="Prova" para="prova">
                 <x-select id="prova" wire:model.live="prova_id">
-                    <option value="">Todas do recorte</option>
+                    <option value="" @selected((string) $prova_id === '')>Todas do recorte</option>
                     @foreach ($provas as $opcao)
-                        <option value="{{ $opcao->id }}">
+                        <option value="{{ $opcao->id }}" @selected((string) $prova_id === (string) ($opcao->id))>
                             {{ $opcao->titulo }} · {{ $opcao->turma->nome }} · {{ $opcao->turma->curso->nome }}
                         </option>
                     @endforeach

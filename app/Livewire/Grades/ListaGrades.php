@@ -3,7 +3,10 @@
 namespace App\Livewire\Grades;
 
 use App\Enums\StatusGrade;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Curso;
 use App\Models\GradeCurricular;
 use Illuminate\Contracts\View\View;
@@ -16,11 +19,15 @@ class ListaGrades extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     public function mount(): void

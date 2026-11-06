@@ -6,7 +6,9 @@ use App\Actions\Avaliacao\AnalisarQuestaoAction;
 use App\Actions\Avaliacao\EncerrarSolicitacaoAction;
 use App\Enums\StatusQuestao;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
+use App\Models\Exclusao;
 use App\Models\Questao;
 use App\Models\SolicitacaoProva;
 use Illuminate\Contracts\View\View;
@@ -24,6 +26,7 @@ use Livewire\Component;
 class DetalheSolicitacao extends Component
 {
     use AuthorizesRequests;
+    use ConfirmaExclusao;
     use Notifica;
 
     public SolicitacaoProva $solicitacao;
@@ -216,6 +219,13 @@ class DetalheSolicitacao extends Component
             ->whereIn('status', [StatusQuestao::Enviada->value, StatusQuestao::EmAnalise->value])
             ->with(['parte.disciplina', 'solicitacao'])
             ->get();
+    }
+
+    /** A solicitação desta tela saiu: volta para a lista. */
+    protected function depoisDeExcluir(Exclusao $lote): void
+    {
+        $this->flashSucesso($this->mensagemDeExcluido($lote));
+        $this->redirectRoute('solicitacoes.index', navigate: true);
     }
 
     public function render(): View

@@ -5,9 +5,9 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <x-campo rotulo="Turma" para="turma_id" obrigatorio :erro="$errors->first('turma_id')">
                         <x-select id="turma_id" wire:model.live="turma_id" required>
-                            <option value="">Selecione…</option>
+                            <option value="" @selected((string) $turma_id === '')>Selecione…</option>
                             @foreach ($turmas as $turma)
-                                <option value="{{ $turma->id }}">
+                                <option value="{{ $turma->id }}" @selected((string) $turma_id === (string) ($turma->id))>
                                     {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo }}º período
                                 </option>
                             @endforeach
@@ -18,7 +18,7 @@
                              ajuda="O ano letivo tem quatro.">
                         <x-select id="bimestre" wire:model="bimestre" required>
                             @foreach ($bimestres as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                <option value="{{ $valor }}" @selected((string) $bimestre === (string) ($valor))>{{ $rotulo }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>
@@ -42,7 +42,7 @@
                              ajuda="Vale para a prova inteira.">
                         <x-select id="quantidade_alternativas" wire:model="quantidade_alternativas" required>
                             @for ($n = 2; $n <= 6; $n++)
-                                <option value="{{ $n }}">{{ $n }} alternativas</option>
+                                <option value="{{ $n }}" @selected((string) $quantidade_alternativas === (string) ($n))>{{ $n }} alternativas</option>
                             @endfor
                         </x-select>
                     </x-campo>

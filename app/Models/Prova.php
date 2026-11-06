@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\Bimestre;
 use App\Enums\StatusProva;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,12 +17,13 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class Prova extends Model
+class Prova extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'provas';
 
@@ -94,7 +97,8 @@ class Prova extends Model
     /** @return BelongsTo<ModeloProva, $this> */
     public function modelo(): BelongsTo
     {
-        return $this->belongsTo(ModeloProva::class, 'modelo_prova_id');
+        // A prova montada é foto do layout: continua com ele mesmo na Lixeira.
+        return $this->belongsTo(ModeloProva::class, 'modelo_prova_id')->withTrashed();
     }
 
     /** @return HasMany<ProvaQuestao, $this> */
@@ -217,5 +221,30 @@ class Prova extends Model
             $this->status === StatusProva::Encerrada => 'Esta prova já foi encerrada.',
             default => null,
         };
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Prova {$this->titulo}";
+    }
+
+    /** As leituras da folha e os resultados saem junto. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect()
+            ->concat($this->importacoes()->get())
+            ->concat($this->resultados()->get());
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        return ['As questões dela continuam no banco e podem entrar em outra prova.'];
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->turma()->withTrashed()->first();
     }
 }

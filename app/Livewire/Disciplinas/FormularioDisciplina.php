@@ -64,7 +64,7 @@ class FormularioDisciplina extends Component
             'curso_id' => [
                 'required',
                 Rule::exists('cursos', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn('eixo_id', $usuario->eixoIds())
+                    fn ($consulta) => $consulta->whereIn('eixo_id', $usuario->eixoIds())->whereNull('deleted_at')
                 ),
             ],
             'nome' => ['required', 'string', 'max:255'],
@@ -98,7 +98,9 @@ class FormularioDisciplina extends Component
     protected function messages(): array
     {
         return [
-            'codigo.unique' => 'Já existe uma disciplina com este código neste curso.',
+            'codigo.unique' => Disciplina::onlyTrashed()->where('curso_id', $this->curso_id)->where('codigo', $this->codigo)->exists()
+                ? 'Uma disciplina com este código está na Lixeira. O PAEET Admin pode restaurá-la por lá.'
+                : 'Já existe uma disciplina com este código neste curso.',
             'periodo.max' => 'O curso selecionado não tem esse período.',
         ];
     }

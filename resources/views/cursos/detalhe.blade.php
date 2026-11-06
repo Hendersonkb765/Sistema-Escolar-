@@ -1,6 +1,9 @@
 <div class="space-y-4">
     <x-cartao titulo="Identificação">
         <x-slot:acoes>
+            @can('delete', $curso)
+                <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('curso', {{ $curso->id }})">Excluir curso</x-botao>
+            @endcan
             @can('update', $curso)
                 <x-botao variante="secundario" href="{{ route('cursos.editar', $curso) }}" wire:navigate>Editar curso</x-botao>
             @endcan
@@ -193,4 +196,6 @@
             @endforelse
         </x-cartao>
     </div>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

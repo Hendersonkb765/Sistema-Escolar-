@@ -13,9 +13,9 @@
 
             <x-campo rotulo="Situação" para="filtro-status">
                 <x-select id="filtro-status" wire:model.live="filtroStatus">
-                    <option value="">Todas</option>
+                    <option value="" @selected((string) $filtroStatus === '')>Todas</option>
                     @foreach ($situacoes as $valor => $rotulo)
-                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        <option value="{{ $valor }}" @selected((string) $filtroStatus === (string) ($valor))>{{ $rotulo }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
@@ -23,9 +23,9 @@
             @if ($ehGestao)
                 <x-campo rotulo="Curso" para="filtro-curso">
                     <x-select id="filtro-curso" wire:model.live="filtroCurso">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroCurso === '')>Todos</option>
                         @foreach ($cursos as $id => $nome)
-                            <option value="{{ $id }}">{{ $nome }}</option>
+                            <option value="{{ $id }}" @selected((string) $filtroCurso === (string) ($id))>{{ $nome }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

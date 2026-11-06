@@ -8,8 +8,10 @@ use App\Actions\Academico\DesligarAlunoAction;
 use App\Enums\StatusAluno;
 use App\Enums\StatusGrade;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
 use App\Models\Aluno;
+use App\Models\Exclusao;
 use App\Models\GradeCurricular;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -20,6 +22,7 @@ use Livewire\Component;
 class DetalheTurma extends Component
 {
     use AuthorizesRequests;
+    use ConfirmaExclusao;
     use Notifica;
 
     public Turma $turma;
@@ -249,6 +252,13 @@ class DetalheTurma extends Component
             ->whereKeyNot($this->turma->getKey())
             ->orderBy('nome')
             ->get();
+    }
+
+    /** A turma desta tela saiu: volta para a lista. */
+    protected function depoisDeExcluir(Exclusao $lote): void
+    {
+        $this->flashSucesso($this->mensagemDeExcluido($lote));
+        $this->redirectRoute('turmas.index', navigate: true);
     }
 
     public function render(): View

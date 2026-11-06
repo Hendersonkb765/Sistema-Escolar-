@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\StatusGrade;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,12 +15,13 @@ use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class GradeCurricular extends Model
+class GradeCurricular extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'grades_curriculares';
 
@@ -106,5 +109,35 @@ class GradeCurricular extends Model
             ->get()
             ->groupBy('periodo')
             ->sortKeys();
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Grade versão {$this->versao}";
+    }
+
+    /**
+     * A grade em uso não sai: as turmas dela ficariam sem disciplinas. O
+     * caminho é trocar a grade das turmas antes — ou excluir as turmas.
+     */
+    public function impedimentoDaExclusao(): ?string
+    {
+        $turmas = $this->turmas()->orderBy('nome')->pluck('nome');
+
+        if ($turmas->isEmpty()) {
+            return null;
+        }
+
+        $quais = $turmas->take(5)->join(', ', ' e ').($turmas->count() > 5 ? ' e outras '.($turmas->count() - 5) : '');
+
+        return "A grade versão {$this->versao} é usada pela(s) turma(s) {$quais}. "
+            .'Troque a grade delas, na tela de cada turma, antes de excluir esta versão.';
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->curso()->withTrashed()->first();
     }
 }

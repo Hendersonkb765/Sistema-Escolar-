@@ -14,7 +14,7 @@
                 <x-campo rotulo="Status" para="status" obrigatorio :erro="$errors->first('status')">
                     <x-select id="status" wire:model="status" required>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $status === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

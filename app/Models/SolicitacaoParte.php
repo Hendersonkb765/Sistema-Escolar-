@@ -81,7 +81,8 @@ class SolicitacaoParte extends Model
     /** @return BelongsTo<Disciplina, $this> */
     public function disciplina(): BelongsTo
     {
-        return $this->belongsTo(Disciplina::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Disciplina::class)->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */

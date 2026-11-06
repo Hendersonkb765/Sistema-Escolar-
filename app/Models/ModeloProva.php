@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\NormaDaFolha;
 use App\Enums\OrigemDaLogo;
 use App\Models\Concerns\AplicaEscopoDeEixo;
+use App\Models\Concerns\VaiParaALixeira;
+use App\Models\Contracts\Excluivel;
 use App\Support\LayoutDaFolha;
 use App\Support\LogoDaFolha;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,12 +17,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-class ModeloProva extends Model
+class ModeloProva extends Model implements Excluivel
 {
     use AplicaEscopoDeEixo;
     use HasFactory;
     use LogsActivity;
     use SoftDeletes;
+    use VaiParaALixeira;
 
     protected $table = 'modelos_prova';
 
@@ -112,5 +115,24 @@ class ModeloProva extends Model
     public function provas(): HasMany
     {
         return $this->hasMany(Prova::class);
+    }
+
+    // --- Lixeira -----------------------------------------------------------
+
+    public function rotuloParaExclusao(): string
+    {
+        return "Modelo de prova {$this->nome}";
+    }
+
+    public function avisosDaExclusao(): array
+    {
+        $provas = $this->provas()->count();
+
+        return $provas > 0 ? ["{$provas} prova(s) já montada(s) com ele continuam com este layout."] : [];
+    }
+
+    public function paiNaRestauracao(): ?Model
+    {
+        return $this->eixo()->withTrashed()->first();
     }
 }

@@ -99,14 +99,23 @@ it('mantém o escopo por eixo através do curso', function () {
         ->assertForbidden();
 });
 
-it('não apaga disciplina já fotografada em alguma grade', function () {
+/*
+ * A disciplina de uma grade publicada também vai para a Lixeira: um
+ * cadastro errado precisa ter conserto. A grade é foto e continua com ela;
+ * a confirmação diz isso, em vez de o botão sumir sem explicação.
+ */
+it('deixa excluir disciplina já fotografada em grade, avisando que a grade continua com ela', function () {
     $montagem = cursoComGrade($this->eixo, [1 => ['Lógica']], autor: $this->paeet);
     $fotografada = $montagem['disciplinas']['Lógica'];
 
     $solta = Disciplina::factory()->doCurso($montagem['curso'])->create(['codigo' => 'SOL']);
 
-    expect($this->paeet->can('delete', $fotografada))->toBeFalse()
-        ->and($this->paeet->can('delete', $solta))->toBeTrue();
+    expect($this->paeet->can('delete', $fotografada))->toBeTrue()
+        ->and($this->paeet->can('delete', $solta))->toBeTrue()
+        ->and($fotografada->avisosDaExclusao())->toBe([
+            'Continua nas 1 grade(s) já publicada(s), que são fotos e não mudam; a próxima versão sai sem ela.',
+        ])
+        ->and($solta->avisosDaExclusao())->toBe([]);
 });
 
 it('impede encurtar o curso abaixo do período de suas disciplinas', function () {

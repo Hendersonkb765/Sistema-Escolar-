@@ -125,6 +125,9 @@
                                                 Editar
                                             </x-botao>
                                         @endcan
+                                        @can('delete', $modelo)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('modelo-documento', {{ $modelo->id }})">Excluir</x-botao>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -144,9 +147,9 @@
                                             <x-campo rotulo="Enviar para" para="destinatario_id" obrigatorio
                                                      :erro="$errors->first('destinatario_id')">
                                                 <x-select id="destinatario_id" wire:model="destinatario_id">
-                                                    <option value="">Escolha um PAEET</option>
+                                                    <option value="" @selected((string) $destinatario_id === '')>Escolha um PAEET</option>
                                                     @foreach ($destinatarios as $pessoa)
-                                                        <option value="{{ $pessoa->id }}">
+                                                        <option value="{{ $pessoa->id }}" @selected((string) $destinatario_id === (string) ($pessoa->id))>
                                                             {{ $pessoa->nome }} — {{ $pessoa->email }}
                                                         </option>
                                                     @endforeach
@@ -177,4 +180,6 @@
             <div class="mt-4">{{ $modelos->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

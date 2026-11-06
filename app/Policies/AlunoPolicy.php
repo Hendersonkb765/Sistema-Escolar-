@@ -45,11 +45,12 @@ class AlunoPolicy extends PolicyBase
         return $usuario->ehGestao() && $this->noEscopo($usuario, $aluno);
     }
 
-    /** Um aluno com resultado de prova lançado nunca é removido. */
+    /**
+     * Vai para a Lixeira mesmo com resultados lançados: eles saem junto, e
+     * a confirmação diz quantos. Responde só "é seu?".
+     */
     public function delete(User $usuario, $registro): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $registro)
-            && ! $registro->resultados()->exists();
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 }

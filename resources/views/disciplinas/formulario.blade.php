@@ -5,9 +5,9 @@
             <div class="space-y-4">
                 <x-campo rotulo="Curso" para="curso_id" obrigatorio :erro="$errors->first('curso_id')">
                     <x-select id="curso_id" wire:model.live="curso_id" required>
-                        <option value="">Selecione…</option>
+                        <option value="" @selected((string) $curso_id === '')>Selecione…</option>
                         @foreach ($cursosDisponiveis as $curso)
-                            <option value="{{ $curso->id }}">{{ $curso->nome }} ({{ $curso->duracao_anos }} anos)</option>
+                            <option value="{{ $curso->id }}" @selected((string) $curso_id === (string) ($curso->id))>{{ $curso->nome }} ({{ $curso->duracao_anos }} anos)</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -26,7 +26,7 @@
                              ajuda="Ano do curso.">
                         <x-select id="periodo" wire:model="periodo" required>
                             @for ($p = 1; $p <= $duracao; $p++)
-                                <option value="{{ $p }}">{{ $p }}º período</option>
+                                <option value="{{ $p }}" @selected((string) $periodo === (string) ($p))>{{ $p }}º período</option>
                             @endfor
                         </x-select>
                     </x-campo>
@@ -40,7 +40,7 @@
                 <x-campo rotulo="Status" para="status" obrigatorio :erro="$errors->first('status')">
                     <x-select id="status" wire:model="status" required>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $status === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

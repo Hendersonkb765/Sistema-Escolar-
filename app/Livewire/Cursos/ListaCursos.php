@@ -3,6 +3,8 @@
 namespace App\Livewire\Cursos;
 
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Curso;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +19,8 @@ class ListaCursos extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     public function mount(): void
     {

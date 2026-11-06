@@ -184,6 +184,8 @@ class AnalisarDesempenhoAction
 
         $respostas = RespostaAluno::query()
             ->where('prova_questao_id', $questao->getKey())
+            // Só de resultados fora da Lixeira: o aluno excluído não conta mais.
+            ->whereHas('resultado')
             ->with(['resultado:id,aluno_id', 'resultado.aluno:id,nome,ra'])
             ->get();
 
@@ -703,6 +705,8 @@ class AnalisarDesempenhoAction
 
         return RespostaAluno::query()
             ->where('prova_questao_id', $questao->getKey())
+            // Só de resultados fora da Lixeira: o aluno excluído não conta mais.
+            ->whereHas('resultado')
             ->with(['resultado:id,aluno_id', 'resultado.aluno:id,nome,ra'])
             ->get()
             ->map(fn (RespostaAluno $resposta) => [

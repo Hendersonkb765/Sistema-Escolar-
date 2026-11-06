@@ -4,9 +4,9 @@
             <div class="space-y-4">
                 <x-campo rotulo="Eixo" para="eixo_id" obrigatorio :erro="$errors->first('eixo_id')">
                     <x-select id="eixo_id" wire:model="eixo_id" required>
-                        <option value="">Selecione…</option>
+                        <option value="" @selected((string) $eixo_id === '')>Selecione…</option>
                         @foreach ($eixosDisponiveis as $eixo)
-                            <option value="{{ $eixo->id }}">{{ $eixo->nome }}</option>
+                            <option value="{{ $eixo->id }}" @selected((string) $eixo_id === (string) ($eixo->id))>{{ $eixo->nome }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -23,8 +23,8 @@
 
                     <x-campo rotulo="Duração" para="duracao_anos" obrigatorio :erro="$errors->first('duracao_anos')">
                         <x-select id="duracao_anos" wire:model="duracao_anos" required>
-                            <option value="2">2 anos</option>
-                            <option value="3">3 anos</option>
+                            <option value="2" @selected((string) $duracao_anos === '2')>2 anos</option>
+                            <option value="3" @selected((string) $duracao_anos === '3')>3 anos</option>
                         </x-select>
                     </x-campo>
                 </div>
@@ -32,7 +32,7 @@
                 <x-campo rotulo="Status" para="status" obrigatorio :erro="$errors->first('status')">
                     <x-select id="status" wire:model="status" required>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $status === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

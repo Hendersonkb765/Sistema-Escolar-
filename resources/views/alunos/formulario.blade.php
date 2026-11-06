@@ -5,9 +5,9 @@
                 <x-campo rotulo="Turma" para="turma_id" obrigatorio :erro="$errors->first('turma_id')"
                          ajuda="Mudar a turma aqui registra a movimentação no histórico do aluno.">
                     <x-select id="turma_id" wire:model.live="turma_id" required>
-                        <option value="">Selecione…</option>
+                        <option value="" @selected((string) $turma_id === '')>Selecione…</option>
                         @foreach ($turmasDisponiveis as $turma)
-                            <option value="{{ $turma->id }}">
+                            <option value="{{ $turma->id }}" @selected((string) $turma_id === (string) ($turma->id))>
                                 {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo_letivo }}
                             </option>
                         @endforeach
@@ -37,7 +37,7 @@
                     <x-campo rotulo="Status" para="status" obrigatorio :erro="$errors->first('status')">
                         <x-select id="status" wire:model="status" required>
                             @foreach ($situacoes as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                <option value="{{ $valor }}" @selected((string) $status === (string) ($valor))>{{ $rotulo }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>

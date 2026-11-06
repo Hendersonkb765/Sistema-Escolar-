@@ -53,13 +53,15 @@ class AlunoHistorico extends Model
     /** @return BelongsTo<Turma, $this> */
     public function turmaAnterior(): BelongsTo
     {
-        return $this->belongsTo(Turma::class, 'turma_anterior_id');
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Turma::class, 'turma_anterior_id')->withTrashed();
     }
 
     /** @return BelongsTo<Turma, $this> */
     public function turmaNova(): BelongsTo
     {
-        return $this->belongsTo(Turma::class, 'turma_nova_id');
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Turma::class, 'turma_nova_id')->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */

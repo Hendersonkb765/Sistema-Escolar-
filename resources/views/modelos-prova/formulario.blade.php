@@ -12,9 +12,9 @@
 
                     <x-campo rotulo="Eixo" para="eixo_id" obrigatorio :erro="$errors->first('eixo_id')">
                         <x-select id="eixo_id" wire:model="eixo_id" required>
-                            <option value="">Selecione…</option>
+                            <option value="" @selected((string) $eixo_id === '')>Selecione…</option>
                             @foreach ($eixos as $eixo)
-                                <option value="{{ $eixo->id }}">{{ $eixo->nome }}</option>
+                                <option value="{{ $eixo->id }}" @selected((string) $eixo_id === (string) ($eixo->id))>{{ $eixo->nome }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>
@@ -107,7 +107,7 @@
                     <x-campo rotulo="Norma" para="norma" obrigatorio :erro="$errors->first('norma')">
                         <x-select id="norma" wire:model.live="norma" required>
                             @foreach ($normas as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                <option value="{{ $valor }}" @selected((string) $norma === (string) ($valor))>{{ $rotulo }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>
@@ -116,7 +116,7 @@
                              ajuda="A ABNT admite as duas.">
                         <x-select id="fonte" wire:model.live="fonte" required>
                             @foreach ($fontesDisponiveis as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                <option value="{{ $valor }}" @selected((string) $fonte === (string) ($valor))>{{ $rotulo }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>

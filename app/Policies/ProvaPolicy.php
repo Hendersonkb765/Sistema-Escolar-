@@ -63,8 +63,7 @@ class ProvaPolicy extends PolicyBase
 
     public function delete(User $usuario, Model $registro): bool
     {
-        return $usuario->ehGestao()
-            && $this->noEscopo($usuario, $registro)
-            && $registro->status->editavel();
+        // Mesmo aplicada: leituras e resultados vão juntos para a Lixeira.
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 }

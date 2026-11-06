@@ -8,18 +8,18 @@
 
                 <x-campo rotulo="Bimestre" para="filtro-bimestre">
                     <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroBimestre === '')>Todos</option>
                         @foreach ($bimestres as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroBimestre === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-status">
                     <x-select id="filtro-status" wire:model.live="filtroStatus">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroStatus === '')>Todas</option>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroStatus === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -101,6 +101,9 @@
                                     @else
                                         <span class="text-xs text-slate-400">Nada gravado</span>
                                     @endif
+                                    @can('delete', $importacao)
+                                        <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('importacao', {{ $importacao->id }})">Excluir</x-botao>
+                                    @endcan
                                 </td>
                             </tr>
                         @endforeach
@@ -111,4 +114,6 @@
             <div class="mt-4">{{ $importacoes->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

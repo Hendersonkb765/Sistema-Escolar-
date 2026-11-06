@@ -8,7 +8,7 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <x-campo rotulo="Curso" para="curso" :erro="$errors->first('curso_id')">
                     <x-select id="curso" wire:model.live="curso_id">
-                        <option value="">Escolha o curso</option>
+                        <option value="" @selected((string) $curso_id === '')>Escolha o curso</option>
                         @foreach ($cursos as $curso)
                             <option value="{{ $curso->id }}" @selected($curso->id === $curso_id)>{{ $curso->nome }} ({{ $curso->eixo->nome }})</option>
                         @endforeach
@@ -24,7 +24,7 @@
                          ajuda="Não vem na planilha — os bimestres se repetem a cada período."
                          :erro="$errors->first('periodo')">
                     <x-select id="periodo" wire:model.live="periodo" :desabilitado="$periodos === []">
-                        <option value="">{{ $cursoEscolhido ? 'Escolha o período' : 'Escolha o curso primeiro' }}</option>
+                        <option value="" @selected((string) $periodo === '')>{{ $cursoEscolhido ? 'Escolha o período' : 'Escolha o curso primeiro' }}</option>
                         @foreach ($periodos as $opcao)
                             <option value="{{ $opcao }}" @selected($opcao === $periodo)>{{ $opcao }}º período</option>
                         @endforeach

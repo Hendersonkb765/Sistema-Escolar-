@@ -93,7 +93,7 @@
                 <x-campo rotulo="Disciplina" para="disciplina_id" obrigatorio :erro="$errors->first('disciplina_id')"
                          class="sm:col-span-2">
                     <x-select id="disciplina_id" wire:model.live="disciplina_id">
-                        <option value="">Selecione…</option>
+                        <option value="" @selected((string) $disciplina_id === '')>Selecione…</option>
                         @foreach ($disciplinas as $disciplina)
                             <option value="{{ $disciplina->id }}" @selected($disciplina_id === (string) $disciplina->id)>{{ $disciplina->nome }}</option>
                         @endforeach
@@ -106,7 +106,7 @@
                              ? 'Escolha a disciplina primeiro.'
                              : ($professores->isEmpty() ? 'Ninguém tem vínculo com esta disciplina. O vínculo é feito no cadastro do usuário.' : null)">
                     <x-select id="professor_id" wire:model="professor_id" :desabilitado="$professores->isEmpty()">
-                        <option value="">Selecione…</option>
+                        <option value="" @selected((string) $professor_id === '')>Selecione…</option>
                         @foreach ($professores as $professor)
                             <option value="{{ $professor->id }}" @selected($professor_id === (string) $professor->id)>{{ $professor->nome }}</option>
                         @endforeach

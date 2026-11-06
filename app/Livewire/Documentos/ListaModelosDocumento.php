@@ -5,7 +5,9 @@ namespace App\Livewire\Documentos;
 use App\Actions\Documento\CompartilharModeloAction;
 use App\Enums\StatusCompartilhamento;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
 use App\Models\CompartilhamentoDeModelo;
 use App\Models\ModeloDocumento;
@@ -20,9 +22,11 @@ class ListaModelosDocumento extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
     use Notifica;
 
     #[Url(as: 'inativos', except: false)]
+    #[LembrarFiltro]
     public bool $mostrarInativos = false;
 
     /** O modelo cuja janela de compartilhamento está aberta. */

@@ -8,19 +8,19 @@
 
                 <x-campo rotulo="Curso" para="filtro-curso">
                     <x-select id="filtro-curso" wire:model.live="filtroCurso">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroCurso === '')>Todos</option>
                         @foreach ($cursos as $id => $nome)
-                            <option value="{{ $id }}">{{ $nome }}</option>
+                            <option value="{{ $id }}" @selected((string) $filtroCurso === (string) ($id))>{{ $nome }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Período" para="filtro-periodo">
                     <x-select id="filtro-periodo" wire:model.live="filtroPeriodo">
-                        <option value="">Todos</option>
-                        <option value="1">1º período</option>
-                        <option value="2">2º período</option>
-                        <option value="3">3º período</option>
+                        <option value="" @selected((string) $filtroPeriodo === '')>Todos</option>
+                        <option value="1" @selected((string) $filtroPeriodo === '1')>1º período</option>
+                        <option value="2" @selected((string) $filtroPeriodo === '2')>2º período</option>
+                        <option value="3" @selected((string) $filtroPeriodo === '3')>3º período</option>
                     </x-select>
                 </x-campo>
             </div>
@@ -80,9 +80,14 @@
                                     <x-badge :cor="$disciplina->status->cor()" :rotulo="$disciplina->status->rotulo()"/>
                                 </td>
                                 <td class="px-4 py-3 text-right sm:px-6">
-                                    @can('update', $disciplina)
-                                        <x-botao variante="discreto" href="{{ route('disciplinas.editar', $disciplina) }}" wire:navigate>Editar</x-botao>
-                                    @endcan
+                                    <div class="flex items-center justify-end gap-1">
+                                        @can('update', $disciplina)
+                                            <x-botao variante="discreto" href="{{ route('disciplinas.editar', $disciplina) }}" wire:navigate>Editar</x-botao>
+                                        @endcan
+                                        @can('delete', $disciplina)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('disciplina', {{ $disciplina->id }})">Excluir</x-botao>
+                                        @endcan
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -93,4 +98,6 @@
             <div class="mt-4">{{ $disciplinas->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

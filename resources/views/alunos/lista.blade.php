@@ -8,18 +8,18 @@
 
                 <x-campo rotulo="Turma" para="filtro-turma">
                     <x-select id="filtro-turma" wire:model.live="filtroTurma">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroTurma === '')>Todas</option>
                         @foreach ($turmas as $turma)
-                            <option value="{{ $turma->id }}">{{ $turma->nome }} · {{ $turma->periodo_letivo }}</option>
+                            <option value="{{ $turma->id }}" @selected((string) $filtroTurma === (string) ($turma->id))>{{ $turma->nome }} · {{ $turma->periodo_letivo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-status">
                     <x-select id="filtro-status" wire:model.live="filtroStatus">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroStatus === '')>Todas</option>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroStatus === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -107,6 +107,9 @@
                                         @can('update', $aluno)
                                             <x-botao variante="discreto" href="{{ route('alunos.editar', $aluno) }}" wire:navigate>Editar</x-botao>
                                         @endcan
+                                        @can('delete', $aluno)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('aluno', {{ $aluno->id }})">Excluir</x-botao>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -118,4 +121,6 @@
             <div class="mt-4">{{ $alunos->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

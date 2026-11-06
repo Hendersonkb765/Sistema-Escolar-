@@ -17,36 +17,36 @@
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
             <x-campo rotulo="Ano letivo" para="filtro-ano">
                 <x-select id="filtro-ano" wire:model.live="filtroAno">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroAno === '')>Todos</option>
                     @foreach ($anos as $ano)
-                        <option value="{{ $ano }}">{{ $ano }}</option>
+                        <option value="{{ $ano }}" @selected((string) $filtroAno === (string) ($ano))>{{ $ano }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
 
             <x-campo rotulo="Turma" para="filtro-turma">
                 <x-select id="filtro-turma" wire:model.live="filtroTurma">
-                    <option value="">Todas</option>
+                    <option value="" @selected((string) $filtroTurma === '')>Todas</option>
                     @foreach ($turmas as $id => $nome)
-                        <option value="{{ $id }}">{{ $nome }}</option>
+                        <option value="{{ $id }}" @selected((string) $filtroTurma === (string) ($id))>{{ $nome }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
 
             <x-campo rotulo="Bimestre" para="filtro-bimestre">
                 <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
-                    <option value="">Todos</option>
+                    <option value="" @selected((string) $filtroBimestre === '')>Todos</option>
                     @foreach ($bimestres as $valor => $rotulo)
-                        <option value="{{ $valor }}">{{ $rotulo }}</option>
+                        <option value="{{ $valor }}" @selected((string) $filtroBimestre === (string) ($valor))>{{ $rotulo }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
 
             <x-campo rotulo="Disciplina" para="filtro-disciplina">
                 <x-select id="filtro-disciplina" wire:model.live="filtroDisciplina">
-                    <option value="">Todas</option>
+                    <option value="" @selected((string) $filtroDisciplina === '')>Todas</option>
                     @foreach ($disciplinas as $id => $nome)
-                        <option value="{{ $id }}">{{ $nome }}</option>
+                        <option value="{{ $id }}" @selected((string) $filtroDisciplina === (string) ($id))>{{ $nome }}</option>
                     @endforeach
                 </x-select>
             </x-campo>

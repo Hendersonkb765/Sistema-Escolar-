@@ -5,6 +5,8 @@ namespace App\Livewire\Ausencias;
 use App\Actions\Ausencias\TomarCienciaAction;
 use App\Enums\StatusAusencia;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Livewire\Concerns\Notifica;
 use App\Models\Ausencia;
 use Illuminate\Contracts\View\View;
@@ -22,6 +24,7 @@ use Livewire\Component;
 class AusenciasDaCoordenacao extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
     use Notifica;
 
     public const SITUACOES = ['pendente', 'ciente', 'cancelada', 'todas'];
@@ -29,9 +32,11 @@ class AusenciasDaCoordenacao extends Component
     public const QUANDO = ['proximas', 'passadas', 'todas'];
 
     #[Url(as: 'situacao', except: 'pendente')]
+    #[LembrarFiltro]
     public string $situacao = 'pendente';
 
     #[Url(as: 'quando', except: 'proximas')]
+    #[LembrarFiltro]
     public string $quando = 'proximas';
 
     public function mount(): void

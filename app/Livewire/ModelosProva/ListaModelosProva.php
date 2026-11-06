@@ -2,7 +2,9 @@
 
 namespace App\Livewire\ModelosProva;
 
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
 use App\Models\ModeloProva;
 use Illuminate\Contracts\View\View;
@@ -15,9 +17,11 @@ class ListaModelosProva extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
     use Notifica;
 
     #[Url(as: 'inativos', except: false)]
+    #[LembrarFiltro]
     public bool $mostrarInativos = false;
 
     public function mount(): void

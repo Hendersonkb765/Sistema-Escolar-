@@ -113,7 +113,7 @@ class FormularioUsuario extends Component
             // só vale vincular o que está no escopo de quem edita.
             'disciplinasSelecionadas.*' => [
                 Rule::exists('disciplinas', 'id')->where(
-                    fn ($consulta) => $consulta->whereIn(
+                    fn ($consulta) => $consulta->whereNull('deleted_at')->whereIn(
                         'curso_id',
                         Curso::query()->whereIn('eixo_id', $autor->eixoIds())->select('id')
                     )

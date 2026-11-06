@@ -60,13 +60,15 @@ class ProvaQuestao extends Model
     /** @return BelongsTo<Questao, $this> */
     public function questao(): BelongsTo
     {
-        return $this->belongsTo(Questao::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Questao::class)->withTrashed();
     }
 
     /** @return BelongsTo<Disciplina, $this> */
     public function disciplina(): BelongsTo
     {
-        return $this->belongsTo(Disciplina::class);
+        // Registro do que aconteceu: mostra o nome mesmo com ele na Lixeira.
+        return $this->belongsTo(Disciplina::class)->withTrashed();
     }
 
     /** @return BelongsTo<User, $this> */

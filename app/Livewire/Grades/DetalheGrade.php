@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Grades;
 
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
+use App\Models\Exclusao;
 use App\Models\GradeCurricular;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +17,8 @@ use Livewire\Component;
 class DetalheGrade extends Component
 {
     use AuthorizesRequests;
+    use ConfirmaExclusao;
+    use Notifica;
 
     public GradeCurricular $grade;
 
@@ -22,6 +27,13 @@ class DetalheGrade extends Component
         $this->authorize('view', $grade);
 
         $this->grade = $grade;
+    }
+
+    /** A versão de grade desta tela saiu: volta para a lista. */
+    protected function depoisDeExcluir(Exclusao $lote): void
+    {
+        $this->flashSucesso($this->mensagemDeExcluido($lote));
+        $this->redirectRoute('grades.index', navigate: true);
     }
 
     public function render(): View

@@ -5,6 +5,8 @@ namespace App\Livewire\Calendario;
 use App\Actions\Calendario\SalvarCalendarioAction;
 use App\Enums\Bimestre;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Livewire\Concerns\Notifica;
 use App\Models\BimestreLetivo;
 use App\Models\Turma;
@@ -16,9 +18,11 @@ use Livewire\Component;
 class CalendarioLetivo extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
     use Notifica;
 
     #[Url(as: 'ano', except: '')]
+    #[LembrarFiltro]
     public string $ano = '';
 
     /** @var array<int, array{inicio: string, fim: string}> */

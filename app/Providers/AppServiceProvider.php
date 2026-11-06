@@ -49,6 +49,9 @@ class AppServiceProvider extends ServiceProvider
         // documentos, aulas do dia e intervalos de todas as turmas.
         Gate::define('configurarEscola', fn (User $usuario) => $usuario->ehPaeetAdmin());
 
+        // A Lixeira desfaz exclusões de qualquer pessoa: é do PAEET Admin.
+        Gate::define('administrarLixeira', fn (User $usuario) => $usuario->ehPaeetAdmin());
+
         ConfiguracaoDaEscola::aplicar();
 
         /*

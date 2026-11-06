@@ -33,6 +33,7 @@ use App\Livewire\Horarios\MinhaSemana;
 use App\Livewire\Horarios\QuadroDeHorarios;
 use App\Livewire\Importacoes\ListaImportacoes;
 use App\Livewire\Importacoes\NovaImportacao;
+use App\Livewire\Lixeira\Lixeira;
 use App\Livewire\ModelosProva\FormularioModeloProva;
 use App\Livewire\ModelosProva\ListaModelosProva;
 use App\Livewire\Painel;
@@ -171,5 +172,6 @@ Route::middleware(['auth', 'ativo', 'senha-propria'])->group(function () {
     Route::get('/usuarios/{usuario}/editar', FormularioUsuario::class)->name('usuarios.editar');
 
     Route::get('/configuracao-da-escola', ConfiguracaoDaEscola::class)->name('configuracao.escola');
+    Route::get('/lixeira', Lixeira::class)->name('lixeira.index');
     Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
 })->scopeBindings();

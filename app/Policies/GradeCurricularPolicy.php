@@ -8,8 +8,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Uma grade é uma foto do curso, não um documento editável. Só se cria
- * (publicando uma versão) e se consulta.
+ * Uma grade é uma foto do curso, não um documento editável. Cria-se
+ * (publicando uma versão), consulta-se e, se nenhuma turma a usa, exclui-se.
  */
 class GradeCurricularPolicy extends PolicyBase
 {
@@ -18,9 +18,13 @@ class GradeCurricularPolicy extends PolicyBase
         return false;
     }
 
+    /**
+     * Responde só "é sua?". A versão usada por turmas não sai, mas quem
+     * diz isso — e quais turmas — é GradeCurricular::impedimentoDaExclusao.
+     */
     public function delete(User $usuario, Model $registro): bool
     {
-        return false;
+        return $usuario->ehGestao() && $this->noEscopo($usuario, $registro);
     }
 
     /** Arquivar retira a versão de circulação sem apagar nada. */

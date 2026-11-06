@@ -3,18 +3,18 @@
         <div class="grid gap-4 p-4 sm:grid-cols-2 sm:p-6">
             <x-campo rotulo="Modelo do documento" para="modelo_id" obrigatorio>
                 <x-select id="modelo_id" wire:model.live="modelo_id">
-                    <option value="">Escolha um modelo</option>
+                    <option value="" @selected((string) $modelo_id === '')>Escolha um modelo</option>
                     @foreach ($modelos as $opcao)
-                        <option value="{{ $opcao->id }}">{{ $opcao->nome }}</option>
+                        <option value="{{ $opcao->id }}" @selected((string) $modelo_id === (string) ($opcao->id))>{{ $opcao->nome }}</option>
                     @endforeach
                 </x-select>
             </x-campo>
 
             <x-campo rotulo="Turma" para="turma_id" obrigatorio>
                 <x-select id="turma_id" wire:model.live="turma_id">
-                    <option value="">Escolha uma turma</option>
+                    <option value="" @selected((string) $turma_id === '')>Escolha uma turma</option>
                     @foreach ($turmas as $opcao)
-                        <option value="{{ $opcao->id }}">
+                        <option value="{{ $opcao->id }}" @selected((string) $turma_id === (string) ($opcao->id))>
                             {{ $opcao->nome }} — {{ $opcao->curso->nome }} ({{ $opcao->periodo_letivo }})
                         </option>
                     @endforeach

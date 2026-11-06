@@ -4,6 +4,8 @@ namespace App\Livewire\Horarios;
 
 use App\Enums\DiaDaSemana;
 use App\Enums\StatusTurma;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Models\QuadroHorario;
 use App\Support\IntervaloDoDia;
 use Illuminate\Contracts\View\View;
@@ -29,11 +31,15 @@ use Livewire\Component;
  */
 class EscalaDaSemana extends Component
 {
+    use LembraFiltros;
+
     /** @var array<int, string> número da aula => primeiro início dela na escola, "HH:MM". Só para montar a grade. */
     private array $horarioDaEscola = [];
 
+    #[LembrarFiltro]
     public string $eixo = '';
 
+    #[LembrarFiltro]
     public string $curso = '';
 
     /** Trocar de Eixo invalida o curso escolhido no anterior. */

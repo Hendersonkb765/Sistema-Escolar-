@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Livewire\Attributes\LembrarFiltro;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
@@ -13,18 +14,23 @@ use Livewire\WithPagination;
  */
 trait ComTabela
 {
+    use LembraFiltros;
     use WithPagination;
 
     #[Url(as: 'q', except: '')]
+    #[LembrarFiltro]
     public string $busca = '';
 
     #[Url(as: 'ordem', except: '')]
+    #[LembrarFiltro]
     public string $ordenarPor = '';
 
     #[Url(as: 'dir', except: 'asc')]
+    #[LembrarFiltro]
     public string $direcao = 'asc';
 
     #[Url(as: 'por', except: 15)]
+    #[LembrarFiltro]
     public int $porPagina = 15;
 
     /** @return array<int, string> colunas que aceitam ordenação */

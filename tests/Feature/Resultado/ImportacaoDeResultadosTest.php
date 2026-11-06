@@ -9,6 +9,7 @@
  */
 
 use App\Actions\Avaliacao\AnalisarQuestaoAction;
+use App\Actions\Exclusao\ExcluirRegistroAction;
 use App\Actions\Prova\MontarProvaAction;
 use App\Actions\Resultado\ConferirImportacaoAction;
 use App\Actions\Resultado\ConfirmarImportacaoAction;
@@ -562,4 +563,26 @@ it('não inventa letra nenhuma no formato de acerto e erro', function () {
 
     expect($respostas)->toHaveCount(8)
         ->and($respostas->pluck('alternativa_marcada')->unique()->all())->toBe([null]);
+});
+
+/*
+ * A leitura errada vai para a Lixeira com os resultados que trouxe. Eles
+ * continuam ocupando a chave (prova, aluno) no banco, e a nova leitura
+ * precisa trazê-los de volta em vez de esbarrar neles.
+ */
+it('reimporta a prova depois de a importação anterior ir para a Lixeira', function () {
+    $primeira = ($this->importar)(($this->planilha)($this->duasLinhas));
+    app(ConferirImportacaoAction::class)->executar($primeira, $this->paeet);
+    app(ConfirmarImportacaoAction::class)->executar($primeira->refresh(), $this->paeet);
+
+    app(ExcluirRegistroAction::class)->executar($primeira->refresh(), $this->paeet);
+
+    expect($this->prova->resultados()->count())->toBe(0);
+
+    $segunda = ($this->importar)(($this->planilha)($this->duasLinhas));
+    app(ConferirImportacaoAction::class)->executar($segunda, $this->paeet);
+    app(ConfirmarImportacaoAction::class)->executar($segunda->refresh(), $this->paeet);
+
+    expect($this->prova->resultados()->count())->toBe(2)
+        ->and($this->prova->resultados()->pluck('importacao_id')->unique()->all())->toBe([$segunda->id]);
 });

@@ -4,7 +4,10 @@ namespace App\Livewire\Provas;
 
 use App\Enums\Bimestre;
 use App\Enums\StatusProva;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Prova;
 use App\Models\Turma;
 use Illuminate\Contracts\View\View;
@@ -17,14 +20,19 @@ class ListaProvas extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     #[Url(as: 'turma', except: '')]
+    #[LembrarFiltro]
     public string $filtroTurma = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     public function mount(): void

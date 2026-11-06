@@ -5,7 +5,9 @@ namespace App\Livewire\Provas;
 use App\Actions\Prova\GerarGabaritoCsvAction;
 use App\Actions\Prova\RenderizarProvaAction;
 use App\Enums\StatusProva;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
+use App\Models\Exclusao;
 use App\Models\Prova;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -18,6 +20,7 @@ use Livewire\Component;
 class DetalheProva extends Component
 {
     use AuthorizesRequests;
+    use ConfirmaExclusao;
     use Notifica;
 
     public Prova $prova;
@@ -49,6 +52,13 @@ class DetalheProva extends Component
             ->log('Prova marcada como aplicada');
 
         $this->notificarSucesso('Prova marcada como aplicada. Agora ela aceita a importação de resultados.');
+    }
+
+    /** A prova desta tela saiu: volta para a lista. */
+    protected function depoisDeExcluir(Exclusao $lote): void
+    {
+        $this->flashSucesso($this->mensagemDeExcluido($lote));
+        $this->redirectRoute('provas.index', navigate: true);
     }
 
     public function render(RenderizarProvaAction $renderizar, GerarGabaritoCsvAction $gabarito): View
