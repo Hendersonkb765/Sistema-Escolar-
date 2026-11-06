@@ -65,12 +65,16 @@ class UserPolicy
         return ! $usuario->is($alvo) && $this->update($usuario, $alvo);
     }
 
+    /**
+     * Quem edita a conta pode excluí-la — o PAEET, os professores do Eixo
+     * dele —, menos a própria e a de um PAEET Admin. Conta com histórico
+     * não sai, mas quem diz isso é User::impedimentoDaExclusao.
+     */
     public function delete(User $usuario, User $alvo): bool
     {
         return ! $usuario->is($alvo)
-            && $usuario->ehPaeetAdmin()
             && $alvo->perfil !== PerfilUsuario::PaeetAdmin
-            && $this->compartilhamEixo($usuario, $alvo);
+            && $this->update($usuario, $alvo);
     }
 
     public function forceDelete(User $usuario, User $alvo): bool

@@ -291,6 +291,15 @@ class SolicitacaoProva extends Model implements Excluivel
         return collect($this->questoes()->get());
     }
 
+    public function avisosDaExclusao(): array
+    {
+        $provas = Prova::query()
+            ->whereHas('questoes', fn ($q) => $q->whereIn('questao_id', $this->questoes()->select('id')))
+            ->count();
+
+        return $provas > 0 ? ["{$provas} prova(s) já montada(s) com estas questões continuam como estão."] : [];
+    }
+
     public function paiNaRestauracao(): ?Model
     {
         return $this->turma()->withTrashed()->first();

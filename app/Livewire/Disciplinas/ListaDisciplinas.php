@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Disciplinas;
 
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
 use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
@@ -21,9 +22,11 @@ class ListaDisciplinas extends Component
     use Notifica;
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     #[Url(as: 'periodo', except: '')]
+    #[LembrarFiltro]
     public string $filtroPeriodo = '';
 
     public function mount(): void

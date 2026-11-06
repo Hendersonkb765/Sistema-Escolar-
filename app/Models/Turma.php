@@ -191,11 +191,9 @@ class Turma extends Model implements Excluivel
 
     public function avisosDaExclusao(): array
     {
-        $resultados = ResultadoAluno::query()->whereIn('prova_id', $this->provas()->select('id'))->count();
         $aulas = QuadroHorario::query()->where('turma_id', $this->id)->count();
 
         return array_values(array_filter([
-            $resultados > 0 ? "{$resultados} resultado(s) de prova lançado(s) deixam de aparecer nas notas e na análise." : null,
             $aulas > 0 ? "{$aulas} aula(s) do quadro de horários deixam de aparecer na escala." : null,
             'O histórico da turma é mantido.',
         ]));

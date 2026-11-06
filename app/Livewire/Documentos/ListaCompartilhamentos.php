@@ -4,6 +4,8 @@ namespace App\Livewire\Documentos;
 
 use App\Actions\Documento\ResponderCompartilhamentoAction;
 use App\Exceptions\RegraDeNegocioException;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Livewire\Concerns\Notifica;
 use App\Models\CompartilhamentoDeModelo;
 use App\Support\CamposDoDocumento;
@@ -25,10 +27,12 @@ use Livewire\WithPagination;
 class ListaCompartilhamentos extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
     use Notifica;
     use WithPagination;
 
     #[Url(as: 'caixa', except: 'recebidos')]
+    #[LembrarFiltro]
     public string $caixa = 'recebidos';
 
     /** O compartilhamento cuja prévia está aberta. */

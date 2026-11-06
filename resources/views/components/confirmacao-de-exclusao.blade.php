@@ -16,7 +16,15 @@
          data-etapa="{{ $exclusao['etapa'] }}" role="dialog" aria-modal="true" aria-labelledby="titulo-da-exclusao"
          x-data x-on:keydown.escape.window="$wire.cancelarExclusao()">
         <div class="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-            @if (! $segunda)
+            @if ($exclusao['impedimento'] ?? null)
+                <h2 id="titulo-da-exclusao" class="text-base font-semibold text-slate-900 dark:text-slate-100">Não dá para excluir {{ $exclusao['rotulo'] }} agora</h2>
+
+                <p class="mt-3 text-sm text-slate-700 dark:text-slate-200" data-impedimento>{{ $exclusao['impedimento'] }}</p>
+
+                <div class="mt-4 flex justify-end">
+                    <x-botao variante="secundario" wire:click="cancelarExclusao">Fechar</x-botao>
+                </div>
+            @elseif (! $segunda)
                 <h2 id="titulo-da-exclusao" class="text-base font-semibold text-slate-900 dark:text-slate-100">Excluir {{ $exclusao['rotulo'] }}?</h2>
 
                 @if ($exclusao['contagens'] !== [])
@@ -52,16 +60,18 @@
                 </div>
             @endif
 
-            <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                Nada é apagado de vez: o PAEET Admin pode restaurar tudo pela Lixeira.
-            </p>
+            @unless ($exclusao['impedimento'] ?? null)
+                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                    Nada é apagado de vez: o PAEET Admin pode restaurar tudo pela Lixeira.
+                </p>
 
-            <div class="mt-4 flex flex-wrap justify-end gap-2">
-                <x-botao variante="secundario" wire:click="cancelarExclusao">Cancelar</x-botao>
-                <x-botao variante="perigo" wire:click="confirmarExclusao" wire:loading.attr="disabled">
-                    {{ $ultima ? ($segunda ? 'Sim, excluir mesmo assim' : 'Excluir') : 'Continuar' }}
-                </x-botao>
-            </div>
+                <div class="mt-4 flex flex-wrap justify-end gap-2">
+                    <x-botao variante="secundario" wire:click="cancelarExclusao">Cancelar</x-botao>
+                    <x-botao variante="perigo" wire:click="confirmarExclusao" wire:loading.attr="disabled">
+                        {{ $ultima ? ($segunda ? 'Sim, excluir mesmo assim' : 'Excluir') : 'Continuar' }}
+                    </x-botao>
+                </div>
+            @endunless
         </div>
     </div>
 @endif

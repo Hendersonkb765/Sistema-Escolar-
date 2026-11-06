@@ -4,7 +4,10 @@ namespace App\Livewire\Importacoes;
 
 use App\Enums\Bimestre;
 use App\Enums\StatusImportacao;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
+use App\Livewire\Concerns\Notifica;
 use App\Models\Importacao;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,11 +19,15 @@ class ListaImportacoes extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
+    use Notifica;
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     public function mount(): void

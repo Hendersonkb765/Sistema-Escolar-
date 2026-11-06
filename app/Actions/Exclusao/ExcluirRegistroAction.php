@@ -2,15 +2,22 @@
 
 namespace App\Actions\Exclusao;
 
+use App\Exceptions\RegraDeNegocioException;
 use App\Models\Aluno;
+use App\Models\CompartilhamentoDeModelo;
 use App\Models\Contracts\Excluivel;
 use App\Models\Curso;
 use App\Models\Disciplina;
+use App\Models\Eixo;
 use App\Models\Exclusao;
 use App\Models\GradeCurricular;
+use App\Models\Importacao;
+use App\Models\ModeloDocumento;
+use App\Models\ModeloProva;
 use App\Models\Prova;
 use App\Models\QuadroHorario;
 use App\Models\Questao;
+use App\Models\ResultadoAluno;
 use App\Models\SolicitacaoProva;
 use App\Models\Turma;
 use App\Models\User;
@@ -37,6 +44,7 @@ class ExcluirRegistroAction
 {
     /** Como cada tipo aparece no resumo do impacto. */
     public const ROTULOS = [
+        Eixo::class => 'Eixo(s)',
         Curso::class => 'curso(s)',
         Turma::class => 'turma(s)',
         Disciplina::class => 'disciplina(s)',
@@ -45,7 +53,13 @@ class ExcluirRegistroAction
         Prova::class => 'prova(s)',
         SolicitacaoProva::class => 'solicitação(ões) de questões',
         Questao::class => 'questão(ões)',
+        Importacao::class => 'importação(ões) de resultados',
+        ResultadoAluno::class => 'resultado(s) de aluno',
         QuadroHorario::class => 'aula(s) do quadro de horários',
+        ModeloProva::class => 'modelo(s) de prova',
+        ModeloDocumento::class => 'modelo(s) de documento',
+        CompartilhamentoDeModelo::class => 'compartilhamento(s) de modelo',
+        User::class => 'usuário(s)',
     ];
 
     public function planejar(Model&Excluivel $raiz): PlanoDeExclusao
@@ -91,6 +105,7 @@ class ExcluirRegistroAction
             $contagens,
             $raiz->avisosDaExclusao(),
             $raiz->confirmacoesParaExcluir(),
+            $raiz->impedimentoDaExclusao(),
         );
     }
 
@@ -99,6 +114,10 @@ class ExcluirRegistroAction
         Gate::forUser($autor)->authorize('delete', $raiz);
 
         $plano = $this->planejar($raiz);
+
+        if ($plano->impedimento !== null) {
+            throw RegraDeNegocioException::porque($plano->impedimento);
+        }
 
         // O caminho até o Eixo é lido antes: depois, ele pode estar na Lixeira junto.
         $eixoId = method_exists($raiz, 'eixoId') ? $raiz->eixoId() : null;

@@ -1,6 +1,9 @@
 <div class="space-y-4">
     <x-cartao>
         <x-slot:acoes>
+            @can('delete', $prova)
+                <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('prova', {{ $prova->id }})">Excluir</x-botao>
+            @endcan
             @if ($podeVerOGabarito)
                 <x-botao variante="secundario" href="{{ route('provas.gabarito', $prova) }}"
                          title="Baixa o CSV de chaves de respostas para importar no leitor de folhas.">
@@ -123,4 +126,6 @@
                 title="Pré-visualização da prova"
                 class="h-[80vh] w-full rounded-lg border border-slate-300 bg-white dark:border-slate-700"></iframe>
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

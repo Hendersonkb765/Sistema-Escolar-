@@ -108,9 +108,14 @@ it('publicar arquiva a versão anterior sem apagá-la', function () {
         ->and($this->turmaAntiga->refresh()->grade_curricular_id)->toBe($this->v1->id);
 });
 
-it('a grade é uma foto e nunca é editada nem apagada', function () {
+/*
+ * A grade em uso não sai: quem impede não é a permissão — o PAEET
+ * administra o curso —, e sim a turma que depende dela. A tela diz qual.
+ */
+it('a grade é uma foto: nunca é editada, e não sai enquanto uma turma a usa', function () {
     expect($this->paeet->can('update', $this->v1))->toBeFalse()
-        ->and($this->paeet->can('delete', $this->v1))->toBeFalse()
+        ->and($this->paeet->can('delete', $this->v1))->toBeTrue()
+        ->and($this->v1->impedimentoDaExclusao())->toContain('é usada pela(s) turma(s)')
         ->and($this->v1->editavel())->toBeFalse()
         ->and($this->v1->emUso())->toBeTrue();
 });

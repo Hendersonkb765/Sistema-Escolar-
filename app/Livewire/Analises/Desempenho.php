@@ -4,6 +4,8 @@ namespace App\Livewire\Analises;
 
 use App\Actions\Resultado\AnalisarDesempenhoAction;
 use App\Enums\Bimestre;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
@@ -30,14 +32,18 @@ use Livewire\Component;
 class Desempenho extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
 
     #[Url(as: 'ano', except: '')]
+    #[LembrarFiltro]
     public string $filtroAno = '';
 
     #[Url(as: 'turma', except: '')]
+    #[LembrarFiltro]
     public string $filtroTurma = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     /**
@@ -49,9 +55,11 @@ class Desempenho extends Component
      * @var array<int, string>
      */
     #[Url(as: 'provas', except: [])]
+    #[LembrarFiltro]
     public array $provasEscolhidas = [];
 
     #[Url(as: 'disciplina', except: '')]
+    #[LembrarFiltro]
     public string $filtroDisciplina = '';
 
     /** A habilidade aberta para ver aluno a aluno. */

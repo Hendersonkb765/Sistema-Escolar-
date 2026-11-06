@@ -147,14 +147,9 @@ class Curso extends Model implements Excluivel
 
     public function avisosDaExclusao(): array
     {
-        $turmas = $this->turmas()->select('id');
-        $resultados = ResultadoAluno::query()
-            ->whereHas('prova', fn ($q) => $q->whereIn('turma_id', $turmas))
-            ->count();
         $escopo = $this->escopoAulas()->count();
 
         return array_values(array_filter([
-            $resultados > 0 ? "{$resultados} resultado(s) de prova lançado(s) deixam de aparecer nas notas e na análise." : null,
             $escopo > 0 ? "{$escopo} aula(s) do escopo-sequência deixam de aparecer." : null,
             'O histórico das turmas é mantido.',
         ]));

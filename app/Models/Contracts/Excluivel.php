@@ -40,6 +40,14 @@ interface Excluivel
      */
     public function avisosDaExclusao(): array;
 
+    /**
+     * O que impede excluir agora, ou null. Não é falta de permissão (isso
+     * é a Policy): é o registro que, saindo, deixaria outros sem sentido —
+     * a grade usada por turmas, a conta com histórico. A confirmação mostra
+     * o motivo no lugar do botão.
+     */
+    public function impedimentoDaExclusao(): ?string;
+
     /** Quantas confirmações a exclusão pede: 1, ou 2 para o que leva muita coisa. */
     public function confirmacoesParaExcluir(): int;
 

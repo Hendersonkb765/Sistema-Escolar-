@@ -5,9 +5,9 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <x-campo rotulo="Turma" para="turma_id" obrigatorio :erro="$errors->first('turma_id')">
                         <x-select id="turma_id" wire:model.live="turma_id" required>
-                            <option value="">Selecione…</option>
+                            <option value="" @selected((string) $turma_id === '')>Selecione…</option>
                             @foreach ($turmas as $turma)
-                                <option value="{{ $turma->id }}">
+                                <option value="{{ $turma->id }}" @selected((string) $turma_id === (string) ($turma->id))>
                                     {{ $turma->nome }} · {{ $turma->curso->nome }} · {{ $turma->periodo }}º período
                                 </option>
                             @endforeach
@@ -29,7 +29,7 @@
                                  cabeçalho acompanhar o modelo escolhido. --}}
                             <x-select id="modelo_prova_id" wire:model.live="modelo_prova_id" required>
                                 @foreach ($modelos as $modelo)
-                                    <option value="{{ $modelo->id }}">{{ $modelo->nome }}</option>
+                                    <option value="{{ $modelo->id }}" @selected((string) $modelo_prova_id === (string) ($modelo->id))>{{ $modelo->nome }}</option>
                                 @endforeach
                             </x-select>
                         @endif
@@ -45,7 +45,7 @@
                              ajuda="Sugerido pelas solicitações que geraram as questões.">
                         <x-select id="bimestre" wire:model="bimestre" required>
                             @foreach ($bimestres as $valor => $rotulo)
-                                <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                <option value="{{ $valor }}" @selected((string) $bimestre === (string) ($valor))>{{ $rotulo }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>
@@ -101,8 +101,8 @@
                 <x-campo rotulo="Colunas de texto" para="colunas" obrigatorio :erro="$errors->first('colunas')"
                          ajuda="Duas colunas é o padrão de prova impressa.">
                     <x-select id="colunas" wire:model.live="colunas" required>
-                        <option value="2">Duas colunas</option>
-                        <option value="1">Coluna única</option>
+                        <option value="2" @selected((string) $colunas === '2')>Duas colunas</option>
+                        <option value="1" @selected((string) $colunas === '1')>Coluna única</option>
                     </x-select>
                 </x-campo>
 

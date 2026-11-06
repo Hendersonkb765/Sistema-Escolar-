@@ -8,27 +8,27 @@
 
                 <x-campo rotulo="Turma" para="filtro-turma">
                     <x-select id="filtro-turma" wire:model.live="filtroTurma">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroTurma === '')>Todas</option>
                         @foreach ($turmas as $id => $nome)
-                            <option value="{{ $id }}">{{ $nome }}</option>
+                            <option value="{{ $id }}" @selected((string) $filtroTurma === (string) ($id))>{{ $nome }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Bimestre" para="filtro-bimestre">
                     <x-select id="filtro-bimestre" wire:model.live="filtroBimestre">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroBimestre === '')>Todos</option>
                         @foreach ($bimestres as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroBimestre === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-status">
                     <x-select id="filtro-status" wire:model.live="filtroStatus">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroStatus === '')>Todas</option>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroStatus === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -105,6 +105,9 @@
                                         <x-botao variante="secundario" href="{{ route('provas.show', $prova) }}" wire:navigate>
                                             Ver
                                         </x-botao>
+                                            @can('delete', $prova)
+                                                <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('prova', {{ $prova->id }})">Excluir</x-botao>
+                                            @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -116,4 +119,6 @@
             <div class="mt-4">{{ $provas->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

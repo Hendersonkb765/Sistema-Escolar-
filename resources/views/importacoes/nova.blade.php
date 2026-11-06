@@ -13,9 +13,9 @@
                             </x-alerta>
                         @else
                             <x-select id="prova_id" wire:model="prova_id" required>
-                                <option value="">Selecione…</option>
+                                <option value="" @selected((string) $prova_id === '')>Selecione…</option>
                                 @foreach ($provas as $opcao)
-                                    <option value="{{ $opcao->id }}">
+                                    <option value="{{ $opcao->id }}" @selected((string) $prova_id === (string) ($opcao->id))>
                                         {{ $opcao->titulo }} · {{ $opcao->turma->nome }} · {{ $opcao->turma->curso->nome }}
                                     </option>
                                 @endforeach

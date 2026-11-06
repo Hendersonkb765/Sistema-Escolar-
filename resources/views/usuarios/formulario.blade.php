@@ -19,7 +19,7 @@
                 <x-campo rotulo="Perfil" para="perfil" obrigatorio :erro="$errors->first('perfil')">
                     <x-select id="perfil" wire:model.live="perfil" required>
                         @foreach ($perfisDisponiveis as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $perfil === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

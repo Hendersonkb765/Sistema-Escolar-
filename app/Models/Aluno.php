@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -115,11 +116,15 @@ class Aluno extends Model implements Excluivel
         return "Aluno {$this->nome} (RA {$this->ra})";
     }
 
+    /** Os resultados dele saem junto: senão, as notas seguiriam contando na análise. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect($this->resultados()->get());
+    }
+
     public function avisosDaExclusao(): array
     {
-        $resultados = $this->resultados()->count();
-
-        return $resultados > 0 ? ["{$resultados} resultado(s) de prova deste aluno deixam de aparecer."] : [];
+        return ['O histórico de turmas dele é mantido.'];
     }
 
     public function paiNaRestauracao(): ?Model

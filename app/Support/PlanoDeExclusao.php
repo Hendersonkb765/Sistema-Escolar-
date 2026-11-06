@@ -24,6 +24,7 @@ final readonly class PlanoDeExclusao
         public array $contagens,
         public array $avisos,
         public int $confirmacoes,
+        public ?string $impedimento = null,
     ) {}
 
     /** Algo além do próprio registro é atingido? */

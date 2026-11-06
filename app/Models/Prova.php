@@ -97,7 +97,8 @@ class Prova extends Model implements Excluivel
     /** @return BelongsTo<ModeloProva, $this> */
     public function modelo(): BelongsTo
     {
-        return $this->belongsTo(ModeloProva::class, 'modelo_prova_id');
+        // A prova montada é foto do layout: continua com ele mesmo na Lixeira.
+        return $this->belongsTo(ModeloProva::class, 'modelo_prova_id')->withTrashed();
     }
 
     /** @return HasMany<ProvaQuestao, $this> */
@@ -229,11 +230,17 @@ class Prova extends Model implements Excluivel
         return "Prova {$this->titulo}";
     }
 
+    /** As leituras da folha e os resultados saem junto. */
+    public function dependentesNaExclusao(): Collection
+    {
+        return collect()
+            ->concat($this->importacoes()->get())
+            ->concat($this->resultados()->get());
+    }
+
     public function avisosDaExclusao(): array
     {
-        $resultados = $this->resultados()->count();
-
-        return $resultados > 0 ? ["{$resultados} resultado(s) lançado(s) desta prova deixam de aparecer."] : [];
+        return ['As questões dela continuam no banco e podem entrar em outra prova.'];
     }
 
     public function paiNaRestauracao(): ?Model

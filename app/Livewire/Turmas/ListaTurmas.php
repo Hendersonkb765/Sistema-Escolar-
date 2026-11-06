@@ -3,6 +3,7 @@
 namespace App\Livewire\Turmas;
 
 use App\Enums\StatusTurma;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
 use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
@@ -22,12 +23,15 @@ class ListaTurmas extends Component
     use Notifica;
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     #[Url(as: 'periodo', except: '')]
+    #[LembrarFiltro]
     public string $filtroPeriodo = '';
 
     public function mount(): void

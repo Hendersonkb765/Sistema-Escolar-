@@ -4,11 +4,20 @@ namespace App\Livewire\Concerns;
 
 use App\Actions\Exclusao\ExcluirRegistroAction;
 use App\Exceptions\RegraDeNegocioException;
+use App\Models\Aluno;
 use App\Models\Contracts\Excluivel;
 use App\Models\Curso;
 use App\Models\Disciplina;
+use App\Models\Eixo;
 use App\Models\Exclusao;
+use App\Models\GradeCurricular;
+use App\Models\Importacao;
+use App\Models\ModeloDocumento;
+use App\Models\ModeloProva;
+use App\Models\Prova;
+use App\Models\SolicitacaoProva;
 use App\Models\Turma;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Locked;
 
@@ -29,7 +38,7 @@ use Livewire\Attributes\Locked;
 trait ConfirmaExclusao
 {
     /**
-     * @var array{tipo: string, id: int, rotulo: string, contagens: array<string, int>, avisos: array<int, string>, etapa: int, etapas: int}|null
+     * @var array{tipo: string, id: int, rotulo: string, contagens: array<string, int>, avisos: array<int, string>, impedimento: ?string, etapa: int, etapas: int}|null
      */
     #[Locked]
     public ?array $exclusao = null;
@@ -38,9 +47,18 @@ trait ConfirmaExclusao
     protected function tiposExcluiveis(): array
     {
         return [
+            'eixo' => Eixo::class,
             'curso' => Curso::class,
             'turma' => Turma::class,
             'disciplina' => Disciplina::class,
+            'grade' => GradeCurricular::class,
+            'aluno' => Aluno::class,
+            'usuario' => User::class,
+            'solicitacao' => SolicitacaoProva::class,
+            'prova' => Prova::class,
+            'importacao' => Importacao::class,
+            'modelo-prova' => ModeloProva::class,
+            'modelo-documento' => ModeloDocumento::class,
         ];
     }
 
@@ -58,6 +76,7 @@ trait ConfirmaExclusao
             'rotulo' => $plano->rotulo,
             'contagens' => $plano->contagens,
             'avisos' => $plano->avisos,
+            'impedimento' => $plano->impedimento,
             'etapa' => 1,
             'etapas' => $plano->confirmacoes,
         ];
@@ -65,7 +84,8 @@ trait ConfirmaExclusao
 
     public function confirmarExclusao(ExcluirRegistroAction $action): void
     {
-        if ($this->exclusao === null) {
+        // Impedida, a confirmação só explica: não há o que confirmar.
+        if ($this->exclusao === null || $this->exclusao['impedimento'] !== null) {
             return;
         }
 

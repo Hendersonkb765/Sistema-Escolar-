@@ -8,27 +8,27 @@
 
                 <x-campo rotulo="Curso" para="filtro-curso">
                     <x-select id="filtro-curso" wire:model.live="filtroCurso">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroCurso === '')>Todos</option>
                         @foreach ($cursos as $id => $nome)
-                            <option value="{{ $id }}">{{ $nome }}</option>
+                            <option value="{{ $id }}" @selected((string) $filtroCurso === (string) ($id))>{{ $nome }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Período" para="filtro-periodo">
                     <x-select id="filtro-periodo" wire:model.live="filtroPeriodo">
-                        <option value="">Todos</option>
-                        <option value="1">1º período</option>
-                        <option value="2">2º período</option>
-                        <option value="3">3º período</option>
+                        <option value="" @selected((string) $filtroPeriodo === '')>Todos</option>
+                        <option value="1" @selected((string) $filtroPeriodo === '1')>1º período</option>
+                        <option value="2" @selected((string) $filtroPeriodo === '2')>2º período</option>
+                        <option value="3" @selected((string) $filtroPeriodo === '3')>3º período</option>
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-status">
                     <x-select id="filtro-status" wire:model.live="filtroStatus">
-                        <option value="">Todas</option>
+                        <option value="" @selected((string) $filtroStatus === '')>Todas</option>
                         @foreach ($situacoes as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroStatus === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>

@@ -82,6 +82,9 @@
                                                 Editar
                                             </x-botao>
                                         @endcan
+                                        @can('delete', $modelo)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('modelo-prova', {{ $modelo->id }})">Excluir</x-botao>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -93,4 +96,6 @@
             <div class="mt-4">{{ $modelos->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

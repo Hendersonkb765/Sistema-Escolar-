@@ -118,6 +118,24 @@ class GradeCurricular extends Model implements Excluivel
         return "Grade versão {$this->versao}";
     }
 
+    /**
+     * A grade em uso não sai: as turmas dela ficariam sem disciplinas. O
+     * caminho é trocar a grade das turmas antes — ou excluir as turmas.
+     */
+    public function impedimentoDaExclusao(): ?string
+    {
+        $turmas = $this->turmas()->orderBy('nome')->pluck('nome');
+
+        if ($turmas->isEmpty()) {
+            return null;
+        }
+
+        $quais = $turmas->take(5)->join(', ', ' e ').($turmas->count() > 5 ? ' e outras '.($turmas->count() - 5) : '');
+
+        return "A grade versão {$this->versao} é usada pela(s) turma(s) {$quais}. "
+            .'Troque a grade delas, na tela de cada turma, antes de excluir esta versão.';
+    }
+
     public function paiNaRestauracao(): ?Model
     {
         return $this->curso()->withTrashed()->first();

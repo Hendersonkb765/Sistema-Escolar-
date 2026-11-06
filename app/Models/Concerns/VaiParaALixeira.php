@@ -29,6 +29,11 @@ trait VaiParaALixeira
         return [];
     }
 
+    public function impedimentoDaExclusao(): ?string
+    {
+        return null;
+    }
+
     public function confirmacoesParaExcluir(): int
     {
         return 1;

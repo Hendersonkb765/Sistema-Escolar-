@@ -91,9 +91,9 @@
             <div class="space-y-4">
                 <x-campo rotulo="Como avançar" para="turma-destino">
                     <x-select id="turma-destino" wire:model.live="turmaDestinoId">
-                        <option value="">Promover esta turma ({{ $turma->nome }} passa ao {{ $turma->periodo + 1 }}º período)</option>
+                        <option value="" @selected((string) $turmaDestinoId === '')>Promover esta turma ({{ $turma->nome }} passa ao {{ $turma->periodo + 1 }}º período)</option>
                         @foreach ($destinos as $destino)
-                            <option value="{{ $destino->id }}">Mover alunos para {{ $destino->nome }} ({{ $destino->periodo_letivo }})</option>
+                            <option value="{{ $destino->id }}" @selected((string) $turmaDestinoId === (string) ($destino->id))>Mover alunos para {{ $destino->nome }} ({{ $destino->periodo_letivo }})</option>
                         @endforeach
                     </x-select>
                 </x-campo>
@@ -220,7 +220,7 @@
                             <x-campo rotulo="Para onde está saindo" para="saida-{{ $aluno->id }}">
                                 <x-select id="saida-{{ $aluno->id }}" wire:model.live="situacaoDesligamento">
                                     @foreach ($situacoesDeSaida as $situacao)
-                                        <option value="{{ $situacao->value }}">
+                                        <option value="{{ $situacao->value }}" @selected((string) $situacaoDesligamento === (string) ($situacao->value))>
                                             {{ $situacao->rotulo() }} — {{ $situacao->descricao() }}
                                         </option>
                                     @endforeach

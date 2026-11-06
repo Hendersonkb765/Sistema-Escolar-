@@ -3,7 +3,9 @@
 namespace App\Livewire\Usuarios;
 
 use App\Enums\PerfilUsuario;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
+use App\Livewire\Concerns\ConfirmaExclusao;
 use App\Livewire\Concerns\Notifica;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -16,12 +18,15 @@ class ListaUsuarios extends Component
 {
     use AuthorizesRequests;
     use ComTabela;
+    use ConfirmaExclusao;
     use Notifica;
 
     #[Url(as: 'perfil', except: '')]
+    #[LembrarFiltro]
     public string $filtroPerfil = '';
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroSituacao = '';
 
     public ?int $confirmandoDesativacao = null;

@@ -3,6 +3,8 @@
 namespace App\Livewire\Resultados;
 
 use App\Enums\Bimestre;
+use App\Livewire\Attributes\LembrarFiltro;
+use App\Livewire\Concerns\LembraFiltros;
 use App\Models\Prova;
 use App\Models\ProvaQuestao;
 use App\Models\ResultadoAluno;
@@ -30,14 +32,18 @@ use Livewire\Component;
 class ListaResultados extends Component
 {
     use AuthorizesRequests;
+    use LembraFiltros;
 
     #[Url(as: 'turma', except: '')]
+    #[LembrarFiltro]
     public string $filtroTurma = '';
 
     #[Url(as: 'bimestre', except: '')]
+    #[LembrarFiltro]
     public string $filtroBimestre = '';
 
     #[Url(as: 'prova', except: '')]
+    #[LembrarFiltro]
     public string $prova_id = '';
 
     /**
@@ -49,6 +55,7 @@ class ListaResultados extends Component
      * @var array<int, string>
      */
     #[Url(as: 'disciplinas', except: [])]
+    #[LembrarFiltro]
     public array $disciplinasEscolhidas = [];
 
     public function mount(): void

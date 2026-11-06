@@ -3,6 +3,7 @@
 namespace App\Livewire\Questoes;
 
 use App\Enums\StatusQuestao;
+use App\Livewire\Attributes\LembrarFiltro;
 use App\Livewire\Concerns\ComTabela;
 use App\Models\Curso;
 use App\Models\Questao;
@@ -22,9 +23,11 @@ class ListaQuestoes extends Component
     use ComTabela;
 
     #[Url(as: 'situacao', except: '')]
+    #[LembrarFiltro]
     public string $filtroStatus = '';
 
     #[Url(as: 'curso', except: '')]
+    #[LembrarFiltro]
     public string $filtroCurso = '';
 
     public function mount(): void

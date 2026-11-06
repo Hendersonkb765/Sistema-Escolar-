@@ -10,18 +10,18 @@
 
                 <x-campo rotulo="Perfil" para="filtro-perfil">
                     <x-select id="filtro-perfil" wire:model.live="filtroPerfil">
-                        <option value="">Todos</option>
+                        <option value="" @selected((string) $filtroPerfil === '')>Todos</option>
                         @foreach ($perfis as $valor => $rotulo)
-                            <option value="{{ $valor }}">{{ $rotulo }}</option>
+                            <option value="{{ $valor }}" @selected((string) $filtroPerfil === (string) ($valor))>{{ $rotulo }}</option>
                         @endforeach
                     </x-select>
                 </x-campo>
 
                 <x-campo rotulo="Situação" para="filtro-situacao">
                     <x-select id="filtro-situacao" wire:model.live="filtroSituacao">
-                        <option value="">Todas</option>
-                        <option value="ativos">Ativos</option>
-                        <option value="inativos">Inativos</option>
+                        <option value="" @selected((string) $filtroSituacao === '')>Todas</option>
+                        <option value="ativos" @selected((string) $filtroSituacao === 'ativos')>Ativos</option>
+                        <option value="inativos" @selected((string) $filtroSituacao === 'inativos')>Inativos</option>
                     </x-select>
                 </x-campo>
             </div>
@@ -92,6 +92,9 @@
                                                 Editar
                                             </x-botao>
                                         @endcan
+                                        @can('delete', $linha)
+                                            <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('usuario', {{ $linha->id }})">Excluir</x-botao>
+                                        @endcan
 
                                         @can('alternarAtivacao', $linha)
                                             @if ($confirmandoDesativacao === $linha->id)
@@ -120,4 +123,6 @@
             <div class="mt-4">{{ $usuarios->links() }}</div>
         @endif
     </x-cartao>
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>

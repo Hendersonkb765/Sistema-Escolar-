@@ -111,9 +111,10 @@ it('diz tudo o que sai junto com a turma, e o que só deixa de aparecer', functi
             'prova(s)' => 1,
             'solicitação(ões) de questões' => 1,
             'questão(ões)' => 2,
+            'importação(ões) de resultados' => 1,
+            'resultado(s) de aluno' => 2,
         ])
         ->and($plano->avisos)->toBe([
-            '2 resultado(s) de prova lançado(s) deixam de aparecer nas notas e na análise.',
             '1 aula(s) do quadro de horários deixam de aparecer na escala.',
             'O histórico da turma é mantido.',
         ])
@@ -127,7 +128,7 @@ it('pede duas confirmações para excluir a turma, a segunda reforçando o risco
         ->call('pedirExclusao', 'turma', $this->turma->id)
         ->assertSee('Excluir Turma 1 A (2026)?')
         ->assertSee('2 aluno(s)')
-        ->assertSee('2 resultado(s) de prova lançado(s) deixam de aparecer')
+        ->assertSee('2 resultado(s) de aluno')
         ->assertSeeHtml('data-etapa="1"');
 
     $tela->call('confirmarExclusao')
@@ -147,7 +148,8 @@ it('pede duas confirmações para excluir a turma, a segunda reforçando o risco
         ->and(Turma::withTrashed()->find($this->turma->id)->trashed())->toBeTrue()
         ->and(Aluno::query()->where('turma_id', $this->turma->id)->count())->toBe(0)
         ->and(Prova::query()->whereKey($this->prova->id)->exists())->toBeFalse()
-        ->and(Exclusao::query()->sole()->itens()->count())->toBe(7);
+        // A turma, 2 alunos, a prova, a importação, 2 resultados, a solicitação e 2 questões.
+        ->and(Exclusao::query()->sole()->itens()->count())->toBe(10);
 });
 
 it('não exclui nada quando se cancela, mesmo na segunda confirmação', function () {
@@ -240,7 +242,7 @@ it('lista na Lixeira o que foi excluído e restaura o lote inteiro', function ()
 
     $lixeira = Livewire::actingAs($this->admin)->test(Lixeira::class)
         ->assertSee('Turma 1 A (2026)')
-        ->assertSee('Saiu junto: 2 aluno(s), 1 prova(s), 1 solicitação(ões) de questões e 2 questão(ões).');
+        ->assertSee('Saiu junto: 2 aluno(s), 1 prova(s), 1 solicitação(ões) de questões, 2 questão(ões), 1 importação(ões) de resultados e 2 resultado(s) de aluno.');
 
     $lixeira->call('restaurar', Exclusao::query()->sole()->id)
         ->assertDispatched('notificar', fn (string $e, array $dados) => $dados['tipo'] === 'sucesso')
@@ -337,6 +339,8 @@ it('exclui o curso com turmas, disciplinas e grades, em duas confirmações, sai
         'prova(s)' => 1,
         'solicitação(ões) de questões' => 1,
         'questão(ões)' => 2,
+        'importação(ões) de resultados' => 1,
+        'resultado(s) de aluno' => 2,
         'aula(s) do quadro de horários' => 1,
     ])->and($tela->get('exclusao')['etapas'])->toBe(2);
 

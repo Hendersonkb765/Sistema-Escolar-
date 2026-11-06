@@ -17,7 +17,7 @@
                     <x-campo rotulo="Eixo" para="eixo_id" obrigatorio :erro="$errors->first('eixo_id')">
                         <x-select id="eixo_id" wire:model="eixo_id">
                             @foreach ($eixos as $eixo)
-                                <option value="{{ $eixo->id }}">{{ $eixo->nome }}</option>
+                                <option value="{{ $eixo->id }}" @selected((string) $eixo_id === (string) ($eixo->id))>{{ $eixo->nome }}</option>
                             @endforeach
                         </x-select>
                     </x-campo>
@@ -63,7 +63,7 @@
                                  ajuda="No automático, cabem quantas o texto permitir, com linha de corte entre elas — e nenhuma é partida ao meio.">
                             <x-select id="por_pagina" wire:model.live="por_pagina">
                                 @foreach (App\Models\ModeloDocumento::POR_PAGINA as $valor => $rotulo)
-                                    <option value="{{ $valor }}">{{ $rotulo }}</option>
+                                    <option value="{{ $valor }}" @selected((string) $por_pagina === (string) ($valor))>{{ $rotulo }}</option>
                                 @endforeach
                             </x-select>
                         </x-campo>

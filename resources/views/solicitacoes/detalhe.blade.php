@@ -1,6 +1,9 @@
 <div class="space-y-4">
     <x-cartao>
         <x-slot:acoes>
+            @can('delete', $solicitacao)
+                <x-botao variante="discreto" class="text-rose-600 dark:text-rose-400" wire:click="pedirExclusao('solicitacao', {{ $solicitacao->id }})">Excluir</x-botao>
+            @endcan
             @if ($podeResponder)
                 <x-botao href="{{ route('solicitacoes.responder', $solicitacao) }}" wire:navigate>Responder questões</x-botao>
             @endif
@@ -238,4 +241,6 @@
             </div>
         </x-cartao>
     @endforeach
+
+    <x-confirmacao-de-exclusao :exclusao="$exclusao"/>
 </div>
